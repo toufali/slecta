@@ -12,5 +12,10 @@
   "workspaces": [
     "server",
     "client"
-  ]
+  ],
+  "overrides": {
+    "nodemon@2.0.22": {
+      "semver": "7.5.2"
+    }
+  }
 }
