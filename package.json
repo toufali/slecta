@@ -1,0 +1,16 @@
+{
+  "name": "slector",
+  "version": "1.0.0",
+  "type": "module",
+  "author": "A Toufali",
+  "license": "ISC",
+  "description": "",
+  "scripts": {
+    "start": "npm run build -w client && npm start -w server",
+    "dev": "npm run dev -w server"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ]
+}

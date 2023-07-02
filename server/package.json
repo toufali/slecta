@@ -1,0 +1,28 @@
+{
+  "name": "slector-server",
+  "version": "1.0.0",
+  "type": "module",
+  "author": "A Toufali",
+  "license": "ISC",
+  "description": "Slector back-end code, packages, and npm scripts",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "@koa/router": "^12.0.0",
+    "dotenv": "^16.3.1",
+    "koa": "^2.14.2",
+    "koa-static": "^5.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "*",
+      "../.env"
+    ],
+    "ext": "js,json,env"
+  }
+}

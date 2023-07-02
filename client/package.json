@@ -1,0 +1,15 @@
+{
+  "name": "slector-client",
+  "version": "1.0.0",
+  "type": "module",
+  "author": "A Toufali",
+  "license": "ISC",
+  "description": "Slector front-end code, packages, and npm scripts",
+  "scripts": {
+    "build": "node esbuild & npm run copy:root",
+    "copy:root": "mkdir -p dist/ && cp src/*.* dist/"
+  },
+  "dependencies": {
+    "esbuild": "^0.18.11"
+  }
+}
