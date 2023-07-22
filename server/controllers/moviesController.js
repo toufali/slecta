@@ -5,7 +5,8 @@ import { moviesDetail } from '../views/partials/moviesDetail.js'
 
 export async function getMovies(ctx) {
   const selectedGenres = ctx.query.genres ?? ''
-  const movies = await tmdbService.getMovies(selectedGenres)
+  const selectedSort = ctx.query.sort ?? 'popularity.desc'
+  const movies = await tmdbService.getMovies(selectedGenres, selectedSort)
 
   return ctx.url.includes('/api/') ? ctx.body = movies : movies
 }
@@ -20,13 +21,15 @@ export async function showMoviesList(ctx) {
   // I think this is unused.  TODO: SSR initial movies list
   const genres = await tmdbService.getGenres()
   const selectedGenres = ctx.query.genres ?? '' // string for single genre or array for multiple
+  const selectedSort = ctx.query.sort ?? 'popularity.desc'
 
   return ctx.body = mainView({
     partial: moviesList,
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
     genres,
-    selectedGenres
+    selectedGenres,
+    selectedSort
   })
 }
 

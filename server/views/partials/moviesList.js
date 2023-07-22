@@ -4,15 +4,32 @@ const genreChecklist = data => data.genres.reduce((acc, cur) => {
   <label>
     <input type='checkbox' name='genres' value='${cur.id}' ${data.selectedGenres.includes(cur.id.toString()) ? 'checked' : ''}>
     <span>${cur.name}</span>
-  </label>`
+  </label>
+  `
   return acc
 }, ``);
 
+const sortOptions = ['popularity.desc', 'popularity.asc', 'primary_release_date.desc', 'primary_release_date.asc', 'vote_average.desc', 'vote_average.asc']
+const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
+  acc += `
+  <label>
+    <input type='radio' name='sort' value='${cur}' ${data.selectedSort.includes(cur) ? 'checked' : ''}>
+    <span>${cur}</span>
+  </label>
+  `
+  return acc
+}, ``)
+
 export const moviesList = data => `
 <form action='/api/v1/movies'>
-  <p>Choose genres:</p>
-  ${genreChecklist(data)}
-  <button type='submit'>SUBMIT</button>
+  <fieldset>
+    <p>Choose genres:</p>
+    ${genreChecklist(data)}
+  </fieldset>
+  <fieldset>
+    <p>Sort by:</p>
+    ${sortRadiolist(data)}
+  </fieldset>
 </form>
 <ul class='movies-list'></ul>
 `

@@ -36,15 +36,15 @@ export const tmdbService = {
       console.error("Error fetching data:", error);
     }
   },
-  async getMovies(genres) {
+  async getMovies(with_genres, sort_by) {
     const params = new URLSearchParams({
       include_adult: false,
       include_video: false,
       language: 'en-US',
       page: 1,
-      'release_date.lte': Date.now(),
-      sort_by: 'popularity.desc',
-      with_genres: genres,
+      'primary_release_date.lte': Date.now(),
+      sort_by,
+      with_genres
     })
 
     try {
