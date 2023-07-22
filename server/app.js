@@ -1,10 +1,14 @@
-import env from "./env.js"
 import Koa from 'koa'
 import serve from "koa-static"
+
+import vars from "./env.js"
 import routes from './routes.js'
+import { tmdbService } from './services/tmdbService.js'
 
 const app = new Koa();
-const { PORT, STATIC_DIR } = env
+const { PORT, STATIC_DIR } = vars
+
+await tmdbService.init()
 
 app.use(routes)
 
