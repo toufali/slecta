@@ -36,7 +36,7 @@ export const tmdbService = {
       console.error("Error fetching data:", error);
     }
   },
-  async getMovies(with_genres, sort_by) {
+  async getMovies(with_genres, sort_by, score) {
     const params = new URLSearchParams({
       include_adult: false,
       include_video: false,
@@ -44,11 +44,12 @@ export const tmdbService = {
       page: 1,
       'primary_release_date.lte': Date.now(),
       sort_by,
+      'vote_average.gte': score / 10,
       with_genres
     })
 
     try {
-      console.log('Fetching movies from tmdb.')
+      console.log('Fetching movies from tmdb using params:', params)
       // https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=true&language=en-US&page=1&release_date.lte=2023-07-06&sort_by=popularity.desc&with_genres=878';
       const res = await fetch(`${apiUrl}/discover/movie?${params}`, { headers })
 

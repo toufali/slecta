@@ -6,7 +6,8 @@ import { moviesDetail } from '../views/partials/moviesDetail.js'
 export async function getMovies(ctx) {
   const selectedGenres = ctx.query.genres ?? ''
   const selectedSort = ctx.query.sort ?? 'popularity.desc'
-  const movies = await tmdbService.getMovies(selectedGenres, selectedSort)
+  const selectedScore = ctx.query.score ?? 60
+  const movies = await tmdbService.getMovies(selectedGenres, selectedSort, selectedScore)
 
   return ctx.url.includes('/api/') ? ctx.body = movies : movies
 }
@@ -22,6 +23,7 @@ export async function showMoviesList(ctx) {
   const genres = await tmdbService.getGenres()
   const selectedGenres = ctx.query.genres ?? '' // string for single genre or array for multiple
   const selectedSort = ctx.query.sort ?? 'popularity.desc'
+  const selectedScore = ctx.query.score ?? 60
 
   return ctx.body = mainView({
     partial: moviesList,
@@ -29,7 +31,8 @@ export async function showMoviesList(ctx) {
     partialScript: true, // defaults to true, included here for posterity
     genres,
     selectedGenres,
-    selectedSort
+    selectedSort,
+    selectedScore
   })
 }
 

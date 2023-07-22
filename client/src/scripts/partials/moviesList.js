@@ -17,6 +17,7 @@ const list = document.querySelector('[data-partial="moviesList"] ul')
 
 
 form.addEventListener('change', handleChange)
+form.elements['score'].addEventListener('input', handleScoreInput)
 form.dispatchEvent(new Event('change'))
 
 async function handleChange() {
@@ -25,6 +26,10 @@ async function handleChange() {
 
   renderMovieList(data)
   updateUrl(searchParams)
+}
+
+function handleScoreInput(e) {
+  e.target.nextElementSibling.textContent = e.target.value
 }
 
 async function getMovieData(searchParams) {

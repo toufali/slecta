@@ -30,6 +30,13 @@ export const moviesList = data => `
     <p>Sort by:</p>
     ${sortRadiolist(data)}
   </fieldset>
+  <fieldset>
+    <p>Minimum review score:</p>
+    <label>
+      <input type="range" name="score" min="0" max="100" value="${data.selectedScore}" step="1">
+      <output>${data.selectedScore}</output>
+    </label>
+  </fieldset>
 </form>
 <ul class='movies-list'></ul>
 `
