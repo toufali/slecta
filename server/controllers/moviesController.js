@@ -4,10 +4,14 @@ import { moviesList } from '../views/partials/moviesList.js'
 import { moviesDetail } from '../views/partials/moviesDetail.js'
 
 export async function getMovies(ctx) {
-  const selectedGenres = ctx.query.genres ?? ''
-  const selectedSort = ctx.query.sort ?? 'popularity.desc'
-  const selectedScore = ctx.query.score ?? 60
-  const movies = await tmdbService.getMovies(selectedGenres, selectedSort, selectedScore)
+  // TODO: this logic is split between controller and service - probably not good practice?
+  const movies = await tmdbService.getMovies({
+    genres: ctx.query.genres ?? '',
+    sort: ctx.query.sort ?? 'vote_average.desc',
+    reviewScore: ctx.query.score ?? '',
+    reviewCount: ctx.query.count ?? '',
+    years: ctx.query.years ?? '',
+  })
 
   return ctx.url.includes('/api/') ? ctx.body = movies : movies
 }
@@ -19,20 +23,23 @@ export async function getMoviesDetail(ctx) {
 }
 
 export async function showMoviesList(ctx) {
-  // I think this is unused.  TODO: SSR initial movies list
-  const genres = await tmdbService.getGenres()
-  const selectedGenres = ctx.query.genres ?? '' // string for single genre or array for multiple
-  const selectedSort = ctx.query.sort ?? 'popularity.desc'
-  const selectedScore = ctx.query.score ?? 60
+  // This is to populate initial form view. Actual movie results are triggered via client API call.
+  // Initial form values are first pulled from url query, else we set a default.
+  // TODO: SSR initial movies list
+  const allGenres = await tmdbService.getGenres()
+  const currentYear = new Date().getFullYear()
 
   return ctx.body = mainView({
     partial: moviesList,
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
-    genres,
-    selectedGenres,
-    selectedSort,
-    selectedScore
+    allGenres,
+    currentYear,
+    genres: ctx.query.genres ?? '',
+    sort: ctx.query.sort ?? 'vote_average.desc',
+    reviewScore: ctx.query.score ?? 60,
+    reviewCount: ctx.query.count ?? 50,
+    years: ctx.query.years ?? `${currentYear - 1},${currentYear}`
   })
 }
 

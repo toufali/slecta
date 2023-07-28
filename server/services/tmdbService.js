@@ -36,16 +36,20 @@ export const tmdbService = {
       console.error("Error fetching data:", error);
     }
   },
-  async getMovies(with_genres, sort_by, score) {
+  async getMovies(query) {
+    const years = query.years.split(',')
+    const genres = Array.isArray(query.genres) ? query.genres.join('|') : query.genres
     const params = new URLSearchParams({
       include_adult: false,
       include_video: false,
       language: 'en-US',
       page: 1,
-      'primary_release_date.lte': Date.now(),
-      sort_by,
-      'vote_average.gte': score / 10,
-      with_genres
+      'primary_release_date.gte': `${years[0]}-01-01`,
+      'primary_release_date.lte': `${years[1]}-12-31`,
+      sort_by: query.sort,
+      'vote_average.gte': query.reviewScore / 10,
+      'vote_count.gte': query.reviewCount,
+      with_genres: genres
     })
 
     try {

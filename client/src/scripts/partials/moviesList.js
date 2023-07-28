@@ -17,7 +17,9 @@ const list = document.querySelector('[data-partial="moviesList"] ul')
 
 
 form.addEventListener('change', handleChange)
-form.elements['score'].addEventListener('input', handleScoreInput)
+form.elements['score'].addEventListener('input', handleInput)
+form.elements['count'].addEventListener('input', handleInput)
+form.elements['years'].addEventListener('input', handleInput)
 form.dispatchEvent(new Event('change'))
 
 async function handleChange() {
@@ -28,8 +30,20 @@ async function handleChange() {
   updateUrl(searchParams)
 }
 
-function handleScoreInput(e) {
-  e.target.nextElementSibling.textContent = e.target.value
+function handleInput(e) {
+  const outputEl = e.target.parentElement.querySelector('output')
+
+  switch (e.target.name) {
+    case 'score':
+      outputEl.textContent = e.target.value
+      break
+    case 'count':
+      outputEl.textContent = e.target.value
+      break
+    case 'years':
+      outputEl.textContent = e.target.value.join(' - ')
+      break
+  }
 }
 
 async function getMovieData(searchParams) {

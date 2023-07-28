@@ -1,8 +1,8 @@
-const genreChecklist = data => data.genres.reduce((acc, cur) => {
-  // selectedGenres can be a string '27' or array ['27', '878']. The includes() function should work on both.
+const genreChecklist = data => data.allGenres.reduce((acc, cur) => {
+  // data.genres can be a string '27' or array ['27', '878']. The includes() function should work on both.
   acc += `
   <label>
-    <input type='checkbox' name='genres' value='${cur.id}' ${data.selectedGenres.includes(cur.id.toString()) ? 'checked' : ''}>
+    <input type='checkbox' name='genres' value='${cur.id}' ${data.genres.includes(cur.id.toString()) ? 'checked' : ''}>
     <span>${cur.name}</span>
   </label>
   `
@@ -13,7 +13,7 @@ const sortOptions = ['popularity.desc', 'popularity.asc', 'primary_release_date.
 const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
   acc += `
   <label>
-    <input type='radio' name='sort' value='${cur}' ${data.selectedSort.includes(cur) ? 'checked' : ''}>
+    <input type='radio' name='sort' value='${cur}' ${data.sort.includes(cur) ? 'checked' : ''}>
     <span>${cur}</span>
   </label>
   `
@@ -33,8 +33,18 @@ export const moviesList = data => `
   <fieldset>
     <p>Minimum review score:</p>
     <label>
-      <input type="range" name="score" min="0" max="100" value="${data.selectedScore}" step="1">
-      <output>${data.selectedScore}</output>
+      <input type="range" name="score" min="0" max="100" value="${data.reviewScore}" step="1">
+      <output>${data.reviewScore}</output>
+    </label>
+    <p>Minimum review count:</p>
+    <label>
+      <input type="range" name="count" min="10" max="1000" value="${data.reviewCount}" step="10">
+      <output>${data.reviewCount}</output>
+    </label>
+    <p>Release date:</p>
+    <label>
+      <range-slider name="years" min='1900' max='${data.currentYear}' value='${data.years}'></range-slider>
+      <output>${data.years.split(',').join(' - ')}</output>
     </label>
   </fieldset>
 </form>
