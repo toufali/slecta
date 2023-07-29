@@ -53,23 +53,14 @@ async function getMovieData(searchParams) {
   return data
 }
 
-function renderMovieList(data) {
+function renderMovieList(movies) {
   const movieItems = []
-  const { results: movies } = data
 
   movies.forEach(movie => {
     const item = document.createElement('li')
     const movieCard = document.createElement('movie-card')
 
-    movieCard.data = {
-      id: movie.id,
-      title: movie.title,
-      releaseDate: movie.release_date,
-      imgBaseUrl: data.secureBaseUrl,
-      posterSizes: data.posterSizes,
-      posterFilename: movie.poster_path,
-      voteAverage: movie.vote_average
-    }
+    movieCard.data = movie
 
     item.append(movieCard)
     movieItems.push(item)

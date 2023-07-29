@@ -61,10 +61,15 @@ export const tmdbService = {
 
       const json = await res.json()
 
-      json.secureBaseUrl = this.config.images.secure_base_url
-      json.posterSizes = this.config.images.poster_sizes
-
-      return json
+      return json.results.map(item => new Object({
+        id: item.id,
+        title: item.title,
+        genres: item.genre_ids,
+        releaseDate: item.release_date,
+        posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}/${item.poster_path}`,
+        overview: item.overview,
+        reviewScore: item.vote_average
+      }))
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -84,6 +89,26 @@ export const tmdbService = {
       json.backdropSizes = this.config.images.backdrop_sizes
 
       return json
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  },
+  async getMoviesTrailer(id) {
+    try {
+      console.log('Fetching movie trailer from tmdb.')
+      // https://api.themoviedb.org/3/movie/{movie_id}/videos
+      const res = await fetch(`${apiUrl}/movie/${id}/videos`, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const json = await res.json()
+
+      console.log(json)
+
+      const ytTrailers = json.results.filter(item => /youtube/i.test(item.site))
+      const trailer = ytTrailers.find(item => /trailer/i.test(item.type)) ?? json.results.find(item => /teaser/i.test(item.type)) ?? json.results.find(item => /clip/i.test(item.type))
+
+      return trailer ?? {}
     } catch (error) {
       console.error("Error fetching data:", error);
     }

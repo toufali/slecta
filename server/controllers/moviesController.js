@@ -22,10 +22,16 @@ export async function getMoviesDetail(ctx) {
   return ctx.url.includes('/api/') ? ctx.body = movie : movie
 }
 
+export async function getMoviesTrailer(ctx) {
+  const trailer = await tmdbService.getMoviesTrailer(ctx.params.id)
+
+  return ctx.url.includes('/api/') ? ctx.body = trailer : trailer
+}
+
 export async function showMoviesList(ctx) {
   // This is to populate initial form view. Actual movie results are triggered via client API call.
   // Initial form values are first pulled from url query, else we set a default.
-  // TODO: SSR initial movies list
+  // TODO: get and store genres on server start?
   const allGenres = await tmdbService.getGenres()
   const currentYear = new Date().getFullYear()
 
@@ -53,4 +59,3 @@ export async function showMoviesDetail(ctx) {
     movie
   })
 }
-
