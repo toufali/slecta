@@ -6,7 +6,8 @@ import { moviesDetail } from '../views/partials/moviesDetail.js'
 export async function getMovies(ctx) {
   // TODO: this logic is split between controller and service - probably not good practice?
   const movies = await tmdbService.getMovies({
-    genres: ctx.query.genres ?? '',
+    withGenres: ctx.query.wg ?? '',
+    withoutGenres: ctx.query.wog ?? '',
     sort: ctx.query.sort ?? 'vote_average.desc',
     reviewScore: ctx.query.score ?? '',
     reviewCount: ctx.query.count ?? '',
@@ -39,10 +40,11 @@ export async function showMoviesList(ctx) {
     partialScript: true, // defaults to true, included here for posterity
     allGenres: tmdbService.genres,
     currentYear,
-    genres: ctx.query.genres ?? '',
+    withGenres: ctx.query.wg ?? '',
+    withoutGenres: ctx.query.wog ?? '',
     sort: ctx.query.sort ?? 'vote_average.desc',
     reviewScore: ctx.query.score ?? 60,
-    reviewCount: ctx.query.count ?? 50,
+    reviewCount: ctx.query.count ?? 100,
     years: ctx.query.years ?? `${currentYear - 1},${currentYear}`
   })
 }

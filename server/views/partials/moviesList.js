@@ -1,10 +1,23 @@
-const genreChecklist = data => {
+const withGenres = data => {
   let html = ''
 
-  // data.genres can be a string '27' or array ['27', '878']. The includes() function should work on both.
+  // data.withGenres can be a string '27' or array ['27', '878']. The includes() function should work on both.
   for (const [id, name] of data.allGenres) html += `
   <label>
-    <input type='checkbox' name='genres' value='${id}' ${data.genres.includes(id.toString()) ? 'checked' : ''}>
+    <input type='checkbox' name='wg' value='${id}' ${data.withGenres.includes(id.toString()) ? 'checked' : ''}>
+    <span>${name}</span>
+  </label>
+  `
+  return html
+}
+
+const withoutGenres = data => {
+  let html = ''
+
+  // data.withoutGenres can be a string '27' or array ['27', '878']. The includes() function should work on both.
+  for (const [id, name] of data.allGenres) html += `
+  <label>
+    <input type='checkbox' name='wog' value='${id}' ${data.withoutGenres.includes(id.toString()) ? 'checked' : ''}>
     <span>${name}</span>
   </label>
   `
@@ -25,8 +38,12 @@ const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
 export const moviesList = data => `
 <form action='/api/v1/movies'>
   <fieldset>
-    <p>Choose genres:</p>
-    ${genreChecklist(data)}
+    <p>Include genres:</p>
+    ${withGenres(data)}
+  </fieldset>
+  <fieldset>
+    <p>Exclude genres:</p>
+    ${withoutGenres(data)}
   </fieldset>
   <fieldset>
     <p>Sort by:</p>

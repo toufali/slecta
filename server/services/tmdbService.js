@@ -45,7 +45,7 @@ export const tmdbService = {
   },
   async getMovies(query) {
     const years = query.years.split(',')
-    const genres = Array.isArray(query.genres) ? query.genres.join('|') : query.genres
+    const withGenres = Array.isArray(query.withGenres) ? query.withGenres.join('|') : query.withGenres
     const params = new URLSearchParams({
       include_adult: false,
       include_video: false,
@@ -56,7 +56,8 @@ export const tmdbService = {
       sort_by: query.sort,
       'vote_average.gte': query.reviewScore / 10,
       'vote_count.gte': query.reviewCount,
-      with_genres: genres
+      with_genres: withGenres,
+      without_genres: query.withoutGenres
     })
 
     try {

@@ -57,7 +57,7 @@ customElements.define('movie-card', class extends HTMLElement {
     if (!res.ok) return console.info('Unable to load trailer:', res.status, res.statusText)
 
     const data = await res.json()
-    console.log(data)
+
     if (!data.key) return console.info('Unable to load trailer: key is undefined')
 
     this.detailsEl.insertAdjacentHTML('beforeend', `<iframe 
