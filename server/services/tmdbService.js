@@ -9,22 +9,29 @@ const headers = {
 
 export const tmdbService = {
   config: null,
+  genres: null,
   async init() {
+    const [config, genres] = await Promise.all([this.getConfig(), this.getGenres()])
+
+    this.config = config
+    this.genres = genres
+    console.info('TMDB init complete.')
+    console.info('image config:', config.images)
+    console.info('genres:', genres)
+  },
+  async getConfig() {
     try {
-      console.log('Fetching config from tmdb. We should really cache this.')
       const res = await fetch(`${apiUrl}/configuration`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-      this.config = await res.json()
-      console.log(this.config)
+      return await res.json()
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error getting TMDB config:", error);
     }
   },
   async getGenres() {
     try {
-      console.log('Fetching genres from tmdb. We should really cache this.')
       const res = await fetch(`${apiUrl}/genre/movie/list?language=en`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -33,7 +40,7 @@ export const tmdbService = {
 
       return genres
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error getting TMDB genres:", error);
     }
   },
   async getMovies(query) {

@@ -31,15 +31,13 @@ export async function getMoviesTrailer(ctx) {
 export async function showMoviesList(ctx) {
   // This is to populate initial form view. Actual movie results are triggered via client API call.
   // Initial form values are first pulled from url query, else we set a default.
-  // TODO: get and store genres on server start?
-  const allGenres = await tmdbService.getGenres()
   const currentYear = new Date().getFullYear()
 
   return ctx.body = mainView({
     partial: moviesList,
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
-    allGenres,
+    allGenres: tmdbService.genres,
     currentYear,
     genres: ctx.query.genres ?? '',
     sort: ctx.query.sort ?? 'vote_average.desc',
