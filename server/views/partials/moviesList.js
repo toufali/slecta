@@ -1,13 +1,15 @@
-const genreChecklist = data => data.allGenres.reduce((acc, cur) => {
+const genreChecklist = data => {
+  let html = ''
+
   // data.genres can be a string '27' or array ['27', '878']. The includes() function should work on both.
-  acc += `
+  for (const [id, name] of data.allGenres) html += `
   <label>
-    <input type='checkbox' name='genres' value='${cur.id}' ${data.genres.includes(cur.id.toString()) ? 'checked' : ''}>
-    <span>${cur.name}</span>
+    <input type='checkbox' name='genres' value='${id}' ${data.genres.includes(id.toString()) ? 'checked' : ''}>
+    <span>${name}</span>
   </label>
   `
-  return acc
-}, ``);
+  return html
+}
 
 const sortOptions = ['popularity.desc', 'popularity.asc', 'primary_release_date.desc', 'primary_release_date.asc', 'vote_average.desc', 'vote_average.asc']
 const sortRadiolist = data => sortOptions.reduce((acc, cur) => {

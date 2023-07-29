@@ -18,7 +18,7 @@ const html = data => `
     <span>${Math.round(data.reviewScore * 10)}%</span>
   </summary>
   <p>${data.overview}</p>
-  <p>${data.genres}</p>
+  <p>${data.genres.join(', ')}</p>
 </details>
 `
 

@@ -38,7 +38,7 @@ export const tmdbService = {
 
       const { genres } = await res.json()
 
-      return genres
+      return new Map(genres.map(genre => [genre.id, genre.name]))
     } catch (error) {
       console.error("Error getting TMDB genres:", error);
     }
@@ -71,7 +71,7 @@ export const tmdbService = {
       return json.results.map(item => new Object({
         id: item.id,
         title: item.title,
-        genres: item.genre_ids,
+        genres: item.genre_ids.map(id => this.genres.get(id)),
         releaseDate: item.release_date,
         posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}/${item.poster_path}`,
         overview: item.overview,
