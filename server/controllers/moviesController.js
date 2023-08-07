@@ -1,32 +1,24 @@
-import { tmdbService } from '../services/tmdbService.js'
+import { tmdb } from '../services/tmdb.js'
 import { mainView } from '../views/mainView.js'
 import { moviesList } from '../views/partials/moviesList.js'
 import { moviesDetail } from '../views/partials/moviesDetail.js'
 
 export async function getMovies(ctx) {
-  // TODO: this logic is split between controller and service - probably not good practice?
-  const movies = await tmdbService.getMovies({
-    withGenres: ctx.query.wg ?? '',
-    withoutGenres: ctx.query.wog ?? '',
-    sort: ctx.query.sort ?? 'vote_average.desc',
-    reviewScore: ctx.query.score ?? '',
-    reviewCount: ctx.query.count ?? '',
-    years: ctx.query.years ?? '',
-  })
+  const movies = ctx.state.cacheData ?? await tmdb.getMovies(ctx.query)
 
-  return ctx.url.includes('/api/') ? ctx.body = movies : movies
+  return ctx.body = movies
 }
 
 export async function getMoviesDetail(ctx) {
-  const movie = await tmdbService.getMoviesDetail(ctx.params.id)
+  const movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
 
-  return ctx.url.includes('/api/') ? ctx.body = movie : movie
+  return ctx.body = movie
 }
 
 export async function getMoviesTrailer(ctx) {
-  const trailer = await tmdbService.getMoviesTrailer(ctx.params.id)
+  const trailer = ctx.state.cacheData ?? await tmdb.getMoviesTrailer(ctx.params.id)
 
-  return ctx.url.includes('/api/') ? ctx.body = trailer : trailer
+  return ctx.body = trailer
 }
 
 export async function showMoviesList(ctx) {
@@ -38,7 +30,7 @@ export async function showMoviesList(ctx) {
     partial: moviesList,
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
-    allGenres: tmdbService.genres,
+    allGenres: tmdb.genres,
     currentYear,
     withGenres: ctx.query.wg ?? '',
     withoutGenres: ctx.query.wog ?? '',
@@ -50,7 +42,9 @@ export async function showMoviesList(ctx) {
 }
 
 export async function showMoviesDetail(ctx) {
-  const movie = await getMoviesDetail(ctx)
+  const movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
+
+  ctx.state.data = movie // used for cache miss when response type is not JSON
 
   return ctx.body = mainView({
     partial: moviesDetail,

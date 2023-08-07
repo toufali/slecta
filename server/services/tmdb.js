@@ -6,8 +6,17 @@ const headers = {
   accept: 'application/json',
   Authorization: `Bearer ${TMDB_TOKEN}`
 }
+const defaults = {
+  scoreMin: 6,
+  countMin: 100,
+  language: 'en-US',
+  includeAdult: false,
+  includeVideo: false, // true value doesn't work as of this writing
+  dateMin: `${new Date().getFullYear() - 1}-01-01`,
+  sort: 'vote_average.desc',
+}
 
-export const tmdbService = {
+export const tmdb = {
   config: null,
   genres: null,
   async init() {
@@ -26,8 +35,8 @@ export const tmdbService = {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       return await res.json()
-    } catch (error) {
-      console.error("Error getting TMDB config:", error);
+    } catch (e) {
+      console.error("Error getting TMDB config:", e);
     }
   },
   async getGenres() {
@@ -39,37 +48,41 @@ export const tmdbService = {
       const { genres } = await res.json()
 
       return new Map(genres.map(genre => [genre.id, genre.name]))
-    } catch (error) {
-      console.error("Error getting TMDB genres:", error);
+    } catch (e) {
+      console.error("Error getting TMDB genres:", e);
     }
   },
   async getMovies(query) {
-    const years = query.years.split(',')
-    const withGenres = Array.isArray(query.withGenres) ? query.withGenres.join('|') : query.withGenres
-    const params = new URLSearchParams({
-      include_adult: false,
-      include_video: false,
-      language: 'en-US',
-      page: 1,
-      'primary_release_date.gte': `${years[0]}-01-01`,
-      'primary_release_date.lte': `${years[1]}-12-31`,
-      sort_by: query.sort,
-      'vote_average.gte': query.reviewScore / 10,
-      'vote_count.gte': query.reviewCount,
-      with_genres: withGenres,
-      without_genres: query.withoutGenres
-    })
+    const years = query.years ? query.years.split(',') : []
+    const dateMin = years[0] ? `${years[0]}-01-01` : defaults.dateMin
+    const dateMax = years[1] ? `${years[1]}-12-31` : undefined
+    const params = {
+      include_adult: defaults.includeAdult,
+      include_video: defaults.includeVideo,
+      language: defaults.language,
+      'primary_release_date.gte': dateMin,
+      'primary_release_date.lte': dateMax,
+      sort_by: query.sort ?? defaults.sort,
+      'vote_average.gte': query.score ? query.score / 10 : defaults.scoreMin,
+      'vote_count.gte': query.count ?? defaults.countMin,
+      with_genres: Array.isArray(query.wg) ? query.wg.join('|') : query.wg,
+      without_genres: query.wog
+    }
+
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === '') {
+        delete params[key]
+      }
+    }
 
     try {
-      console.log('Fetching movies from tmdb using params:', params)
       // https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=true&language=en-US&page=1&release_date.lte=2023-07-06&sort_by=popularity.desc&with_genres=878';
-      const res = await fetch(`${apiUrl}/discover/movie?${params}`, { headers })
+      const res = await fetch(`${apiUrl}/discover/movie?${new URLSearchParams(params)}`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
-
-      return json.results.map(item => new Object({
+      const movies = json.results.map(item => new Object({
         id: item.id,
         title: item.title,
         genres: item.genre_ids.map(id => this.genres.get(id)),
@@ -78,13 +91,14 @@ export const tmdbService = {
         overview: item.overview,
         reviewScore: item.vote_average
       }))
-    } catch (error) {
-      console.error("Error fetching data:", error);
+
+      return { movies }
+    } catch (e) {
+      console.error("Error fetching data:", e);
     }
   },
   async getMoviesDetail(id) {
     try {
-      console.log('Fetching movie detail from tmdb.')
       // https://api.themoviedb.org/3/movie/{movie_id}
       const res = await fetch(`${apiUrl}/movie/${id}`, { headers })
 
@@ -97,28 +111,24 @@ export const tmdbService = {
       json.backdropSizes = this.config.images.backdrop_sizes
 
       return json
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (e) {
+      console.error("Error fetching data:", e);
     }
   },
   async getMoviesTrailer(id) {
     try {
-      console.log('Fetching movie trailer from tmdb.')
       // https://api.themoviedb.org/3/movie/{movie_id}/videos
       const res = await fetch(`${apiUrl}/movie/${id}/videos`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
-
-      console.log(json)
-
       const ytTrailers = json.results.filter(item => /youtube/i.test(item.site))
       const trailer = ytTrailers.find(item => /trailer/i.test(item.type)) ?? json.results.find(item => /teaser/i.test(item.type)) ?? json.results.find(item => /clip/i.test(item.type))
 
       return trailer ?? {}
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (e) {
+      console.error("Error fetching data:", e);
     }
   }
 }

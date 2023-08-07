@@ -48,9 +48,9 @@ function handleInput(e) {
 
 async function getMovieData(searchParams) {
   const res = await fetch(`${form.action}?${searchParams}`)
-  const data = await res.json()
+  const { movies } = await res.json().catch(e => console.error(e))
 
-  return data
+  return movies
 }
 
 function renderMovieList(movies) {

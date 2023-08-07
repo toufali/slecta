@@ -3,12 +3,14 @@ import serve from "koa-static"
 
 import vars from "./env.js"
 import routes from './routes.js'
-import { tmdbService } from './services/tmdbService.js'
+import { redis } from './services/redis.js'
+import { tmdb } from './services/tmdb.js'
 
 const app = new Koa();
 const { PORT, STATIC_DIR } = vars
 
-await tmdbService.init()
+await redis.init()
+await tmdb.init()
 
 app.use(routes)
 
