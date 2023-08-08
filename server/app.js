@@ -1,13 +1,13 @@
 import Koa from 'koa'
 import serve from "koa-static"
 
-import vars from "./env.js"
+import env from "./env.js"
 import routes from './routes.js'
 import { redis } from './services/redis.js'
 import { tmdb } from './services/tmdb.js'
 
 const app = new Koa();
-const { PORT, STATIC_DIR } = vars
+const { PORT, STATIC_DIR } = env
 
 await redis.init()
 await tmdb.init()
