@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import env from "../env.js"
 
 let client
 
@@ -6,7 +7,9 @@ export const redis = {
   async init() {
     if (client) return console.info('Redis client already connected.')
 
-    client = createClient()
+    client = createClient({
+      url: `redis://${env.REDISHOST}:${env.REDISPORT}`
+    })
     client.on('error', err => console.log('Redis Client Error', err))
     await client.connect()
     console.info('Redis client connected.')

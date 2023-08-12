@@ -7,7 +7,9 @@ const env = {
 }
 
 const requiredKeys = [
-  'TMDB_TOKEN'
+  'TMDB_TOKEN',
+  'REDISHOST',
+  'REDISPORT'
 ]
 
 const optionalKeys = [
