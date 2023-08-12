@@ -19,6 +19,7 @@ const defaults = {
 export const tmdb = {
   config: null,
   genres: null,
+
   async init() {
     const [config, genres] = await Promise.all([this.getConfig(), this.getGenres()])
 
@@ -28,6 +29,7 @@ export const tmdb = {
     console.info('image config:', config.images)
     console.info('genres:', genres)
   },
+
   async getConfig() {
     try {
       const res = await fetch(`${apiUrl}/configuration`, { headers })
@@ -39,6 +41,7 @@ export const tmdb = {
       console.error("Error getting TMDB config:", e);
     }
   },
+
   async getGenres() {
     try {
       const res = await fetch(`${apiUrl}/genre/movie/list?language=en`, { headers })
@@ -52,6 +55,7 @@ export const tmdb = {
       console.error("Error getting TMDB genres:", e);
     }
   },
+
   async getMovies(query) {
     const years = query.years ? query.years.split(',') : []
     const dateMin = years[0] ? `${years[0]}-01-01` : defaults.dateMin
@@ -97,6 +101,7 @@ export const tmdb = {
       console.error("Error fetching data:", e);
     }
   },
+
   async getMoviesDetail(id) {
     try {
       // https://api.themoviedb.org/3/movie/{movie_id}
@@ -115,6 +120,7 @@ export const tmdb = {
       console.error("Error fetching data:", e);
     }
   },
+
   async getMoviesTrailer(id) {
     try {
       // https://api.themoviedb.org/3/movie/{movie_id}/videos

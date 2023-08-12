@@ -19,6 +19,7 @@ const html = data => `
   </summary>
   <p>${data.overview}</p>
   <p>${data.genres.join(', ')}</p>
+  <p><a href='/movies/${data.id}'>More details</a></p>
 </details>
 `
 

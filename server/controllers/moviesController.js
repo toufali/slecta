@@ -44,12 +44,12 @@ export async function showMoviesList(ctx) {
 export async function showMoviesDetail(ctx) {
   const movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
 
-  ctx.state.data = movie // used for cache miss when response type is not JSON
+  ctx.state.data = movie // pass JSON data back to cache when response body is text/html
 
   return ctx.body = mainView({
     partial: moviesDetail,
     partialStyle: true, // defaults to true, included here for posterity
-    partialScript: false, // defaults to true, included here for posterity
+    partialScript: false,
     movie
   })
 }

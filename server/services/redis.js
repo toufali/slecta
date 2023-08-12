@@ -14,6 +14,7 @@ export const redis = {
     await client.connect()
     console.info('Redis client connected.')
   },
+
   async cache(ctx, next) {
     const key = JSON.stringify(ctx.path + ctx.search)
     let value
