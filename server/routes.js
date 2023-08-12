@@ -4,6 +4,7 @@ import { getMovies, getMoviesDetail, getMoviesTrailer, showMoviesList, showMovie
 
 const router = new Router();
 
+router.get('/', showMoviesList);
 router.get('/movies', showMoviesList);
 router.get('/movies/:id', redis.cache, showMoviesDetail);
 
