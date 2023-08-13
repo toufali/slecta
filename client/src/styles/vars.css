@@ -1,0 +1,17 @@
+:root{
+  --multiplier: 1;
+  --min-width: 320px;
+  --max-width: 1200px;
+  --mobile-breakpoint: 480px;
+  --border-radius: 4px;
+  --checkbox-w: 20px;
+  --padding-sm: calc(8px * var(--multiplier));
+  --padding-md: calc(16px * var(--multiplier));
+  --padding-lg: calc(32px * var(--multiplier));
+  --gap: calc(32px * var(--multiplier));
+
+  --h1-font: 600 2.5rem/1 'Quicksand','Inter', sans-serif;
+  --h2-font: 600 1.75rem/1 'Quicksand','Inter', sans-serif;
+  --h3-font: 600 1.25rem/1 'Quicksand','Inter', sans-serif;
+  --h4-font: 600 1.125rem/1 'Quicksand','Inter', sans-serif;
+}

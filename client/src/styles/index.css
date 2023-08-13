@@ -1,4 +1,6 @@
 /* Use this file to load global styles. Partial styles should be loaded directly from the partial using <link rel='stylesheet'> */
 
-@import url('./vars.css');
-@import url('./global.css');
+/* @import url('./normalize.css'); */
+@import './fonts.css';
+@import './vars.css';
+@import './global.css';

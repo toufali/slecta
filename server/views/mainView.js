@@ -2,7 +2,7 @@ export const mainView = data => `
      <!doctype html>
      <html lang=en>
        <head>
-         <title>Slector</title>
+         <title>SLECTA</title>
  
          <meta charset='utf-8'>
          <meta name='viewport' content='width=320, initial-scale=1'>
@@ -17,7 +17,9 @@ export const mainView = data => `
          <meta property='og:type' content='website'>
          <meta property='og:url' content=''>
          <meta property='og:image' content=''>
- 
+         <link rel="preconnect" href="https://fonts.googleapis.com">
+         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+         <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
          <link rel='stylesheet' href='/styles/index.css' type='text/css'>
          ${!data.partialStyle ? '' : `<link rel='stylesheet' href='/styles/partials/${data.partial.name}.css' type='text/css'>`}
          <link rel='icon' href='data:,' sizes='16x16'>
@@ -33,7 +35,7 @@ export const mainView = data => `
       </head>
        <body>
          <header>
-          <h1>Slector</h1>
+          <h1>SLECTA</h1>
          </header>
  
          <main data-partial='${data.partial.name}'>
