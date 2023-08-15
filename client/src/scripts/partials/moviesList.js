@@ -2,6 +2,7 @@ import '../components/movieCard.js'
 
 const form = document.querySelector('[data-partial="moviesList"] form')
 const list = document.querySelector('[data-partial="moviesList"] ul')
+const formToggle = document.querySelector('.form-toggle')
 // const state = new Proxy({
 //   searchParams: null,
 // }, {
@@ -20,6 +21,7 @@ form.addEventListener('change', handleChange)
 form.elements['score'].addEventListener('input', handleInput)
 form.elements['count'].addEventListener('input', handleInput)
 form.elements['years'].addEventListener('input', handleInput)
+formToggle.addEventListener('mousedown', handleMouseEvent)
 form.dispatchEvent(new Event('change'))
 
 async function handleChange() {
@@ -44,6 +46,10 @@ function handleInput(e) {
       outputEl.textContent = e.target.value.join(' - ')
       break
   }
+}
+
+function handleMouseEvent(e) {
+  form.toggleAttribute('hidden', form.getAttribute('hidden') === null)
 }
 
 async function getMovieData(searchParams) {

@@ -14,4 +14,12 @@
   --h2-font: 600 1.75rem/1 'Quicksand','Inter', sans-serif;
   --h3-font: 600 1.25rem/1 'Quicksand','Inter', sans-serif;
   --h4-font: 600 1.125rem/1 'Quicksand','Inter', sans-serif;
+
+  --blue-10: #20232b;
+  --blue-30: #3b444f;
+  --blue-50: #3e79b4;
+  --red-50: #a45a52;
+  --yellow-50: #daa520;
+  --green-50: #52948e;
+  --gray-90: #edeae0;
 }

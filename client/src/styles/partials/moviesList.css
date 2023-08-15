@@ -1,4 +1,20 @@
 [data-partial='moviesList'] form {
+  position: fixed;
   display: flex;
   flex-direction: column;
+  background: var(--blue-30);
+  transition: transform .2s ease-out;
+  z-index: 1;
+  overflow-y: auto;
+  max-height: 100vh;
+  top: 0;
+}
+
+[data-partial='moviesList'] form[hidden] {
+  transform: translateX(-100%);
+}
+
+.form-toggle {
+  position: fixed;
+  bottom: 0;
 }
