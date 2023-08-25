@@ -16,20 +16,18 @@ const formToggle = document.querySelector('.form-toggle')
 //   }
 // })
 
-
-form.addEventListener('change', handleChange)
+formToggle.addEventListener('mousedown', handleMouseEvent)
 form.elements['score'].addEventListener('input', handleInput)
 form.elements['count'].addEventListener('input', handleInput)
 form.elements['years'].addEventListener('input', handleInput)
-formToggle.addEventListener('mousedown', handleMouseEvent)
-form.dispatchEvent(new Event('change'))
+form.addEventListener('change', handleChange)
+form.addEventListener('submit', handleSubmit)
+handleSubmit()
 
-async function handleChange() {
-  const searchParams = new URLSearchParams(new FormData(form))
-  const data = await getMovieData(searchParams)
-
-  renderMovieList(data)
-  updateUrl(searchParams)
+function handleChange(e) {
+  if (document.documentElement.hasAttribute('desktop')) {
+    handleSubmit() // "live" update on change for desktop only
+  }
 }
 
 function handleInput(e) {
@@ -52,11 +50,35 @@ function handleMouseEvent(e) {
   form.toggleAttribute('hidden', form.getAttribute('hidden') === null)
 }
 
-async function getMovieData(searchParams) {
-  const res = await fetch(`${form.action}?${searchParams}`)
-  const { movies } = await res.json().catch(e => console.error(e))
+async function handleSubmit(e) {
+  console.log('handleSubmit')
+  if (e) e.preventDefault()
 
-  return movies
+  const searchParams = new URLSearchParams(new FormData(form))
+  const data = await getMovieData(searchParams)
+
+  renderMovieList(data)
+  updateUrl(searchParams)
+  if (!document.documentElement.hasAttribute('desktop')) {
+    form.toggleAttribute('hidden', true) // hide filter panel for mobile only
+  }
+}
+
+async function getMovieData(searchParams) {
+  let movieData
+
+  try {
+    const res = await fetch(`${form.action}?${searchParams}`)
+
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+    const { movies } = await res.json()
+    movieData = movies
+  } catch (e) {
+    console.error(e)
+  }
+
+  return movieData
 }
 
 function renderMovieList(movies) {
