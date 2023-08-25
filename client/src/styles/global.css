@@ -54,6 +54,7 @@ a {
 button,
 .button {
   all: unset;
+  box-sizing: border-box;
   display: inline-block;
   text-align: center;
   cursor: pointer;
@@ -72,6 +73,35 @@ button.primary,
 button.primary:enabled:hover,
 .button.primary:enabled:hover {
   filter: brightness(1.3);
+}
+
+details {
+  border-top: 1px solid var(--blue-10);
+  border-bottom: 1px solid var(--blue-10);
+  border-radius: var(--border-radius);
+}
+
+summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--padding-lg);
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none; /* Safari 16 */
+}
+
+summary::after {
+  content: '+';
+  font: var(--h2-font);
+  transition: transform 0.2s ease-out;
+}
+
+details[open] > summary::after {
+  transform: rotate(-45deg);
 }
 
 fieldset {

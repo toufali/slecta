@@ -1,20 +1,58 @@
-[data-partial='moviesList'] form {
+form {
   position: fixed;
   display: flex;
   flex-direction: column;
   background: var(--blue-30);
-  transition: transform .2s ease-out;
+  transition: transform .2s ease-out, opacity .2s ease-out;
   z-index: 1;
   overflow-y: auto;
-  max-height: 100vh;
+  height: 100vh;
   top: 0;
 }
 
-[data-partial='moviesList'] form[hidden] {
-  transform: translateX(-100%);
+form[hidden] {
+  transform: translateX(50%);
+  opacity: 0;
+}
+
+fieldset {
+  padding: var(--padding-md) var(--padding-lg);
+}
+
+fieldset > :first-child {
+  color: var(--yellow-50);
+}
+
+fieldset + fieldset {
+  border-top: 1px solid var(--blue-10);
+}
+
+summary {
+  font: var(--h4-font);
+}
+
+button[type="submit"] {
+  margin: var(--padding-lg);
+}
+
+[desktop] [data-partial='moviesList'] {
+  display: flex;
+}
+
+[desktop] form{
+  right: 0;
+  transform: none;
+  opacity: 1;
+  width: clamp(var(--min-width), 40%, 480px);
 }
 
 .form-toggle {
   position: fixed;
-  bottom: 0;
+  bottom: var(--padding-lg);
+  left: var(--padding-lg);
+  width: calc(100vw - var(--padding-lg) * 2);
+}
+
+[desktop] .form-toggle {
+  display: none;
 }
