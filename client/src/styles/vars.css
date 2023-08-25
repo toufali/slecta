@@ -2,8 +2,8 @@
   --multiplier: 1;
   --min-width: 320px;
   --max-width: 1200px;
-  --mobile-breakpoint: 480px;
-  --border-radius: 4px;
+  --desktop-breakpoint: 768px;
+  --border-radius: 6px;
   --checkbox-w: 20px;
   --padding-sm: calc(8px * var(--multiplier));
   --padding-md: calc(16px * var(--multiplier));
@@ -22,4 +22,10 @@
   --yellow-50: #daa520;
   --green-50: #52948e;
   --gray-90: #edeae0;
+}
+
+@media (width <= 768px) {
+  :root {
+    --multiplier: 0.75;
+  }
 }
