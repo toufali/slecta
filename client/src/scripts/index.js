@@ -2,3 +2,4 @@
 
 import './components/rangeSlider.js'
 import './app.js'
+import './matchMedia.js'
