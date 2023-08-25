@@ -31,32 +31,72 @@ export const tmdb = {
   },
 
   async getConfig() {
+    let config
     try {
+      // TODO: use Redis to store this, especially for offline
       const res = await fetch(`${apiUrl}/configuration`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-      return await res.json()
+      config = await res.json() 
     } catch (e) {
-      console.error("Error getting TMDB config:", e);
+      console.error("Error getting TMDB config:", e)
+      console.info('Fallback using mock config.')
+      config = {
+        images: {
+          base_url: 'http://image.tmdb.org/t/p/',
+          secure_base_url: 'https://image.tmdb.org/t/p/',
+          backdrop_sizes: ['w300', 'w780', 'w1280', 'original'],
+          logo_sizes: ['w45', 'w92', 'w154', 'w185', 'w300', 'w500', 'original'],
+          poster_sizes: ['w92', 'w154', 'w185', 'w342', 'w500', 'w780', 'original'],
+          profile_sizes: ['w45', 'w185', 'h632', 'original'],
+          still_sizes: ['w92', 'w185', 'w300', 'original']
+        }
+      }
     }
+    return config
   },
 
   async getGenres() {
+    let genres
     try {
+      // TODO: use Redis to store this, especially for offline
       const res = await fetch(`${apiUrl}/genre/movie/list?language=en`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-      const { genres } = await res.json()
+      const { genres: genresArr } = await res.json()
 
-      return new Map(genres.map(genre => [genre.id, genre.name]))
+      genres = new Map(genresArr.map(genre => [genre.id, genre.name]))
     } catch (e) {
-      console.error("Error getting TMDB genres:", e);
+      console.error("Error getting TMDB genres:", e)
+      console.info('Fallback using mock genres data.')
+      genres = new Map([
+        [28, 'Action'],
+        [12, 'Adventure'],
+        [16, 'Animation'],
+        [35, 'Comedy'],
+        [80, 'Crime'],
+        [99, 'Documentary'],
+        [18, 'Drama'],
+        [10751, 'Family'],
+        [14, 'Fantasy'],
+        [36, 'History'],
+        [27, 'Horror'],
+        [10402, 'Music'],
+        [9648, 'Mystery'],
+        [10749, 'Romance'],
+        [878, 'Science Fiction'],
+        [10770, 'TV Movie'],
+        [53, 'Thriller'],
+        [10752, 'War'],
+        [37, 'Western']])
     }
+    return genres
   },
 
   async getMovies(query) {
+    let movies
     const years = query.years ? query.years.split(',') : []
     const dateMin = years[0] ? `${years[0]}-01-01` : defaults.dateMin
     const dateMax = years[1] ? `${years[1]}-12-31` : undefined
@@ -86,7 +126,7 @@ export const tmdb = {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
-      const movies = json.results.map(item => new Object({
+      movies = json.results.map(item => new Object({
         id: item.id,
         title: item.title,
         genres: item.genre_ids.map(id => this.genres.get(id)),
@@ -95,11 +135,19 @@ export const tmdb = {
         overview: item.overview,
         reviewScore: item.vote_average
       }))
-
-      return { movies }
     } catch (e) {
-      console.error("Error fetching data:", e);
+      console.error("Error fetching movies:", e);
+      movies = [{
+        id: 123,
+        title: 'Test Title',
+        genres: ['Fantasy Test'],
+        releaseDate: '2/10/22',
+        posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}/item.poster_path`,
+        overview: 'Test overiew.  Lorem ipsum dolor and shit',
+        reviewScore: 7
+      }]
     }
+    return { movies }
   },
 
   async getMoviesDetail(id) {
