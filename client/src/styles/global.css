@@ -95,13 +95,17 @@ summary::-webkit-details-marker {
 }
 
 summary::after {
-  content: '+';
-  font: var(--h2-font);
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-bottom: 2px solid white;
+  border-right: 2px solid white;
+  transform: rotate(45deg) translate(-3px, -3px);
   transition: transform 0.2s ease-out;
 }
 
 details[open] > summary::after {
-  transform: rotate(-45deg);
+  transform: rotate(45deg) translate(3px, 3px) scale(-1);
 }
 
 fieldset {

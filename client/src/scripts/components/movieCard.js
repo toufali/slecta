@@ -3,24 +3,32 @@ const html = data => `
   :host{
     contain: style paint;
     display: block;
-    border: 1px solid gray;
+    box-shadow: 3px 3px 12px -3px black;
   }
 
   :host([hidden]) {
     display: none 
   }
+  
+  article {
+    display: flex;
+    gap: var(--padding-sm);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    background: var(--blue-30);
+  }
 </style>
-<details>
-  <summary>
-    <img src='${data.posterThumb}'>
-    <strong>${data.title}</strong><br>
+<article>
+  <img src='${data.posterThumb}'>
+  <header>
+    <h3>${data.title}</h3>  
     <time datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric' })}</time><br>
     <span>${Math.round(data.reviewScore * 10)}%</span>
-  </summary>
-  <p>${data.overview}</p>
+  </header>
+  <!-- <p>${data.overview}</p>
   <p>${data.genres.join(', ')}</p>
-  <p><a href='/movies/${data.id}'>More details</a></p>
-</details>
+  <p><a href='/movies/${data.id}'>More details</a></p> -->
+</article>
 `
 
 customElements.define('movie-card', class extends HTMLElement {
@@ -40,9 +48,9 @@ customElements.define('movie-card', class extends HTMLElement {
   }
 
   connectedCallback() {
-    this.detailsEl = this.shadowRoot.querySelector('details')
-    this.trailerLinkEl = this.detailsEl.querySelector('a')
-    this.detailsEl.addEventListener('toggle', e => this.handleToggle(e))
+    // this.detailsEl = this.shadowRoot.querySelector('article')
+    // this.trailerLinkEl = this.detailsEl.querySelector('a')
+    // this.detailsEl.addEventListener('toggle', e => this.handleToggle(e))
   }
 
   handleToggle(e) {

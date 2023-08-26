@@ -1,3 +1,11 @@
+ul {
+  display: grid;
+  gap: var(--padding-md);
+  grid-template-columns: repeat(auto-fill, minmax(var(--min-width), 1fr));
+  list-style: none;
+  padding: var(--padding-md);
+}
+
 form {
   position: fixed;
   display: flex;
@@ -36,14 +44,16 @@ button[type="submit"] {
 }
 
 [desktop] [data-partial='moviesList'] {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
 }
 
 [desktop] form{
-  right: 0;
   transform: none;
   opacity: 1;
-  width: clamp(var(--min-width), 40%, 480px);
+  position: sticky;
+  border-left: 2px solid var(--blue-30);
+  background: none;
 }
 
 .form-toggle {
