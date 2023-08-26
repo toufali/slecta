@@ -2,7 +2,8 @@ const html = data => `
 <style>
   :host{
     display: inline-block;
-    contain: content;
+    contain: layout style;
+    --offset: 13px;
   }
 
   :host([hidden]) {
@@ -11,34 +12,52 @@ const html = data => `
 
   form {
     position: relative;
-    background: linear-gradient(#888, #888) no-repeat 50% / 100% 4px;
-    border-radius: 50%;
   }
 
   input {
+    appearance: none;
     position: relative;
     display: block;
-    width: calc(100% - 16px);
+    width: calc(100% - var(--offset));
+    background: var(--blue-50);
+    box-shadow: var(--offset) 0 0 var(--blue-50); /* extend track underneath both inputs */
+    height: 2px;
     padding: 0;
     margin: 0;
-    background: none;
     pointer-events: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
   }
 
   input[name="input2"] {
     position: absolute;
     top: 0;
     left: 0;
-    transform: translateX(16px);
+    transform: translateX(var(--offset));
+    background: none;
+    box-shadow: none;
   }
 
-  ::-webkit-slider-thumb{
+  input::-webkit-slider-thumb {
+    appearance: none;
+    box-sizing: border-box;
+    border: 1px solid var(--blue-50);
+    height: 36px;
+    width: 12px;
+    border-radius: 12px;
+    background: var(--green-50);
+    cursor: pointer;
+    box-shadow: 1px 1px 2px black;
     pointer-events: auto;
   }
-
-  ::-moz-range-thumb{
+  
+  input::-moz-range-thumb {
+    box-sizing: border-box;
+    border: 1px solid var(--blue-50);
+    height: 36px;
+    width: 12px;
+    border-radius: 12px;
+    background: var(--green-50);
+    cursor: pointer;
+    box-shadow:1px 1px 2px black;
     pointer-events: auto;
   }
 

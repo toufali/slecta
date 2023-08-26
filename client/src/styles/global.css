@@ -134,3 +134,32 @@ label.pill span{
 label.pill input:checked + span{
   box-shadow: inset 0 0 24px 24px var(--green-50);
 }
+
+input[type="range"] {
+  appearance: none;
+  background: var(--blue-50);
+  height: 2px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  box-sizing: border-box;
+  border: 1px solid var(--blue-50);
+  height: 36px;
+  width: 12px;
+  border-radius: 12px;
+  background: var(--green-50);
+  cursor: pointer;
+  box-shadow: 0 0 2px 1px black
+}
+
+input[type=range]::-moz-range-thumb {
+  box-sizing: border-box;
+  border: 1px solid var(--blue-50);
+  height: 36px;
+  width: 12px;
+  border-radius: 12px;
+  background: var(--green-50);
+  cursor: pointer;
+  box-shadow: 0 0 2px 1px black
+}
