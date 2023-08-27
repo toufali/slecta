@@ -55,6 +55,7 @@ button[type="submit"] {
   position: sticky;
   border-left: 2px solid var(--blue-30);
   background: none;
+  z-index: 1;
 }
 
 .form-toggle {
