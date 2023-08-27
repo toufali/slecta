@@ -5,6 +5,7 @@
   --desktop-breakpoint: 768px;
   --border-radius: 6px;
   --checkbox-w: 20px;
+  --range-h: 36px;
   --padding-sm: calc(8px * var(--multiplier));
   --padding-md: calc(16px * var(--multiplier));
   --padding-lg: calc(32px * var(--multiplier));

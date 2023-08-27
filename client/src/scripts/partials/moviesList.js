@@ -35,10 +35,10 @@ function handleInput(e) {
 
   switch (e.target.name) {
     case 'score':
-      outputEl.textContent = e.target.value
+      outputEl.textContent = `${e.target.value}%`
       break
     case 'count':
-      outputEl.textContent = e.target.value
+      outputEl.textContent = `${e.target.value} reviews`
       break
     case 'years':
       outputEl.textContent = e.target.value.join(' - ')

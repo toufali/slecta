@@ -37,21 +37,21 @@ const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
 
 export const moviesList = data => `
 <ul class='movies-list'></ul>
-<form action='/api/v1/movies' hidden>
+<form action='/api/v1/movies'>
   <fieldset>
     <h4>Include genres:</h4>
     ${withGenres(data)}
   </fieldset>
   <fieldset>
     <h4>Minimum review score:</h4>
-    <label>
+    <label class='range'>
       <input type="range" name="score" min="0" max="100" value="${data.reviewScore}" step="1">
-      <output>${data.reviewScore}</output>
+      <output>${data.reviewScore}%</output>
     </label>
   </fieldset>
   <fieldset>
     <h4>Release date:</h4>
-    <label>
+    <label class='range'>
       <range-slider name="years" min='1900' max='${data.currentYear}' value='${data.years}'></range-slider>
       <output>${data.years.split(',').join(' - ')}</output>
     </label>
@@ -68,9 +68,9 @@ export const moviesList = data => `
     </fieldset>
     <fieldset>
       <h4>Minimum review count:</h4>
-      <label>
+      <label class='range'>
         <input type="range" name="count" min="10" max="1000" value="${data.reviewCount}" step="10">
-        <output>${data.reviewCount}</output>
+        <output>${data.reviewCount} reviews</output>
       </label>
     </fieldset>
   </details>

@@ -1,9 +1,11 @@
 const html = data => `
 <style>
   :host{
-    display: inline-block;
+    --x-offset: 13px;
     contain: layout style;
-    --offset: 13px;
+    display: inline-flex;
+    align-items: center;
+    height: var(--range-h);
   }
 
   :host([hidden]) {
@@ -18,9 +20,9 @@ const html = data => `
     appearance: none;
     position: relative;
     display: block;
-    width: calc(100% - var(--offset));
+    width: calc(100% - var(--x-offset));
     background: var(--blue-50);
-    box-shadow: var(--offset) 0 0 var(--blue-50); /* extend track underneath both inputs */
+    box-shadow: var(--x-offset) 0 0 var(--blue-50); /* extend track underneath both inputs */
     height: 2px;
     padding: 0;
     margin: 0;
@@ -29,9 +31,9 @@ const html = data => `
 
   input[name="input2"] {
     position: absolute;
-    top: 0;
+    top: 50%;
     left: 0;
-    transform: translateX(var(--offset));
+    transform: translate(var(--x-offset), -50%);
     background: none;
     box-shadow: none;
   }
@@ -40,24 +42,24 @@ const html = data => `
     appearance: none;
     box-sizing: border-box;
     border: 1px solid var(--blue-50);
-    height: 36px;
+    height: var(--range-h);
     width: 12px;
     border-radius: 12px;
     background: var(--green-50);
     cursor: pointer;
-    box-shadow: 1px 1px 2px black;
+    box-shadow: 1px 1px 2px #0008;
     pointer-events: auto;
   }
   
   input::-moz-range-thumb {
     box-sizing: border-box;
     border: 1px solid var(--blue-50);
-    height: 36px;
+    height: var(--range-h);
     width: 12px;
     border-radius: 12px;
     background: var(--green-50);
     cursor: pointer;
-    box-shadow:1px 1px 2px black;
+    box-shadow: 1px 1px 2px #0008;
     pointer-events: auto;
   }
 

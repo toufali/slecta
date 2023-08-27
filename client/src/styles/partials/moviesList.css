@@ -21,6 +21,7 @@ form {
 form[hidden] {
   transform: translateX(50%);
   opacity: 0;
+  z-index: -1;
 }
 
 fieldset {
