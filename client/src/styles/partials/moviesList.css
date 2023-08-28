@@ -1,12 +1,13 @@
-ul {
+.movies-list {
   display: grid;
   gap: var(--padding-md);
   grid-template-columns: repeat(auto-fill, minmax(var(--min-width), 1fr));
-  list-style: none;
+  width: calc(100% - var(--filter-w));
   padding: var(--padding-md);
+  list-style: none;
 }
 
-form {
+.movies-filter {
   position: fixed;
   display: flex;
   flex-direction: column;
@@ -16,12 +17,26 @@ form {
   overflow-y: auto;
   height: 100vh;
   top: 0;
+  right: 0;
 }
 
-form[hidden] {
+.movies-filter[hidden] {
   transform: translateX(50%);
   opacity: 0;
   z-index: -1;
+}
+
+[desktop] .movies-filter{
+  width: clamp(var(--min-width), 40vw, 640px);
+  transform: none;
+  opacity: 1;
+  border-left: 2px solid var(--blue-30);
+  background: var(--blue-10);
+  z-index: 1;
+}
+
+header {
+  padding: var(--padding-sm) var(--padding-lg) 0;
 }
 
 fieldset {
@@ -32,39 +47,31 @@ fieldset > :first-child {
   color: var(--yellow-50);
 }
 
-fieldset + fieldset {
-  border-top: 1px solid var(--blue-10);
+fieldset{
+  border-top: 1px solid black;
+}
+
+details {
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
 }
 
 summary {
-  font: var(--h4-font);
+  font: var(--h3-font);
+  color: var(--blue-90);
 }
 
 button[type="submit"] {
   margin: var(--padding-lg);
 }
 
-[desktop] [data-partial='moviesList'] {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-}
-
-[desktop] form{
-  transform: none;
-  opacity: 1;
-  position: sticky;
-  border-left: 2px solid var(--blue-30);
-  background: none;
-  z-index: 1;
-}
-
-.form-toggle {
+.filter-toggle {
   position: fixed;
   bottom: var(--padding-lg);
   left: var(--padding-lg);
   width: calc(100vw - var(--padding-lg) * 2);
 }
 
-[desktop] .form-toggle {
+[desktop] .filter-toggle {
   display: none;
 }

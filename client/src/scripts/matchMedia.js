@@ -1,4 +1,4 @@
-const mediaQueryMobile = window.matchMedia('(width > 768px)') // this breakpoint is also set in variables.css
+const mediaQueryMobile = window.matchMedia('(width > 1024px)') // this breakpoint is also set in variables.css
 
 function handleMediaQuery(e = mediaQueryMobile) {
   document.documentElement.toggleAttribute('desktop', e.matches)

@@ -34,17 +34,11 @@ export const mainView = data => `
          ${!data.partialScript ? '' : `<script src='/scripts/partials/${data.partial.name}.js' type='module'></script>`}
       </head>
        <body>
-         <header>
-          <h1>SLECTA</h1>
-         </header>
- 
          <main data-partial='${data.partial.name}'>
             ${data.partial(data)}
          </main>
 
-         <footer>
-          Copyright and stuff
-         </footer>
+         <footer>Copyright and stuff</footer>
        </body>
      </html>
    `

@@ -2,7 +2,7 @@ import '../components/movieCard.js'
 
 const form = document.querySelector('[data-partial="moviesList"] form')
 const list = document.querySelector('[data-partial="moviesList"] ul')
-const formToggle = document.querySelector('.form-toggle')
+const filterToggle = document.querySelector('.filter-toggle')
 // const state = new Proxy({
 //   searchParams: null,
 // }, {
@@ -16,13 +16,12 @@ const formToggle = document.querySelector('.form-toggle')
 //   }
 // })
 
-formToggle.addEventListener('mousedown', handleMouseEvent)
+filterToggle.addEventListener('mousedown', handleMouseEvent)
 form.elements['score'].addEventListener('input', handleInput)
 form.elements['count'].addEventListener('input', handleInput)
 form.elements['years'].addEventListener('input', handleInput)
 form.addEventListener('change', handleChange)
 form.addEventListener('submit', handleSubmit)
-handleSubmit()
 
 function handleChange(e) {
   if (document.documentElement.hasAttribute('desktop')) {

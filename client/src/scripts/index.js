@@ -3,3 +3,4 @@
 import './components/rangeSlider.js'
 import './app.js'
 import './matchMedia.js'
+import './resizeObserver.js'

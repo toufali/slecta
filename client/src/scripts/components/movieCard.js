@@ -15,13 +15,21 @@ const html = data => `
     gap: var(--padding-sm);
     border-radius: var(--border-radius);
     overflow: hidden;
+    color: var(--blue-90);
     background: var(--blue-30);
+    padding-right: var(--padding-md);
+  }
+
+  article > header > h4 {
+    font: var(--h4-font);
+    color: white;
+    margin: var(--padding-lg) 0 var(--padding-md);
   }
 </style>
 <article>
   <img src='${data.posterThumb}'>
   <header>
-    <h3>${data.title}</h3>  
+    <h4>${data.title}</h4>  
     <time datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric' })}</time><br>
     <span>${Math.round(data.reviewScore * 10)}%</span>
   </header>

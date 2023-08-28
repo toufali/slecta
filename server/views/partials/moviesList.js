@@ -37,37 +37,41 @@ const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
 
 export const moviesList = data => `
 <ul class='movies-list'></ul>
-<form action='/api/v1/movies'>
+<form class='movies-filter' action='/api/v1/movies'>
+  <header>
+    <h1>SLECTA</h1>
+  </header>
+
   <fieldset>
-    <h4>Include genres:</h4>
+    <h3>Include genres:</h3>
     ${withGenres(data)}
   </fieldset>
   <fieldset>
-    <h4>Minimum review score:</h4>
+    <h3>Minimum review score:</h3>
     <label class='range'>
       <input type="range" name="score" min="0" max="100" value="${data.reviewScore}" step="1">
       <output>${data.reviewScore}%</output>
     </label>
   </fieldset>
   <fieldset>
-    <h4>Release date:</h4>
+    <h3>Release date:</h3>
     <label class='range'>
       <range-slider name="years" min='1900' max='${data.currentYear}' value='${data.years}'></range-slider>
       <output>${data.years.split(',').join(' - ')}</output>
     </label>
   </fieldset>
   <fieldset>
-    <h4>Sort by:</h4>
+    <h3>Sort by:</h3>
     ${sortRadiolist(data)}
   </fieldset>
   <details>
     <summary>Advanced</summary>
     <fieldset>
-      <h4>Exclude genres:</h4>
+      <h3>Exclude genres:</h3>
       ${withoutGenres(data)}
     </fieldset>
     <fieldset>
-      <h4>Minimum review count:</h4>
+      <h3>Minimum review count:</h3>
       <label class='range'>
         <input type="range" name="count" min="10" max="1000" value="${data.reviewCount}" step="10">
         <output>${data.reviewCount} reviews</output>
@@ -76,5 +80,5 @@ export const moviesList = data => `
   </details>
   <button class='primary' type='submit'>APPLY</button>
 </form>
-<button class='form-toggle primary' type='button'>FILTER</button>
+<button class='filter-toggle primary' type='button'>FILTER</button>
 `
