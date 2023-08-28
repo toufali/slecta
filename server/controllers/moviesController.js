@@ -6,18 +6,21 @@ import { moviesDetail } from '../views/partials/moviesDetail.js'
 export async function getMovies(ctx) {
   const movies = ctx.state.cacheData ?? await tmdb.getMovies(ctx.query)
 
+  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = movies
 }
 
 export async function getMoviesDetail(ctx) {
   const movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
 
+  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = movie
 }
 
 export async function getMoviesTrailer(ctx) {
   const trailer = ctx.state.cacheData ?? await tmdb.getMoviesTrailer(ctx.params.id)
 
+  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = trailer
 }
 

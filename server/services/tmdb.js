@@ -183,6 +183,7 @@ export const tmdb = {
       return trailer ?? {}
     } catch (e) {
       console.error("Error fetching data:", e);
+      return {}
     }
   }
 }
