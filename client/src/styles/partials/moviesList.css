@@ -11,7 +11,7 @@
   position: fixed;
   display: flex;
   flex-direction: column;
-  background: var(--blue-30);
+  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
   transition: transform .2s ease-out, opacity .2s ease-out;
   z-index: 1;
   overflow-y: auto;
@@ -30,8 +30,8 @@
   width: clamp(var(--min-width), 40vw, 640px);
   transform: none;
   opacity: 1;
-  border-left: 2px solid var(--blue-30);
-  background: var(--blue-10);
+  border-left: 2px solid black;
+  background: none;
   z-index: 1;
 }
 
@@ -48,12 +48,15 @@ fieldset > :first-child {
 }
 
 fieldset{
-  border-top: 1px solid black;
+  border-bottom: 2px solid black;
 }
 
 details {
-  border-top: 1px solid black;
-  border-bottom: 1px solid black;
+  border-bottom: 2px solid black;
+}
+
+details[open] {
+  border: none;
 }
 
 summary {

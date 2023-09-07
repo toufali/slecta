@@ -16,7 +16,7 @@ const html = data => `
     border-radius: var(--border-radius);
     overflow: hidden;
     color: var(--blue-90);
-    background: var(--blue-30);
+    background: linear-gradient(-135deg, var(--blue-30), var(--blue-10));
     padding-right: var(--padding-md);
   }
 
