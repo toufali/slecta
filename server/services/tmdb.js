@@ -14,7 +14,7 @@ const defaults = {
   includeVideo: false, // true value doesn't work as of this writing
   dateMin: `${new Date().getFullYear() - 1}-01-01`,
   sort: 'vote_average.desc',
-  country: 'US'
+  region: 'US'
 }
 
 export const tmdb = {
@@ -27,11 +27,11 @@ export const tmdb = {
 
     this.config = config
     this.genres = genres
-    this.ratings = ratings[defaults.country]
+    this.ratings = ratings[defaults.region]
     console.info('TMDB init complete.')
     console.info('image config:', config.images)
     console.info('genres:', genres)
-    console.info(`${defaults.country} ratings:`, ratings[defaults.country])
+    console.info(`${defaults.region} ratings:`, ratings[defaults.region])
   },
 
   async getConfig() {
@@ -65,7 +65,7 @@ export const tmdb = {
     let genres
     try {
       // TODO: use Redis to store this, especially for offline
-      const res = await fetch(`${apiUrl}/genre/movie/list?language=en`, { headers })
+      const res = await fetch(`${apiUrl}/genre/movie/list?language=${defaults.language}`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
@@ -124,7 +124,6 @@ export const tmdb = {
     const params = {
       include_adult: defaults.includeAdult,
       include_video: defaults.includeVideo,
-      language: defaults.language,
       'primary_release_date.gte': dateMin,
       'primary_release_date.lte': dateMax,
       sort_by: query.sort ?? defaults.sort,
@@ -133,7 +132,7 @@ export const tmdb = {
       with_genres: Array.isArray(query.wg) ? query.wg.join('|') : query.wg,
       without_genres: query.wog,
       certification: Array.isArray(query.wr) ? query.wr.join('|') : query.wr,
-      certification_country: defaults.country,
+      certification_country: defaults.region,
     }
 
     for (const [key, value] of Object.entries(params)) {
