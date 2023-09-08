@@ -20,23 +20,47 @@ const html = data => `
     padding-right: var(--padding-md);
   }
 
-  article > header > h4 {
+  img {
+    object-fit: contain;
+  }
+
+  h4 {
     font: var(--h4-font);
     color: white;
-    margin: var(--padding-lg) 0 var(--padding-md);
+    margin: 0 0 var(--padding-sm);
+  }
+
+  a {
+    display: contents;
+    color: inherit;
+  }
+
+  dl {
+    overflow: hidden;
+    margin-top: auto;
+  }
+
+  dd {
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: var(--small-font);
   }
 </style>
-<article>
-  <img src='${data.posterThumb}'>
-  <header>
-    <h4>${data.title}</h4>  
-    <time datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric' })}</time><br>
-    <span>${Math.round(data.reviewScore * 10)}%</span>
-  </header>
-  <!-- <p>${data.overview}</p>
-  <p>${data.genres.join(', ')}</p>
-  <p><a href='/movies/${data.id}'>More details</a></p> -->
-</article>
+<a href='/movies/${data.id}'>
+  <article>
+      <img title='${data.overview}' src='${data.posterThumb}'>
+      <dl>
+        <dt title='${data.overview}'><h4>${data.title}</h4></dt>
+        <dd title='${data.genres.join(', ')}'>${data.genres.join(', ')}</dd>
+        <dd>
+          <time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>
+          &nbsp;&nbsp;<span title='Review score'>${Math.round(data.reviewScore * 10)}%</span>
+        </dd>
+      </dl>
+  </article>
+</a>
 `
 
 customElements.define('movie-card', class extends HTMLElement {
