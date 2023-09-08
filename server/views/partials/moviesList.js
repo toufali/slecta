@@ -35,6 +35,21 @@ const sortRadiolist = data => sortOptions.reduce((acc, cur) => {
   return acc
 }, ``)
 
+const withRatings = data => {
+  let html = ''
+
+  data.allRatings.sort((a, b) => a.order - b.order)
+
+  // data.withRatings can be a string 'R' or array ['PG-13', 'R']. The includes() function should work on both.
+  for (const rating of data.allRatings) html += `
+  <label class='pill' title='${rating.meaning}'>
+    <input type='checkbox' name='wr' value='${rating.certification}' ${data.withRatings.includes(rating.certification) ? 'checked' : ''}>
+    <span>${rating.certification}</span>
+  </label>
+  `
+  return html
+}
+
 export const moviesList = data => `
 <ul class='movies-list'></ul>
 <form class='movies-filter' action='/api/v1/movies'>
@@ -66,6 +81,10 @@ export const moviesList = data => `
   </fieldset>
   <details>
     <summary>Advanced</summary>
+    <fieldset>
+      <h3>Include ratings:</h3>
+      ${withRatings(data)}
+    </fieldset>
     <fieldset>
       <h3>Exclude genres:</h3>
       ${withoutGenres(data)}

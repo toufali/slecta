@@ -34,9 +34,11 @@ export async function showMoviesList(ctx) {
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
     allGenres: tmdb.genres,
+    allRatings: tmdb.ratings,
     currentYear,
     withGenres: ctx.query.wg ?? '',
     withoutGenres: ctx.query.wog ?? '',
+    withRatings: ctx.query.wr ?? '',
     sort: ctx.query.sort ?? 'vote_average.desc',
     reviewScore: ctx.query.score ?? 60,
     reviewCount: ctx.query.count ?? 100,

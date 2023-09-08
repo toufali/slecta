@@ -14,20 +14,24 @@ const defaults = {
   includeVideo: false, // true value doesn't work as of this writing
   dateMin: `${new Date().getFullYear() - 1}-01-01`,
   sort: 'vote_average.desc',
+  country: 'US'
 }
 
 export const tmdb = {
   config: null,
   genres: null,
+  ratings: null,
 
   async init() {
-    const [config, genres] = await Promise.all([this.getConfig(), this.getGenres()])
+    const [config, genres, ratings] = await Promise.all([this.getConfig(), this.getGenres(), this.getRatings()])
 
     this.config = config
     this.genres = genres
+    this.ratings = ratings[defaults.country]
     console.info('TMDB init complete.')
     console.info('image config:', config.images)
     console.info('genres:', genres)
+    console.info(`${defaults.country} ratings:`, ratings[defaults.country])
   },
 
   async getConfig() {
@@ -95,6 +99,23 @@ export const tmdb = {
     return genres
   },
 
+  async getRatings() {
+    let ratings
+    try {
+      // TODO: use Redis to store this, especially for offline
+      const res = await fetch(`${apiUrl}/certification/movie/list`, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const { certifications } = await res.json()
+      ratings = certifications
+
+    } catch (e) {
+      console.error("Error getting TMDB certifications (ratings):", e)
+    }
+    return ratings
+  },
+
   async getMovies(query) {
     let movies
     const years = query.years ? query.years.split(',') : []
@@ -110,7 +131,9 @@ export const tmdb = {
       'vote_average.gte': query.score ? query.score / 10 : defaults.scoreMin,
       'vote_count.gte': query.count ?? defaults.countMin,
       with_genres: Array.isArray(query.wg) ? query.wg.join('|') : query.wg,
-      without_genres: query.wog
+      without_genres: query.wog,
+      certification: Array.isArray(query.wr) ? query.wr.join('|') : query.wr,
+      certification_country: defaults.country,
     }
 
     for (const [key, value] of Object.entries(params)) {
