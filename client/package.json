@@ -6,7 +6,7 @@
   "license": "ISC",
   "description": "Slector front-end code, packages, and npm scripts",
   "scripts": {
-    "build": "node esbuild",
+    "build": "node esbuild & npm run copy:root",
     "copy:root": "mkdir -p dist/ && cp src/*.* dist/"
   },
   "dependencies": {
