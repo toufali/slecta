@@ -173,22 +173,44 @@ export const tmdb = {
   },
 
   async getMoviesDetail(id) {
+    const params = {
+      append_to_response: 'videos,release_dates,watch/providers'
+    }
+    let movie
+
     try {
-      // https://api.themoviedb.org/3/movie/{movie_id}
-      const res = await fetch(`${apiUrl}/movie/${id}`, { headers })
+      // https://api.themoviedb.org/3/movie/157336?append_to_response=videos,images
+      const res = await fetch(`${apiUrl}/movie/${id}?${new URLSearchParams(params)}`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
+      console.log(json.videos)
+      console.log(json.release_dates.results.find(item => item.iso_3166_1 === defaults.region).release_dates)
+      console.log(json['watch/providers'].results[defaults.region])
+      const youtube = json.videos.results.filter(item => /youtube/i.test(item.site))
+      const trailer = youtube.find(item => /trailer/i.test(item.type)) ?? youtube.find(item => /teaser/i.test(item.type)) ?? youtube.find(item => /clip/i.test(item.type))
+      const rating = json.release_dates.results.find(item => item.iso_3166_1 === defaults.region).release_dates.find(release => release.certification !== '')?.certification ?? ''
 
-      json.imgBaseUrl = this.config.images.secure_base_url
-      json.posterSizes = this.config.images.poster_sizes
-      json.backdropSizes = this.config.images.backdrop_sizes
-
-      return json
+      movie = {
+        id: json.id,
+        title: json.title,
+        overview: json.overview,
+        releaseDate: json.release_date,
+        reviewScore: json.vote_average,
+        rating,
+        runtime: json.runtime,
+        languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
+        genres: json.genres.map(genre => genre.name).join(', '),
+        providers: json['watch/providers'].results[defaults.region] ?? 'Not available for streaming',
+        backdropUrl: this.config.images.secure_base_url + this.config.images.backdrop_sizes[2] + json.backdrop_path,
+        ytTrailerId: trailer.key
+      }
     } catch (e) {
       console.error("Error fetching data:", e);
     }
+    // console.log(movie)
+    return movie
   },
 
   async getMoviesTrailer(id) {
