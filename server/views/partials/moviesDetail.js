@@ -1,14 +1,24 @@
+function ytTrailer(id) {
+  if (!id) return ''
+
+  return `
+  <button class='trailer-btn' type='button'>PLAY TRAILER</button>
+  <iframe data-src="https://www.youtube.com/embed/${id}?modestbranding=1&playsinline=1&color=white&iv_load_policy=3&rel=0&autoplay=1"
+    type="text/html"
+    width="1920"
+    height="1080"
+    frameborder="0"
+    allowfullscreen
+    allow='autoplay'>
+  </iframe>
+  `
+}
+
 export const moviesDetail = data => `
 <article id='${data.movie.id}'>
-  <figure data-ytid='${data.movie.ytTrailerId}'>
+  <figure>
     <img src='${data.movie.backdropUrl}'>
-    <iframe
-      type="text/html"
-      width="1920"
-      height="1080"
-      src="https://www.youtube.com/embed/${data.movie.ytTrailerId}?modestbranding=1&playsinline=1&color=white&iv_load_policy=3&rel=0" 
-      frameborder="0" 
-      allowfullscreen></iframe>
+    ${ytTrailer(data.movie.ytTrailerId)}
   </figure>
   <header>
     <h1>${data.movie.title}</h1>

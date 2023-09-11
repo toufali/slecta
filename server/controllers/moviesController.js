@@ -33,8 +33,8 @@ export async function showMoviesList(ctx) {
     partial: moviesList,
     partialStyle: true, // defaults to true, included here for posterity
     partialScript: true, // defaults to true, included here for posterity
-    allGenres: tmdb.genres,
-    allRatings: tmdb.ratings,
+    allGenres: tmdb.defaults.genres,
+    allRatings: tmdb.defaults.ratings,
     currentYear,
     withGenres: ctx.query.wg ?? '',
     withoutGenres: ctx.query.wog ?? '',
@@ -55,7 +55,7 @@ export async function showMoviesDetail(ctx) {
   return ctx.body = mainView({
     partial: moviesDetail,
     partialStyle: true, // defaults to true, included here for posterity
-    partialScript: false,
+    partialScript: true,
     movie
   })
 }

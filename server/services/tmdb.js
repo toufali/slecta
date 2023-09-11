@@ -21,6 +21,7 @@ const defaults = {
 }
 
 export const tmdb = {
+  defaults,
   async init() {
     const [config, genres, ratings] = await Promise.all([this.getConfig(), this.getGenres(), this.getRatings()])
 
