@@ -47,9 +47,10 @@ export async function showMoviesList(ctx) {
 }
 
 export async function showMoviesDetail(ctx) {
-  const movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
+  let movie = ctx.state.cacheData ?? await tmdb.getMoviesDetail(ctx.params.id)
 
-  ctx.state.data = movie // pass JSON data back to cache when response body is text/html
+  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
+  ctx.state.cacheData = movie // store JSON data for cache when response body is text/html
 
   return ctx.body = mainView({
     partial: moviesDetail,

@@ -14,24 +14,20 @@ const defaults = {
   includeVideo: false, // true value doesn't work as of this writing
   dateMin: `${new Date().getFullYear() - 1}-01-01`,
   sort: 'vote_average.desc',
-  region: 'US'
+  region: 'US',
+  config: null,
+  genres: null,
+  ratings: null
 }
 
 export const tmdb = {
-  config: null,
-  genres: null,
-  ratings: null,
-
   async init() {
     const [config, genres, ratings] = await Promise.all([this.getConfig(), this.getGenres(), this.getRatings()])
 
-    this.config = config
-    this.genres = genres
-    this.ratings = ratings[defaults.region]
+    defaults.config = config
+    defaults.genres = genres
+    defaults.ratings = ratings[defaults.region]
     console.info('TMDB init complete.')
-    console.info('image config:', config.images)
-    console.info('genres:', genres)
-    console.info(`${defaults.region} ratings:`, ratings[defaults.region])
   },
 
   async getConfig() {
@@ -151,9 +147,9 @@ export const tmdb = {
       movies = json.results.map(item => new Object({
         id: item.id,
         title: item.title,
-        genres: item.genre_ids.map(id => this.genres.get(id)),
+        genres: item.genre_ids.map(id => defaults.genres.get(id)),
         releaseDate: item.release_date,
-        posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}/${item.poster_path}`,
+        posterThumb: `${defaults.config.images.secure_base_url}${defaults.config.images.poster_sizes[0]}/${item.poster_path}`,
         overview: item.overview,
         reviewScore: item.vote_average
       }))
@@ -164,7 +160,7 @@ export const tmdb = {
         title: 'Test Title',
         genres: ['Fantasy Test'],
         releaseDate: '2/10/22',
-        posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}/item.poster_path`,
+        posterThumb: `${defaults.config.images.secure_base_url}${defaults.config.images.poster_sizes[0]}/item.poster_path`,
         overview: 'Test overiew.  Lorem ipsum dolor and shit',
         reviewScore: 7
       }]
@@ -185,12 +181,21 @@ export const tmdb = {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
-      console.log(json.videos)
-      console.log(json.release_dates.results.find(item => item.iso_3166_1 === defaults.region).release_dates)
-      console.log(json['watch/providers'].results[defaults.region])
-      const youtube = json.videos.results.filter(item => /youtube/i.test(item.site))
-      const trailer = youtube.find(item => /trailer/i.test(item.type)) ?? youtube.find(item => /teaser/i.test(item.type)) ?? youtube.find(item => /clip/i.test(item.type))
-      const rating = json.release_dates.results.find(item => item.iso_3166_1 === defaults.region).release_dates.find(release => release.certification !== '')?.certification ?? ''
+      let providers = json['watch/providers'].results[defaults.region]
+      if (providers) {
+        // reshape, reduce, and mutate data
+        providers = Object.values(providers)
+          .flat()
+          .filter(function (item) {
+            if (!item.provider_id || this.has(item.provider_id)) return
+
+            item.logoUrl = defaults.config.images.secure_base_url + defaults.config.images.logo_sizes[0] + item.logo_path
+            this.add(item.provider_id)
+            return true
+          }, new Set())
+      }
+      const rating = json.release_dates.results.find(item => item.iso_3166_1 === defaults.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
+      const ytTrailer = json.videos.results.filter(item => /youtube/i.test(item.site)).find(item => /trailer|teaser|clip/i.test(item.type))
 
       movie = {
         id: json.id,
@@ -202,9 +207,9 @@ export const tmdb = {
         runtime: json.runtime,
         languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
         genres: json.genres.map(genre => genre.name).join(', '),
-        providers: json['watch/providers'].results[defaults.region] ?? 'Not available for streaming',
-        backdropUrl: this.config.images.secure_base_url + this.config.images.backdrop_sizes[2] + json.backdrop_path,
-        ytTrailerId: trailer.key
+        providers,
+        backdropUrl: defaults.config.images.secure_base_url + defaults.config.images.backdrop_sizes[2] + json.backdrop_path,
+        ytTrailerId: ytTrailer?.key
       }
     } catch (e) {
       console.error("Error fetching data:", e);

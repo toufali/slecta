@@ -2,6 +2,13 @@ export const moviesDetail = data => `
 <article id='${data.movie.id}'>
   <figure data-ytid='${data.movie.ytTrailerId}'>
     <img src='${data.movie.backdropUrl}'>
+    <iframe
+      type="text/html"
+      width="1920"
+      height="1080"
+      src="https://www.youtube.com/embed/${data.movie.ytTrailerId}?modestbranding=1&playsinline=1&color=white&iv_load_policy=3&rel=0" 
+      frameborder="0" 
+      allowfullscreen></iframe>
   </figure>
   <header>
     <h1>${data.movie.title}</h1>
@@ -13,8 +20,8 @@ export const moviesDetail = data => `
     <p>${data.movie.rating}</p>
     <p>${data.movie.languages}</p>
     <p>${Math.round(data.movie.reviewScore * 10)}%</p>
+    <p>${data.movie.providers?.map(item => `<img src='${item.logoUrl}' title='${item.provider_name}'>`).join('') ?? ''}</p>
   </header>
   <p>${data.movie.overview}</p>
-  <pre><code>${JSON.stringify(data.movie.providers, null, 2)}</code></pre>
 </article>
 `
