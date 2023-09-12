@@ -198,7 +198,8 @@ export const tmdb = {
           }, new Set())
       }
       const rating = json.release_dates.results.find(item => item.iso_3166_1 === defaults.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
-      const ytTrailer = json.videos.results.filter(item => /youtube/i.test(item.site)).find(item => /trailer|teaser|clip/i.test(item.type))
+      const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
+      const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
 
       movie = {
         id: json.id,
