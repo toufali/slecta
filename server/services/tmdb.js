@@ -130,6 +130,8 @@ export const tmdb = {
       without_genres: query.wog,
       certification: Array.isArray(query.wr) ? query.wr.join('|') : query.wr,
       certification_country: defaults.region,
+      watch_region: defaults.region,
+      with_watch_monetization_types: query.streaming ? 'buy|free|flatrate|rent' : ''
     }
 
     for (const [key, value] of Object.entries(params)) {

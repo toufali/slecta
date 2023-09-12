@@ -42,6 +42,7 @@ export async function showMoviesList(ctx) {
     sort: ctx.query.sort ?? 'vote_average.desc',
     reviewScore: ctx.query.score ?? 60,
     reviewCount: ctx.query.count ?? 100,
+    streaming: ctx.query.streaming,
     years: ctx.query.years ?? `${currentYear - 1},${currentYear}`
   })
 }

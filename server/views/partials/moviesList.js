@@ -82,6 +82,13 @@ export const moviesList = data => `
   <details>
     <summary>Advanced</summary>
     <fieldset>
+      <h3>Availability:</h3>
+      <label class='pill'>
+        <input type='checkbox' name='streaming' ${data.streaming ? 'checked' : ''}>
+        <span>Streaming now</span>
+      </label>
+    </fieldset>
+    <fieldset>
       <h3>Include ratings:</h3>
       ${withRatings(data)}
     </fieldset>
