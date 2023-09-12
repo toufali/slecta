@@ -2,11 +2,13 @@ function ytTrailer(id) {
   if (!id) return ''
 
   return `
-  <button class='trailer-btn' type='button'>PLAY TRAILER</button>
+  <button class='trailer-btn' type='button'>
+    <img src='/images/yt-play-button-dark.svg' width='1024' height='721'>
+  </button>
   <iframe data-src="https://www.youtube.com/embed/${id}?modestbranding=1&playsinline=1&color=white&iv_load_policy=3&rel=0&autoplay=1"
     type="text/html"
-    width="1920"
-    height="1080"
+    width="1280"
+    height="720"
     frameborder="0"
     allowfullscreen
     allow='autoplay'>
