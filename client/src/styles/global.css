@@ -22,6 +22,7 @@ h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;
   line-height: 1.2;
+  color: white;
 }
 
 h2 {
@@ -40,7 +41,7 @@ h4 {
 }
 
 p {
-  margin: var(--padding-md) 0;
+  margin: var(--padding-md) 0 0;
 }
 
 a {

@@ -38,7 +38,7 @@ export const mainView = data => `
             ${data.partial(data)}
          </main>
 
-         <footer>Copyright and stuff</footer>
+         <footer></footer>
        </body>
      </html>
    `

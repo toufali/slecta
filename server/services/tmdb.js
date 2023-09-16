@@ -17,7 +17,22 @@ const defaults = {
   region: 'US',
   config: null,
   genres: null,
-  ratings: null
+  ratings: null,
+  providerPriority: [
+    8, // Netflix
+    10, // Amazon Video
+    337, // Disney+
+    2, // Apple TV
+    15, // Hulu
+    1899, // Max
+    7, // Vudu
+    386, // Peacock
+    192, // YouTube
+    531, // Paramount+
+    9, // Amazon Prime Video
+    188, // YouTube Premium
+    207, // Roku Channel    
+  ]
 }
 
 export const tmdb = {
@@ -187,6 +202,8 @@ export const tmdb = {
       let providers = json['watch/providers'].results[defaults.region]
       if (providers) {
         // reshape, reduce, and mutate data
+        const providerPriority = defaults.providerPriority.toReversed()
+
         providers = Object.values(providers)
           .flat()
           .filter(function (item) {
@@ -196,6 +213,11 @@ export const tmdb = {
             this.add(item.provider_id)
             return true
           }, new Set())
+          .sort((a, b) => {
+            const j = providerPriority.indexOf(a.provider_id)
+            const k = providerPriority.indexOf(b.provider_id)
+            return k - j
+          })
       }
       const rating = json.release_dates.results.find(item => item.iso_3166_1 === defaults.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
       const yt = json.videos.results.filter(item => /youtube/i.test(item.site))

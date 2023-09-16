@@ -16,24 +16,36 @@ function ytTrailer(id) {
   `
 }
 
+function providers(items) {
+  if (!items) return ''
+
+  const limit = 5
+  const moreHtml = items.length > limit ? `<span>, and others.</span>` : ''
+  const providerHtml = items.map(item => `<span><img src='${item.logoUrl}' alt=''> ${item.provider_name}</span>`)
+    .slice(0, 5)
+    .join(',&nbsp; ')
+
+  return providerHtml + moreHtml
+}
+
 export const moviesDetail = data => `
+<figure>
+  <img src='${data.movie.backdropUrl}'>
+  ${ytTrailer(data.movie.ytTrailerId)}
+</figure>
 <article id='${data.movie.id}'>
-  <figure>
-    <img src='${data.movie.backdropUrl}'>
-    ${ytTrailer(data.movie.ytTrailerId)}
-  </figure>
   <header>
     <h1>${data.movie.title}</h1>
-    <p>${data.movie.genres}</p>
-    <p>
-      <time title='Release date' datetime="${data.movie.releaseDate}">${new Date(data.movie.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>
-    </p>
-    <p>${data.movie.runtime}min</p>
-    <p>${data.movie.rating}</p>
-    <p>${data.movie.languages}</p>
-    <p>${Math.round(data.movie.reviewScore * 10)}%</p>
-    <p>${data.movie.providers?.map(item => `<img src='${item.logoUrl}' title='${item.provider_name}'>`).join('') ?? ''}</p>
+    <ul class='details'>
+      <li><time title='Release date' datetime="${data.movie.releaseDate}">${new Date(data.movie.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
+      <li title='Rating'>${data.movie.rating}</li>
+      <li class='genres' title='${data.movie.genres}'><p>${data.movie.genres}</p></li>
+    </ul>
   </header>
   <p>${data.movie.overview}</p>
+  <p><strong>Review score:</strong>${Math.round(data.movie.reviewScore * 10)}%</p>
+  <p><strong>Running time:</strong>${data.movie.runtime} min</p>
+  <p><strong>Spoken languages:</strong>${data.movie.languages}</p>
+  <p class='providers'><strong>Watch on:</strong>${providers(data.movie.providers)}</p>
 </article>
 `

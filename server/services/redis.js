@@ -38,8 +38,8 @@ export const redis = {
 
       await client.set(key, JSON.stringify(value), {
         // EX: 60 * 60 * 12, // sec * min * hr
-        // EX: 60 * 5,
-        EX: 5,
+        EX: 60 * 5,
+        // EX: 10,
         NX: false, // NX = Only set the key if it does not already exist.
       })
       console.log('Redis set new cache data.')

@@ -1,3 +1,12 @@
+main {
+  max-width: var(--max-width);
+  margin: auto;
+  background: var(--blue-30);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 12px black;
+  overflow: hidden;
+}
+
 figure {
   position: relative;
   width: 100%;
@@ -38,7 +47,6 @@ figure iframe {
   opacity: 0;
 }
 
-
 figure[data-trailer-active] img {
   filter: brightness(0);
 }
@@ -50,6 +58,60 @@ figure[data-trailer-active] button {
 figure[data-trailer-active] iframe[src] {
   display: block;
   animation: fade-in 2s ease-in forwards;
+}
+
+article {
+  padding: var(--padding-lg);
+}
+
+h1 {
+  margin: 0;
+}
+
+strong {
+  color: var(--blue-90);
+  margin-right: var(--padding-sm);
+}
+
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  column-gap: 24px;
+  overflow: hidden;
+  color: var(--yellow-50);
+}
+
+.details li {
+  position: relative;
+}
+
+.details li::before {
+  position: absolute;
+  top: 0;
+  left: -16px;
+  content: '·';
+}
+
+.genres {
+  max-width: 100%;
+}
+
+.genres p {
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.providers span {
+  white-space: nowrap;
+}
+
+.providers img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 @keyframes fade-in {
