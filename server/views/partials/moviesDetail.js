@@ -41,11 +41,11 @@ export const moviesDetail = data => `
     </ul>
   </header>
   <p>${data.movie.overview}</p>
-  <p><strong>Review score:</strong>${Math.round(data.movie.reviewScore * 10)}%</p>
-  <p><strong>Running time:</strong>${data.movie.runtime} min</p>
-  <p><strong>Spoken languages:</strong>${data.movie.languages}</p>
+  <p><label>Review score:</label>${Math.round(data.movie.reviewScore * 10)}%</p>
+  <p><label>Running time:</label>${data.movie.runtime} min</p>
+  <p><label>Spoken languages:</label>${data.movie.languages}</p>
   <div class='providers'>
-    <p><strong>Available on:</strong></p>
+    <p><label>Available on:</label></p>
     <ul>${providers(data.movie.providers)}</ul>
   </div>
 </article>

@@ -64,11 +64,17 @@ article {
   padding: var(--padding-lg);
 }
 
-h1 {
-  margin: 0;
+header{
+  margin-bottom: var(--padding-lg);
 }
 
-strong {
+h1 {
+  border-bottom: 2px solid var(--blue-10);
+  padding-bottom: var(--padding-sm);
+  margin: 0 0 var(--padding-sm);
+}
+
+label {
   color: var(--blue-90);
   margin-right: var(--padding-sm);
 }
@@ -79,7 +85,7 @@ strong {
   list-style: none;
   column-gap: 24px;
   overflow: hidden;
-  color: var(--yellow-50);
+  color: var(--blue-90);
 }
 
 .details li {
@@ -113,7 +119,7 @@ strong {
   flex-wrap: wrap;
   gap: var(--padding-md);
   list-style: none;
-  margin-top: var(--padding-md);
+  margin-top: var(--padding-sm);
 }
 
 .providers li {

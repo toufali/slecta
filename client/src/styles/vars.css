@@ -11,9 +11,9 @@
   --padding-lg: calc(32px * var(--multiplier));
   --gap: calc(32px * var(--multiplier));
 
-  --h1-font: 600 2.5rem/1 'Quicksand','Inter', sans-serif;
-  --h2-font: 600 1.75rem/1 'Quicksand','Inter', sans-serif;
-  --h3-font: 600 1.25rem/1 'Quicksand','Inter', sans-serif;
+  --h1-font: 600 2.5rem/1 'Barlow Semi Condensed','Inter', sans-serif;
+  --h2-font: 600 1.75rem/1 'Barlow Semi Condensed','Inter', sans-serif;
+  --h3-font: normal 1.25rem/1 'Barlow Semi Condensed','Inter', sans-serif;
   --h4-font: 600 1.125rem/1.2 'Inter', sans-serif;
   --small-font: normal .875rem/1.2 'Inter', sans-serif;
 
