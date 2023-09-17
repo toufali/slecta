@@ -19,13 +19,11 @@ function ytTrailer(id) {
 function providers(items) {
   if (!items) return ''
 
-  const limit = 5
-  const moreHtml = items.length > limit ? `<span>, and others.</span>` : ''
-  const providerHtml = items.map(item => `<span><img src='${item.logoUrl}' alt=''> ${item.provider_name}</span>`)
-    .slice(0, 5)
-    .join(',&nbsp; ')
+  const limit = 6
 
-  return providerHtml + moreHtml
+  return items.map(item => `<li><img src='${item.logoUrl}' alt=''> ${item.provider_name}</li>`)
+    .slice(0, limit)
+    .join('')
 }
 
 export const moviesDetail = data => `
@@ -46,6 +44,9 @@ export const moviesDetail = data => `
   <p><strong>Review score:</strong>${Math.round(data.movie.reviewScore * 10)}%</p>
   <p><strong>Running time:</strong>${data.movie.runtime} min</p>
   <p><strong>Spoken languages:</strong>${data.movie.languages}</p>
-  <p class='providers'><strong>Watch on:</strong>${providers(data.movie.providers)}</p>
+  <div class='providers'>
+    <p><strong>Available on:</strong></p>
+    <ul>${providers(data.movie.providers)}</ul>
+  </div>
 </article>
 `

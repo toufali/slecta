@@ -104,14 +104,29 @@ strong {
   overflow: hidden;
 }
 
-.providers span {
+.providers > p {
+  display: inline-block;
+}
+
+.providers ul {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--padding-md);
+  list-style: none;
+  margin-top: var(--padding-md);
+}
+
+.providers li {
+  flex-basis: calc(( 640px - 100vw) * 999);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .providers img {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
+  vertical-align: text-bottom;
 }
 
 @keyframes fade-in {

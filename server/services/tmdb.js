@@ -32,6 +32,9 @@ const defaults = {
     9, // Amazon Prime Video
     188, // YouTube Premium
     207, // Roku Channel    
+  ],
+  providerHidden: [
+    3, // Google Play Movies
   ]
 }
 
@@ -207,7 +210,9 @@ export const tmdb = {
         providers = Object.values(providers)
           .flat()
           .filter(function (item) {
-            if (!item.provider_id || this.has(item.provider_id)) return
+            if (!item.provider_id) return // not a valid provider if no ID
+            if (this.has(item.provider_id)) return // already in set
+            if (defaults.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
             item.logoUrl = defaults.config.images.secure_base_url + defaults.config.images.logo_sizes[0] + item.logo_path
             this.add(item.provider_id)
