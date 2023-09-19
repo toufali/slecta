@@ -19,7 +19,7 @@ export const mainView = data => `
   <meta property='og:image' content=''>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <link rel='stylesheet' href='/styles/index.css' type='text/css'>
   ${!data.partialStyle ? '' : `<link rel='stylesheet' href='/styles/partials/${data.partial.name}.css' type='text/css'>`}
   <link rel='icon' href='data:,' sizes='16x16'>
