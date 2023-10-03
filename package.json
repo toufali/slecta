@@ -8,7 +8,10 @@
   "scripts": {
     "start": "npm run build -w client && npm start -w server",
     "dev": "npm run dev -w server",
-    "convert:webp": "sh scripts/webp.sh"
+    "convert:webp": "sh scripts/webp.sh",
+    "db:make": "npm run db:make -w server",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:rollback": "npm run db:rollback -w server"
   },
   "workspaces": [
     "server",

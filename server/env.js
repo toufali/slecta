@@ -2,19 +2,20 @@ import dotenv from 'dotenv'
 
 dotenv.config({ path: '../.env' })
 
-const env = {
-  STATIC_DIR: process.env.npm_lifecycle_event === 'start' ? 'dist' : 'src'
-}
-
 const requiredKeys = [
   'TMDB_TOKEN',
   'REDISHOST',
-  'REDISPORT'
+  'REDISPORT',
+  'DATABASE_URL'
 ]
 
 const optionalKeys = [
   'PORT',
 ]
+
+const env = {
+  STATIC_DIR: process.env.npm_lifecycle_event === 'start' ? 'dist' : 'src',
+}
 
 requiredKeys.forEach(key => {
   const value = process.env[key]
