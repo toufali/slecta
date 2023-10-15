@@ -31,7 +31,7 @@ export const moviesDetail = data => `
   <img src='${data.movie.backdropUrl}'>
   ${ytTrailer(data.movie.ytTrailerId)}
 </figure>
-<article id='${data.movie.id}'>
+<article id='${data.movie.tmdbId}'>
   <header>
     <h1>${data.movie.title}</h1>
     <ul class='details'>
@@ -41,7 +41,7 @@ export const moviesDetail = data => `
     </ul>
   </header>
   <p>${data.movie.overview}</p>
-  <p><label>Review score:</label>${Math.round(data.movie.reviewScore * 10)}%</p>
+  <p><label>Review score:</label>${Math.round(data.movie.avgScore * 10)}%</p>
   <p><label>Running time:</label>${data.movie.runtime} min</p>
   <p><label>Spoken languages:</label>${data.movie.languages}</p>
   <div class='providers'>

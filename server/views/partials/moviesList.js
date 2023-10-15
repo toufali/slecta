@@ -64,8 +64,8 @@ export const moviesList = data => `
   <fieldset>
     <h3>Minimum review score:</h3>
     <label class='range'>
-      <input type="range" name="score" min="0" max="100" value="${data.reviewScore}" step="1">
-      <output>${data.reviewScore}%</output>
+      <input type="range" name="score" min="0" max="100" value="${data.tmdbScore}" step="1">
+      <output>${data.tmdbScore}%</output>
     </label>
   </fieldset>
   <fieldset>

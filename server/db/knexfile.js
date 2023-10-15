@@ -12,7 +12,7 @@ export default {
     min: 0, // https://knexjs.org/guide/#pool "...recommended to set min: 0 so all idle connections can be terminated"
     max: 10,
     afterCreate: (conn, done) => {
-      console.log("Postgres connected.");
+      console.info("Postgres connected.");
       done();
     },
   }

@@ -172,7 +172,7 @@ export const tmdb = {
         releaseDate: item.release_date,
         posterThumb: `${defaults.config.images.secure_base_url}${defaults.config.images.poster_sizes[0]}/${item.poster_path}`,
         overview: item.overview,
-        reviewScore: item.vote_average
+        tmdbScore: item.vote_average
       }))
     } catch (e) {
       console.error("Error fetching movies:", e);
@@ -183,7 +183,7 @@ export const tmdb = {
         releaseDate: '2/10/22',
         posterThumb: `${defaults.config.images.secure_base_url}${defaults.config.images.poster_sizes[0]}/item.poster_path`,
         overview: 'Test overiew.  Lorem ipsum dolor and shit',
-        reviewScore: 7
+        tmdbScore: 7
       }]
     }
     return { movies }
@@ -191,7 +191,7 @@ export const tmdb = {
 
   async getMoviesDetail(id) {
     const params = {
-      append_to_response: 'videos,release_dates,watch/providers'
+      append_to_response: 'videos,release_dates,watch/providers,external_ids'
     }
     let movie
 
@@ -202,6 +202,7 @@ export const tmdb = {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
+      // console.log(json)
       let providers = json['watch/providers'].results[defaults.region]
       if (providers) {
         // reshape, reduce, and mutate data
@@ -229,11 +230,13 @@ export const tmdb = {
       const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
 
       movie = {
-        id: json.id,
+        tmdbId: json.id,
+        imdbId: json.external_ids.imdb_id,
+        wikiId: json.external_ids.wikidata_id,
         title: json.title,
         overview: json.overview,
         releaseDate: json.release_date,
-        reviewScore: json.vote_average,
+        tmdbScore: json.vote_average,
         rating,
         runtime: json.runtime,
         languages: json.spoken_languages.map(lang => lang.english_name).join(', '),

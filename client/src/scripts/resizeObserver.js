@@ -2,7 +2,6 @@ const resizeObserver = new ResizeObserver(handleResize)
 const filter = document.querySelector('.movies-filter')
 
 function handleResize(entries) {
-  console.log('handleResize')
   let size
 
   entries.forEach((entry) => {
