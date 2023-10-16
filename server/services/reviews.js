@@ -38,8 +38,8 @@ export const reviewService = {
             tmdbScore,
             imdbId,
             imdbScore,
-            rtPath: rtData.path,
-            rtScore: rtData.avgScore
+            rtPath: rtData?.path,
+            rtScore: rtData?.avgScore
         })
 
         await browser.close();
@@ -89,8 +89,9 @@ export const reviewService = {
         }
     },
     async getRTData(wikiId, title, releaseDate, browserCtx) {
+        let path
         // TODO: handle timeout error - locator.getAttribute: Timeout 30000ms exceeded.
-        let path = await reviews.getRTPath(wikiId)
+        if (wikiId) path = await reviews.getRTPath(wikiId)
         if (!path) path = await this.fetchRTPath(wikiId, title, releaseDate)
         if (!path) return
 
@@ -99,7 +100,7 @@ export const reviewService = {
 
         // TODO: parallelize
         // TODO: handle TimeoutError waiting for locator('#scoreboard').first()
-        const element = await page.locator('#scoreboard').first().catch(e => console.log(e))
+        const element = await page.locator('#scoreboard').first()
         const score1 = await element.getAttribute('tomatometerscore')
         const score2 = await element.getAttribute('audiencescore')
         const avgScore = average([parseInt(score1), parseInt(score2)])
