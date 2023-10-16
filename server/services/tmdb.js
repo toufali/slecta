@@ -189,7 +189,7 @@ export const tmdb = {
     return { movies }
   },
 
-  async getMoviesDetail(id) {
+  async getMovieDetail(id) {
     const params = {
       append_to_response: 'videos,release_dates,watch/providers,external_ids'
     }
@@ -252,7 +252,7 @@ export const tmdb = {
     return movie
   },
 
-  async getMoviesTrailer(id) {
+  async getMovieTrailer(id) {
     try {
       // https://api.themoviedb.org/3/movie/{movie_id}/videos
       const res = await fetch(`${apiUrl}/movie/${id}/videos`, { headers })

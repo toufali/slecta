@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import { reviews } from '../db/tables/reviews.js';
+import { reviews } from '../models/reviewModel.js';
 import { average } from '../../scripts/math.js';
 
 const defaults = {

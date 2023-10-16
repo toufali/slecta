@@ -4,3 +4,9 @@ import './components/rangeSlider.js'
 // import './app.js'
 import './matchMedia.js'
 import './resizeObserver.js'
+
+// dynamic import client script associated with partial if it exists
+const { partial } = document.body.dataset
+await import(`./partials/${partial}.js`)
+  .then(module => module.default())
+  .catch(e => console.info(`Client script for ${partial} not found.`))

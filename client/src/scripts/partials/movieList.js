@@ -1,7 +1,7 @@
 import '../components/movieCard.js'
 
-const form = document.querySelector('[data-partial="moviesList"] form')
-const list = document.querySelector('[data-partial="moviesList"] ul')
+const form = document.querySelector('[data-partial="movieList"] form')
+const list = document.querySelector('[data-partial="movieList"] ul')
 const filterToggle = document.querySelector('.filter-toggle')
 // const state = new Proxy({
 //   searchParams: null,
@@ -16,12 +16,14 @@ const filterToggle = document.querySelector('.filter-toggle')
 //   }
 // })
 
-filterToggle.addEventListener('mousedown', handleMouseEvent)
-form.elements['score'].addEventListener('input', handleInput)
-form.elements['count'].addEventListener('input', handleInput)
-form.elements['years'].addEventListener('input', handleInput)
-form.addEventListener('change', handleChange)
-form.addEventListener('submit', handleSubmit)
+export default function init() {
+  filterToggle.addEventListener('mousedown', handleMouseEvent)
+  form.elements['score'].addEventListener('input', handleInput)
+  form.elements['count'].addEventListener('input', handleInput)
+  form.elements['years'].addEventListener('input', handleInput)
+  form.addEventListener('change', handleChange)
+  form.addEventListener('submit', handleSubmit)
+}
 
 function handleChange(e) {
   if (document.documentElement.hasAttribute('desktop')) {
@@ -50,7 +52,6 @@ function handleMouseEvent(e) {
 }
 
 async function handleSubmit(e) {
-  console.log('handleSubmit')
   if (e) e.preventDefault()
 
   const searchParams = new URLSearchParams(new FormData(form))

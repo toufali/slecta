@@ -1,4 +1,4 @@
-import { knex } from '../index.js'
+import { knex } from './index.js'
 
 const reviews = {
   async getScores(tmdbId) {

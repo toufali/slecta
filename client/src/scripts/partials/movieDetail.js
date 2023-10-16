@@ -2,8 +2,10 @@ const figure = document.querySelector('figure')
 const trailer = figure.querySelector('iframe')
 const playBtn = figure.querySelector('button')
 
-if (trailer) {
-  playBtn.addEventListener('click', playTrailer)
+export default function init() {
+  if (trailer) {
+    playBtn.addEventListener('click', playTrailer)
+  }
 }
 
 function playTrailer(e) {

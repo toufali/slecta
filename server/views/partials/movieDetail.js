@@ -26,7 +26,8 @@ function providers(items) {
     .join('')
 }
 
-export const moviesDetail = data => `
+export const movieDetail = data => `
+<link rel='stylesheet' href='/styles/partials/movieDetail.css' type='text/css'>
 <figure>
   <img src='${data.movie.backdropUrl}'>
   ${ytTrailer(data.movie.ytTrailerId)}

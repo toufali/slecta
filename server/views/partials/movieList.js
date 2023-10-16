@@ -50,7 +50,8 @@ const withRatings = data => {
   return html
 }
 
-export const moviesList = data => `
+export const movieList = data => `
+<link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
 <ul class='movies-list'></ul>
 <form class='movies-filter' action='/api/v1/movies'>
   <header>
