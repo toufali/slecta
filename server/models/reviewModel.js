@@ -1,6 +1,6 @@
 import { knex } from './index.js'
 
-const reviews = {
+export const reviewModel = {
   async getScores(tmdbId) {
     const res = await knex.first('imdb_score', 'rt_score')
       .from('reviews')
@@ -13,7 +13,7 @@ const reviews = {
       .from('reviews')
       .where('wiki_id', wikiId)
 
-    return res
+    return res?.rt_path
   },
   async upsert(data) {
     const timestamp = new Date();
@@ -37,5 +37,3 @@ const reviews = {
     return res[0]
   }
 }
-
-export { reviews }

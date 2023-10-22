@@ -17,7 +17,7 @@ function ytTrailer(id) {
 }
 
 function providers(items) {
-  if (!items) return ''
+  if (!items) return 'No providers found'
 
   const limit = 6
 
@@ -32,7 +32,7 @@ export const movieDetail = data => `
   <img src='${data.movie.backdropUrl}'>
   ${ytTrailer(data.movie.ytTrailerId)}
 </figure>
-<article id='${data.movie.tmdbId}'>
+<article id='${data.movie.tmdbId}' data-wiki-id='${data.movie.wikiId}' data-imdb-id='${data.movie.imdbId}'>
   <header>
     <h1>${data.movie.title}</h1>
     <ul class='details'>
@@ -42,7 +42,10 @@ export const movieDetail = data => `
     </ul>
   </header>
   <p>${data.movie.overview}</p>
-  <p><label>Review score:</label>${Math.round(data.movie.avgScore * 10)}%</p>
+  <p>
+    <label>Review score:</label>
+    <output data-tmdb-score='${data.movie.tmdbScore}' data-avg-score='${data.movie.avgScore}'>${data.movie.avgScore ? Math.round(data.movie.avgScore * 10) + '%' : 'Not available'}</output>
+  </p>
   <p><label>Running time:</label>${data.movie.runtime} min</p>
   <p><label>Spoken languages:</label>${data.movie.languages}</p>
   <div class='providers'>

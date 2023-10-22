@@ -28,32 +28,19 @@ export async function showMovieList(ctx) {
 export async function showMovieDetail(ctx) {
   if (ctx.state.cacheData) {
     var movie = ctx.state.cacheData
-    movie.avgScore = movie.avgScore ?? await reviewService.getAvgScore(ctx.params.id)
   } else {
     var [movie, avgScore] = await Promise.all([tmdb.getMovieDetail(ctx.params.id), reviewService.getAvgScore(ctx.params.id)])
     movie.avgScore = avgScore
   }
 
-  if (!movie.avgScore) {
-    // console.log('DB data not available for avgScore. Set event-stream')
-    // ctx.set({
-    //   "Content-Type": "text/event-stream",
-    //   "Cache-Control": "no-cache",
-    //   "Connection": "keep-alive",
-    // });
-
-    // console.log('about to write some data')
-
-    // ctx.res.write(`data: CONNECTION ESTABLISHED)}\n\n`);
-
-    // setTimeout(() => ctx.res.write(`data: INTERVAL CALLED)}\n\n`), 3000)
-
-    console.log('Scores not ready. Populate in background.')
-    const scores = reviewService.populateScores(movie) // run async function without blocking response
-    // add server event here
+  if (!avgScore) {
+    // movie score not available, set low TTL cache
+    ctx.state.cacheTTL = 60 // seconds – after testing, increase this to 1+ hr!
+    ctx.set('Cache-Control', 'max-age=1200')
+  } else {
+    ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   }
 
-  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   ctx.state.cacheData = movie // store JSON data for cache when response body is text/html
 
   return ctx.body = mainView({
@@ -82,4 +69,18 @@ export async function getMovieTrailer(ctx) {
 
   ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = trailer
+}
+
+export async function getMovieScore(ctx) {
+  const tmdbId = ctx.params.id
+  let { wikiId, imdbId, tmdbScore, title, releaseDate } = ctx.query
+  let avgScore = ctx.state.cacheData ?? await reviewService.getAvgScore(tmdbId)
+
+  if (!avgScore) {
+    // TODO: create "resource registry" to return active promise that is populating the scores, instead of each request crawling for the resource
+    avgScore = await reviewService.populateScores({ title, releaseDate, wikiId, tmdbId, tmdbScore, imdbId })
+  }
+
+  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
+  return ctx.body = avgScore
 }

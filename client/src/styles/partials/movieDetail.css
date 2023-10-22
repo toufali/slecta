@@ -92,6 +92,10 @@ label {
   position: relative;
 }
 
+.details li:empty {
+  display: none;
+}
+
 .details li::before {
   position: absolute;
   top: 0;

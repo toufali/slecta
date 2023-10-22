@@ -33,12 +33,11 @@ export const redis = {
       await next()
       console.log('---Response data received:', ctx.type)
       value = ctx.type === 'application/json' ? ctx.body : ctx.state.cacheData 
-
       if (!value) throw new Error('Cannot store invalid value in cache')
 
       await client.set(key, JSON.stringify(value), {
         // EX: 60 * 60 * 12, // sec * min * hr
-        EX: 60 * 1,
+        EX: ctx.state.cacheTTL ?? 60,
         // EX: 10,
         NX: false, // NX = Only set the key if it does not already exist.
       })
