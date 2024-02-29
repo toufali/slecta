@@ -1,7 +1,3 @@
-import dotenv from 'dotenv' // can't use env.js because it's not imported in npm script
-
-dotenv.config({ path: '../../.env' })
-
 export default {
   client: 'pg',
   connection: process.env.DATABASE_URL,

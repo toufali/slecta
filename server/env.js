@@ -1,9 +1,6 @@
-import dotenv from 'dotenv'
-
-dotenv.config({ path: '../.env' })
-
 const requiredKeys = [
   'TMDB_TOKEN',
+  'TMDB_API_URL',
   'REDISHOST',
   'REDISPORT',
   'DATABASE_URL'

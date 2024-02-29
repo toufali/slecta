@@ -1,4 +1,4 @@
-import '../components/movieCard.js'
+// import '../components/movieCard.js'
 
 const form = document.querySelector('[data-partial="movieList"] form')
 const list = document.querySelector('[data-partial="movieList"] ul')

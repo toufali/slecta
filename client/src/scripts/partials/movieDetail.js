@@ -28,11 +28,12 @@ async function getAvgScore() {
   const releaseDate = article.querySelector('.details time').getAttribute('datetime')
   const url = `/api/v1/movies/${tmdbId}/score?wikiId=${wikiId}&imdbId=${imdbId}&tmdbScore=${tmdbScore}&title=${title}&releaseDate=${releaseDate}`
   avgScore.classList.add('loading')
-  avgScore.textContent = 'calculating '
+  avgScore.title = 'calculating '
   const res = await fetch(url)
   const score = await res.json()
   console.log('got avgScore:', score)
   avgScore.classList.remove('loading')
+  avgScore.title = ''
 
-  avgScore.textContent = score ? Math.round(score * 10) + '%' : 'Not available'
+  avgScore.textContent = score ? Math.round(score) + '%' : 'Not available'
 }

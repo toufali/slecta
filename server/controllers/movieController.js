@@ -1,47 +1,20 @@
-import { tmdb } from '../services/tmdb.js'
+import tmdb from '../services/tmdbService.js'
+import scoreService from '../services/scoreService.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
 import { movieDetail } from '../views/partials/movieDetail.js'
-import { reviewService } from '../services/reviewService.js'
 
 export async function showMovieList(ctx) {
-  // This is to populate initial form view. Actual movie results are triggered via client API call.
-  // Initial form values are first pulled from url query, else we set a default.
-  const currentYear = new Date().getFullYear()
+  const movies = await tmdb.getMovies(ctx.query)
 
   return ctx.body = mainView({
     partial: movieList,
-    allGenres: tmdb.defaults.genres,
-    allRatings: tmdb.defaults.ratings,
-    currentYear,
-    withGenres: ctx.query.wg ?? '',
-    withoutGenres: ctx.query.wog ?? '',
-    withRatings: ctx.query.wr ?? '',
-    sort: ctx.query.sort ?? 'vote_average.desc',
-    tmdbScore: ctx.query.score ?? 60,
-    reviewCount: ctx.query.count ?? 100,
-    streaming: ctx.query.streaming,
-    years: ctx.query.years ?? `${currentYear - 1},${currentYear}`
+    movies
   })
 }
 
 export async function showMovieDetail(ctx) {
-  if (ctx.state.cacheData) {
-    var movie = ctx.state.cacheData
-  } else {
-    var [movie, avgScore] = await Promise.all([tmdb.getMovieDetail(ctx.params.id), reviewService.getAvgScore(ctx.params.id)])
-    movie.avgScore = avgScore
-  }
-
-  if (!avgScore) {
-    // movie score not available, set low TTL cache
-    ctx.state.cacheTTL = 60 // seconds – after testing, increase this to 1+ hr!
-    ctx.set('Cache-Control', 'max-age=1200')
-  } else {
-    ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
-  }
-
-  ctx.state.cacheData = movie // store JSON data for cache when response body is text/html
+  const movie = await tmdb.getMovieDetail(ctx.params.id)
 
   return ctx.body = mainView({
     partial: movieDetail,
@@ -58,29 +31,71 @@ export async function getMovies(ctx) {
 }
 
 export async function getMovieDetail(ctx) {
-  const movie = ctx.state.cacheData ?? await tmdb.getMovieDetail(ctx.params.id)
+  // const movie = ctx.state.cacheData ?? await tmdb.getMovieDetail(ctx.params.id)
+  const movie = await tmdb.getMovieDetail(ctx.params.id)
+  const score = await scoreService.getAvgScore()
 
-  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
+  // ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = movie
-}
-
-export async function getMovieTrailer(ctx) {
-  const trailer = ctx.state.cacheData ?? await tmdb.getMovieTrailer(ctx.params.id)
-
-  ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
-  return ctx.body = trailer
 }
 
 export async function getMovieScore(ctx) {
   const tmdbId = ctx.params.id
   let { wikiId, imdbId, tmdbScore, title, releaseDate } = ctx.query
-  let avgScore = ctx.state.cacheData ?? await reviewService.getAvgScore(tmdbId)
+  let avgScore = await scoreService.getAvgScore({ title, releaseDate, wikiId, tmdbScore: parseInt(tmdbScore), imdbId })
 
-  if (!avgScore) {
-    // TODO: create "resource registry" to return active promise that is populating the scores, instead of each request crawling for the resource
-    avgScore = await reviewService.populateScores({ title, releaseDate, wikiId, tmdbId, tmdbScore, imdbId })
-  }
+  // if (!avgScore) {
+  //   // TODO: consider a "resource registry" to return active promise that is populating the scores, instead of each request crawling for the resource
+  //   // https://medium.com/pipedrive-engineering/resource-optimization-in-node-js-c90c731f9df4
+  //   avgScore = await reviewService.populateScores({ title, releaseDate, wikiId, tmdbId, tmdbScore, imdbId })
+  // }
 
   ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
   return ctx.body = avgScore
 }
+
+
+// export async function showMovieList_old(ctx) {
+//   // This is to populate initial form view. Actual movie results are triggered via client API call.
+//   // Initial form values are first pulled from url query, else we set a default.
+//   const currentYear = new Date().getFullYear()
+
+//   return ctx.body = mainView({
+//     partial: movieList,
+//     allGenres: tmdb.defaults.genres,
+//     allRatings: tmdb.defaults.ratings,
+//     currentYear,
+//     withGenres: ctx.query.wg ?? '',
+//     withoutGenres: ctx.query.wog ?? '',
+//     withRatings: ctx.query.wr ?? '',
+//     sort: ctx.query.sort ?? 'vote_average.desc',
+//     tmdbScore: ctx.query.score ?? 60,
+//     reviewCount: ctx.query.count ?? 100,
+//     streaming: ctx.query.streaming,
+//     years: ctx.query.years ?? `${currentYear - 1},${currentYear}`
+//   })
+// }
+
+// export async function showMovieDetail_old(ctx) {
+//   if (ctx.state.cacheData) {
+//     var movie = ctx.state.cacheData
+//   } else {
+//     var [movie, avgScore] = await Promise.all([tmdb.getMovieDetail(ctx.params.id), reviewService.getAvgScore(ctx.params.id)])
+//     movie.avgScore = avgScore
+//   }
+
+//   if (!avgScore) {
+//     // movie score not available, set low TTL cache
+//     ctx.state.cacheTTL = 60 // seconds – after testing, increase this to 1+ hr!
+//     ctx.set('Cache-Control', 'max-age=1200')
+//   } else {
+//     ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
+//   }
+
+//   ctx.state.cacheData = movie // store JSON data for cache when response body is text/html
+
+//   return ctx.body = mainView({
+//     partial: movieDetail,
+//     movie
+//   })
+// }
