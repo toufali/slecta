@@ -6,7 +6,7 @@
   "license": "ISC",
   "description": "",
   "scripts": {
-    "start": "npm run build -w client && npm start -w server",
+    "start": "node -v && npm run build -w client && npm start -w server",
     "dev": "npm run dev -w server",
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
