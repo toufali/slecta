@@ -22,4 +22,7 @@ optionalKeys.forEach(key => {
   if (value) env[key] = value
 })
 
+console.log('process.env.TMDB_API_URL:', process.env.TMDB_API_URL)
+console.log('env.js all done. TMDB_API_URL:', env.TMDB_API_URL)
+
 export default Object.freeze(env)

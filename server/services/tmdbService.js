@@ -48,6 +48,7 @@ class TmdbService {
     let config
     try {
       // TODO: use Redis to store this, especially for offline
+      console.log('TMDB_API_URL:', TMDB_API_URL)
       const res = await fetch(`${TMDB_API_URL}/configuration`, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
