@@ -1,11 +1,11 @@
 FROM node:20-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY package.json ./
+COPY . ./
 
 RUN npm install
 
-COPY . ./
+RUN echo "WORKSPACE=$WORKSPACE" >> .env
 
 CMD [ "npm", "start" ]
