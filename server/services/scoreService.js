@@ -1,4 +1,4 @@
-import { firefox } from 'playwright';
+import { chromium } from 'playwright';
 import { reviewModel } from '../models/reviewModel.js';
 import { average } from '../../scripts/math.js';
 
@@ -15,7 +15,7 @@ class ScoreService {
     browserCtx
 
     async init() {
-        this.browser = await firefox.launch()
+        this.browser = await chromium.launch()
         this.browserCtx = await this.browser.newContext({
             userAgent: this.userAgent
         });
@@ -151,7 +151,7 @@ const reviewService = {
         wikiId = wikiId === 'null' ? null : wikiId
         tmdbScore = parseFloat(tmdbScore)
 
-        const browser = await firefox.launch();
+        const browser = await chromium.launch();
         const browserCtx = await browser.newContext({
             userAgent: defaults.userAgent,
         });
