@@ -1,9 +1,6 @@
 const requiredKeys = [
   'TMDB_TOKEN',
-  'TMDB_API_URL',
-  'REDISHOST',
-  'REDISPORT',
-  'DATABASE_URL'
+  'TMDB_API_URL'
 ]
 
 const optionalKeys = [
