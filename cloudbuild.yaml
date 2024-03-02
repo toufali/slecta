@@ -1,13 +1,17 @@
 steps:
 - name: 'node:20'
   entrypoint: 'npm'
-  args: ['install']
+  args: ['ci']
+- name: mcr.microsoft.com/playwright:v1.42.0
+  script: npx playwright install --with-deps
+  env:
+  - 'CI=true'
 - name: node:20
   entrypoint: npm
   args: ["run", "env:make"]
   env:
-    - 'TMDB_TOKEN=${_TMDB_TOKEN}'
-    - 'TMDB_API_URL=${_TMDB_API_URL}'
+  - 'TMDB_TOKEN=${_TMDB_TOKEN}'
+  - 'TMDB_API_URL=${_TMDB_API_URL}'
 - name: 'node:20'
   entrypoint: 'npm'
   args: ['start']
