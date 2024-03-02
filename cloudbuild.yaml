@@ -1,0 +1,13 @@
+steps:
+- name: 'node'
+  entrypoint: 'npm'
+  args: ['install']
+- name: node
+  entrypoint: npm
+  args: ["run", "env:make"]
+  env:
+    - 'TMDB_TOKEN=${_TMDB_TOKEN}'
+    - 'TMDB_API_URL=${_TMDB_API_URL}'
+- name: 'node'
+  entrypoint: 'npm'
+  args: ['start']

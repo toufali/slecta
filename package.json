@@ -1,6 +1,9 @@
 {
   "name": "slector",
   "version": "2.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "author": "A Toufali",
   "license": "ISC",
@@ -11,7 +14,8 @@
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
     "db:migrate": "npm run db:migrate -w server",
-    "db:rollback": "npm run db:rollback -w server"
+    "db:rollback": "npm run db:rollback -w server",
+    "env:make": "printenv > .env"
   },
   "workspaces": [
     "server",
