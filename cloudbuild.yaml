@@ -1,20 +1,4 @@
 steps:
-# - name: 'node:20-alpine'
-#   script: npm install
-# - name: node:20-alpine
-#   script: npm run env:make
-#   env:
-#   - 'TMDB_TOKEN=${_TMDB_TOKEN}'
-#   - 'TMDB_API_URL=${_TMDB_API_URL}'
-#   - 'PLAYWRIGHT_BROWSERS_PATH=0'
-# - name: mcr.microsoft.com/playwright:v1.42.0
-#   script: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
-#   env:
-#   - 'PLAYWRIGHT_BROWSERS_PATH=0'
-# - name: 'gcr.io/cloud-builders/docker'
-#   args: [ 'build', '-t', '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}', '.' ]
-# images:
-# - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}'
 # Build the container image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA', '.']
