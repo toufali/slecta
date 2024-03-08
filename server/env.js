@@ -8,7 +8,7 @@ const optionalKeys = [
 ]
 
 const env = {
-  STATIC_DIR: process.env.npm_lifecycle_event === 'start' ? 'dist' : 'src',
+  STATIC_DIR: process.env.npm_lifecycle_event === 'dev' ? 'src' : 'dist', // if `npm run dev` load uncompressed assets from src
 }
 
 requiredKeys.forEach(key => {
