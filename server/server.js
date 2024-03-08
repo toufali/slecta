@@ -14,10 +14,10 @@ const { PORT, STATIC_DIR } = env
 await tmdb.init()
 await scoreService.init()
 
-
-// STATIC_DIR set to 'dist' if `npm start` was run, which also triggers build/bundle via ESBuild
-// STATIC_DIR set to 'src' otherwise for dev – files are served directly without build/bundle
-server.use(serve(`../client/${STATIC_DIR}`));
+// STATIC_DIR set to 'src' if `npm run dev` called. Files are served direct from source without build/bundle
+// Otherwise, STATIC_DIR defaults to 'dist' – client build required to serve files from bundle
+const staticUrl = new URL(`../client/${STATIC_DIR}`, import.meta.url);
+server.use(serve(staticUrl.pathname));
 server.use(routes)
 
 server.listen(PORT, function () {
