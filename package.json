@@ -9,8 +9,9 @@
   "license": "ISC",
   "description": "",
   "scripts": {
-    "start": "npm run build -w client && npm start -w server",
-    "dev": "npm run dev -w server",
+    "prestart": "npm run build -w client",
+    "start": "node --env-file=.env server/server.js",
+    "dev": "nodemon --env-file=.env server/server.js",
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
     "db:migrate": "npm run db:migrate -w server",
