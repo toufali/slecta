@@ -5,8 +5,7 @@ const requiredKeys = [
 
 const optionalKeys = [
   'PORT',
-  'REDISHOST',
-  'REDISPORT'
+  'REDIS_URL'
 ]
 
 const env = {

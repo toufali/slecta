@@ -9,13 +9,13 @@ export const redis = {
 
     try {
       client = createClient({
-        url: `redis://${env.REDISHOST}:${env.REDISPORT}`
+        url: env.REDIS_URL
       })
       client.on('error', err => console.error('Redis Client Error', err))
       await client.connect()
       console.info('Redis client connected.')
     } catch (e) {
-      console.error('Unable to initialize Redis:', e.code, e.input)
+      console.error('Unable to initialize Redis:', e)
     }
   },
 
