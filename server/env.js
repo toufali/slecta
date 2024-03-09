@@ -5,10 +5,14 @@ const requiredKeys = [
 
 const optionalKeys = [
   'PORT',
+  'REDISHOST',
+  'REDISPORT'
 ]
 
 const env = {
-  STATIC_DIR: process.env.npm_lifecycle_event === 'dev' ? 'src' : 'dist', // if `npm run dev` load uncompressed assets from src
+  // STATIC_DIR set to 'src' if `npm run dev` called. Files are served direct from source without build/bundle
+  // else, default to 'dist'. Client build required to serve files from bundle
+  STATIC_DIR: process.env.npm_lifecycle_event === 'dev' ? 'src' : 'dist'
 }
 
 requiredKeys.forEach(key => {

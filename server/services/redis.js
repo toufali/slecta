@@ -5,17 +5,23 @@ let client
 
 export const redis = {
   async init() {
-    if (client) return console.info('Redis client already connected.')
+    if (client) return console.info('Redis client was already connected.')
 
-    client = createClient({
-      url: `redis://${env.REDISHOST}:${env.REDISPORT}`
-    })
-    client.on('error', err => console.log('Redis Client Error', err))
-    await client.connect()
-    console.info('Redis client connected.')
+    try {
+      client = createClient({
+        url: `redis://${env.REDISHOST}:${env.REDISPORT}`
+      })
+      client.on('error', err => console.error('Redis Client Error', err))
+      await client.connect()
+      console.info('Redis client connected.')
+    } catch (e) {
+      console.error('Unable to initialize Redis:', e.code, e.input)
+    }
   },
 
   async cache(ctx, next) {
+    if (!client) return next()
+
     const key = JSON.stringify(ctx.path + ctx.search)
     let value
 

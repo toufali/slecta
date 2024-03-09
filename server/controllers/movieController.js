@@ -14,7 +14,10 @@ export async function showMovieList(ctx) {
 }
 
 export async function showMovieDetail(ctx) {
-  const movie = await tmdb.getMovieDetail(ctx.params.id)
+  console.log('showMovieDetail cacheData:', ctx.state.cacheData)
+  const movie = ctx.state.cacheData ?? await tmdb.getMovieDetail(ctx.params.id)
+
+  ctx.state.cacheData = movie // store JSON data for cache when response body is text/html
 
   return ctx.body = mainView({
     partial: movieDetail,
@@ -40,9 +43,11 @@ export async function getMovieDetail(ctx) {
 }
 
 export async function getMovieScore(ctx) {
-  const tmdbId = ctx.params.id
-  let { wikiId, imdbId, tmdbScore, title, releaseDate } = ctx.query
-  let avgScore = await scoreService.getAvgScore({ title, releaseDate, wikiId, tmdbScore: parseInt(tmdbScore), imdbId })
+  console.log('getMovieScore cacheData:', ctx.state.cacheData)
+  const { wikiId, imdbId, tmdbScore, title, releaseDate } = ctx.query
+  const avgScore = ctx.state.cacheData ?? await scoreService.getAvgScore({ title, releaseDate, wikiId, tmdbScore: parseInt(tmdbScore), imdbId })
+
+  // const tmdbId = ctx.params.id
 
   // if (!avgScore) {
   //   // TODO: consider a "resource registry" to return active promise that is populating the scores, instead of each request crawling for the resource

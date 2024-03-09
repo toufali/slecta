@@ -22,7 +22,6 @@ class ScoreService {
         this.browserCtx.setDefaultTimeout(this.defaultTimeout);
         this.browserCtx.setDefaultNavigationTimeout(this.defaultNavigationTimeout);
         console.log('Browser connected:', this.browser.isConnected())
-        console.log('Browser version:', this.browser.version())
     }
 
     async getAvgScore(data) {

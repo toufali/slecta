@@ -70,7 +70,7 @@ async function getMovieData(searchParams) {
   try {
     const res = await fetch(`${form.action}?${searchParams}`)
 
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
 
     const { movies } = await res.json()
     movieData = movies
