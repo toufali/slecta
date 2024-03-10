@@ -16,7 +16,8 @@
     "db:make": "npm run db:make -w server",
     "db:migrate": "npm run db:migrate -w server",
     "db:rollback": "npm run db:rollback -w server",
-    "env:make": "printenv > .env"
+    "docker:build": "docker build -t slecta .",
+    "docker:run": "docker run --env-file .env -p 3210:3210 slecta"
   },
   "workspaces": [
     "server",

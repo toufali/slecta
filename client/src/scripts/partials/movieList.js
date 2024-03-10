@@ -2,7 +2,7 @@
 
 const form = document.querySelector('[data-partial="movieList"] form')
 const list = document.querySelector('[data-partial="movieList"] ul')
-const filterToggle = document.querySelector('.filter-toggle')
+// const filterToggle = document.querySelector('.filter-toggle')
 // const state = new Proxy({
 //   searchParams: null,
 // }, {
@@ -17,12 +17,13 @@ const filterToggle = document.querySelector('.filter-toggle')
 // })
 
 export default function init() {
-  filterToggle.addEventListener('mousedown', handleMouseEvent)
-  form.elements['score'].addEventListener('input', handleInput)
-  form.elements['count'].addEventListener('input', handleInput)
-  form.elements['years'].addEventListener('input', handleInput)
-  form.addEventListener('change', handleChange)
-  form.addEventListener('submit', handleSubmit)
+  console.log('init movieList.js (which does nothing right now)')
+  // filterToggle.addEventListener('mousedown', handleMouseEvent)
+  // form.elements['score'].addEventListener('input', handleInput)
+  // form.elements['count'].addEventListener('input', handleInput)
+  // form.elements['years'].addEventListener('input', handleInput)
+  // form.addEventListener('change', handleChange)
+  // form.addEventListener('submit', handleSubmit)
 }
 
 function handleChange(e) {

@@ -9,4 +9,4 @@ import './resizeObserver.js'
 const { partial } = document.body.dataset
 if (partial) await import(`./partials/${partial}.js`)
   .then(module => module.default())
-  .catch(e => console.info(`Client script for ${partial} not found.`))
+  .catch(e => console.info(`Could not load client script for ${partial}:`, e))
