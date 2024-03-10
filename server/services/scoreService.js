@@ -44,7 +44,9 @@ class ScoreService {
             await page.goto(this.imdbBaseUrl + imdbId, { waitUntil: 'domcontentloaded' })
 
             // TODO: use page.getByTestId(). Regex can be for validation? Or maybe with 'hasText'?
-            var imdbScore = await page.getByText(/^\d\d?\.\d$/).first().textContent() // finds IMDB decimal score
+
+            var imdbScore = await page.getByTestId('hero-rating-bar__aggregate-rating__score').getByText(/^\d\d?\.\d$/).first().textContent() // finds IMDB decimal score
+            // var imdbScore = await page.getByText(/^\d\d?\.\d$/).first().textContent() // finds IMDB decimal score
             imdbScore = parseFloat(imdbScore) * 10 // adjusted to 100 scale
 
             var metaScore = await page.locator('.metacritic-score-box').first().textContent()
