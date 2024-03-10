@@ -3,7 +3,7 @@ import { reviewModel } from '../models/reviewModel.js';
 import { average } from '../../scripts/math.js';
 
 class ScoreService {
-    defaultTimeout = 500
+    defaultTimeout = 1000
     defaultNavigationTimeout = 5000
     blockedResources = ['stylesheet', 'image', 'images', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other']
     imdbBaseUrl = 'https://www.imdb.com/title/'
