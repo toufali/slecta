@@ -1,22 +1,21 @@
-# FROM node:20-slim
-FROM mcr.microsoft.com/playwright:v1.42.1-jammy
+FROM node:20-slim
 
-RUN groupadd --gid 1001 app \
-  && useradd --uid 1001 --gid app --shell /bin/bash --create-home app
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/node/ms-playwright
 
-WORKDIR /home/app
+WORKDIR /home/node
 
-COPY --chown=app:app package*.json ./
-COPY --chown=app:app ./server ./server
-COPY --chown=app:app ./client ./client
-COPY --chown=app:app ./scripts ./scripts
-COPY --chown=app:app ./components ./components
+COPY --chown=node:node ./package*.json ./
+COPY --chown=node:node ./server ./server
+COPY --chown=node:node ./client ./client
+COPY --chown=node:node ./scripts ./scripts
+COPY --chown=node:node ./components ./components
 
 RUN touch .env
 RUN npm ci
+RUN npx playwright install firefox --with-deps
 RUN npm run prestart
 
-USER app
+USER node
 
 ENTRYPOINT ["node"]
 
