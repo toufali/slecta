@@ -33,7 +33,7 @@ export const mainView = data => `
 </head>
 <body data-partial='${data.partial.name}'>
   <main>
-    ${data.partial(data)}
+    ${data.partial(data.content)}
   </main>
 
   <footer></footer>

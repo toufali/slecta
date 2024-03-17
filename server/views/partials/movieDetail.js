@@ -29,28 +29,28 @@ function providers(items) {
 export const movieDetail = data => `
 <link rel='stylesheet' href='/styles/partials/movieDetail.css' type='text/css'>
 <figure>
-  <img src='${data.movie.backdropUrl}'>
-  ${ytTrailer(data.movie.ytTrailerId)}
+  <img src='${data.backdropUrl}'>
+  ${ytTrailer(data.ytTrailerId)}
 </figure>
-<article id='${data.movie.tmdbId}' data-wiki-id='${data.movie.wikiId}' data-imdb-id='${data.movie.imdbId}'>
+<article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
-    <h1>${data.movie.title}</h1>
+    <h1>${data.title}</h1>
     <ul class='details'>
-      <li><time title='Release date' datetime="${data.movie.releaseDate}">${new Date(data.movie.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
-      <li title='Rating'>${data.movie.rating}</li>
-      <li class='genres' title='${data.movie.genres}'><p>${data.movie.genres}</p></li>
+      <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
+      <li title='Rating'>${data.rating}</li>
+      <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
     </ul>
   </header>
-  <p>${data.movie.overview}</p>
+  <p>${data.overview}</p>
   <p>
     <label>Review score:</label>
-    <output data-tmdb-score='${data.movie.tmdbScore}' data-avg-score='${data.movie.avgScore}'>${data.movie.avgScore ? Math.round(data.movie.avgScore * 10) + '%' : ''}</output>
+    <output data-tmdb-score='${data.tmdbScore}' data-avg-score='${data.avgScore}'>${data.avgScore ? Math.round(data.avgScore * 10) + '%' : ''}</output>
   </p>
-  <p><label>Running time:</label>${data.movie.runtime} min</p>
-  <p><label>Spoken languages:</label>${data.movie.languages}</p>
+  <p><label>Running time:</label>${data.runtime} min</p>
+  <p><label>Spoken languages:</label>${data.languages}</p>
   <div class='providers'>
     <p><label>Available on:</label></p>
-    <ul>${providers(data.movie.providers)}</ul>
+    <ul>${providers(data.providers)}</ul>
   </div>
 </article>
 `

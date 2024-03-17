@@ -3,7 +3,7 @@ import serve from "koa-static"
 
 import env from "./env.js"
 import routes from './routes.js'
-import { redis } from './services/redis.js'
+import redis from './services/redisService.js'
 import tmdb from './services/tmdbService.js'
 import scoreService from './services/scoreService.js'
 
@@ -21,6 +21,6 @@ server.use(serve(staticUrl.pathname));
 server.use(routes)
 
 server.listen(PORT, function () {
-  console.info(`Server listening at port ${this.address().port}`)
-  console.info(`Static files are served from "${STATIC_DIR}" directory`)
+  console.info('Static files dir:', staticUrl.pathname)
+  console.info('Server listening at port:', this.address().port)
 });

@@ -1,4 +1,5 @@
 import env from "../env.js"
+import redis from "./redisService.js"
 
 const { TMDB_TOKEN, TMDB_API_URL } = env
 const headers = {
@@ -31,57 +32,64 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
-  config
+  imgConfig
   genres
   ratings
 
   async init() {
-    const [config, genres, ratings] = await Promise.all([this.#getConfig(), this.#getGenres(), this.#getRatings()])
-
-    this.config = config
+    const [imgConfig, genres, ratings] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings()])
+    this.imgConfig = imgConfig
     this.genres = genres
-    this.ratings = ratings[this.region]
-    console.info('TMDB init complete.')
+    this.ratings = ratings
+    console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
+    console.info('- from cache:', Boolean(this.imgConfig.cacheHit && this.genres.cacheHit && this.ratings.cacheHit))
   }
 
-  async #getConfig() {
-    let config
+  async #getImgConfig() {
+    const url = `${TMDB_API_URL}/configuration`
+
+    let imgConfig = await redis.getCache(url)
+    if (imgConfig) return imgConfig
+
     try {
-      // TODO: use Redis to store this, especially for offline
-      const res = await fetch(`${TMDB_API_URL}/configuration`, { headers })
+      const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-      config = await res.json()
+      const { images } = await res.json()
+      imgConfig = images
+      redis.setCache(url, imgConfig)
     } catch (e) {
-      console.error("Error getting TMDB config:", e)
-      console.info('Fallback using mock config.')
-      config = {
-        images: {
-          base_url: 'http://image.tmdb.org/t/p/',
-          secure_base_url: 'https://image.tmdb.org/t/p/',
-          backdrop_sizes: ['w300', 'w780', 'w1280', 'original'],
-          logo_sizes: ['w45', 'w92', 'w154', 'w185', 'w300', 'w500', 'original'],
-          poster_sizes: ['w92', 'w154', 'w185', 'w342', 'w500', 'w780', 'original'],
-          profile_sizes: ['w45', 'w185', 'h632', 'original'],
-          still_sizes: ['w92', 'w185', 'w300', 'original']
-        }
+      console.error("Error getting TMDB imgConfig:", e)
+      console.info('Fallback using mock imgConfig.')
+      imgConfig = {
+        base_url: 'http://image.tmdb.org/t/p/',
+        secure_base_url: 'https://image.tmdb.org/t/p/',
+        backdrop_sizes: ['w300', 'w780', 'w1280', 'original'],
+        logo_sizes: ['w45', 'w92', 'w154', 'w185', 'w300', 'w500', 'original'],
+        poster_sizes: ['w92', 'w154', 'w185', 'w342', 'w500', 'w780', 'original'],
+        profile_sizes: ['w45', 'w185', 'h632', 'original'],
+        still_sizes: ['w92', 'w185', 'w300', 'original']
       }
     }
-    return config
+    return imgConfig
   }
 
   async #getGenres() {
-    let genres
+    const url = `${TMDB_API_URL}/genre/movie/list?language=${this.language}`
+
+    let genres = await redis.getCache(url)
+    if (genres) return genres
+
     try {
-      // TODO: use Redis to store this, especially for offline
-      const res = await fetch(`${TMDB_API_URL}/genre/movie/list?language=${this.language}`, { headers })
+      const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const { genres: genresArr } = await res.json()
 
       genres = new Map(genresArr.map(genre => [genre.id, genre.name]))
+      redis.setCache(url, genres, 60 * 60 * 24)
     } catch (e) {
       console.error("Error getting TMDB genres:", e)
       console.info('Fallback using mock genres data.')
@@ -110,16 +118,19 @@ class TmdbService {
   }
 
   async #getRatings() {
-    let ratings
+    const url = `${TMDB_API_URL}/certification/movie/list`
+
+    let ratings = await redis.getCache(url)
+    if (ratings) return ratings
+
     try {
-      // TODO: use Redis to store this, especially for offline
-      const res = await fetch(`${TMDB_API_URL}/certification/movie/list`, { headers })
+      const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const { certifications } = await res.json()
-      ratings = certifications
-
+      ratings = certifications[this.region]
+      redis.setCache(url, ratings)
     } catch (e) {
       console.error("Error getting TMDB certifications (ratings):", e)
     }
@@ -127,9 +138,8 @@ class TmdbService {
   }
 
   async getMovies(query) {
-    let movies
-
     const params = {
+      // TODO: these params were based on deprecated filter and should be revisited
       page: query.page ?? 1,
       include_adult: this.includeAdult,
       include_video: this.includeVideo,
@@ -150,8 +160,13 @@ class TmdbService {
       }
     }
 
+    const url = `${TMDB_API_URL}/discover/movie?${new URLSearchParams(params)}`
+
+    let movies = await redis.getCache(url)
+    if (movies) return movies
+
     try {
-      const res = await fetch(`${TMDB_API_URL}/discover/movie?${new URLSearchParams(params)}`, { headers })
+      const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
@@ -161,29 +176,32 @@ class TmdbService {
         title: item.title,
         genres: item.genre_ids.map(id => this.genres.get(id)),
         releaseDate: item.release_date,
-        posterThumb: `${this.config.images.secure_base_url}${this.config.images.poster_sizes[0]}${item.poster_path}`,
+        posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
         overview: item.overview,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
         popularity: item.popularity
       }))
 
+      redis.setCache(url, movies)
+      return movies
     } catch (e) {
-      console.error("Error getting TMDB movies:", e)
+      console.error("Error fetching data:", e);
     }
-
-    return movies
   }
 
   async getMovieDetail(id) {
-    let movie
     const params = {
       append_to_response: 'videos,release_dates,watch/providers,external_ids'
     }
+    const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
+
+    let movie = await redis.getCache(url)
+    if (movie) return movie
 
     try {
       // https://api.themoviedb.org/3/movie/157336?append_to_response=videos,images
-      const res = await fetch(`${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`, { headers })
+      const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
@@ -202,7 +220,7 @@ class TmdbService {
             if (this.has(item.provider_id)) return // already in set
             if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
-            item.logoUrl = thisClass.config.images.secure_base_url + thisClass.config.images.logo_sizes[0] + item.logo_path
+            item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
             this.add(item.provider_id)
             return true
           }, new Set())
@@ -229,14 +247,14 @@ class TmdbService {
         languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
         genres: json.genres.map(genre => genre.name).join(', '),
         providers,
-        backdropUrl: this.config.images.secure_base_url + this.config.images.backdrop_sizes[2] + json.backdrop_path,
+        backdropUrl: this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path,
         ytTrailerId: ytTrailer?.key
       }
+      redis.setCache(url, movie)
+      return movie
     } catch (e) {
       console.error("Error fetching data:", e);
     }
-    // console.log(movie)
-    return movie
   }
 }
 
