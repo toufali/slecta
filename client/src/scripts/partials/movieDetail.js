@@ -9,7 +9,7 @@ export default function init() {
     playBtn.addEventListener('click', playTrailer)
   }
   if (score.dataset.avgScore === 'undefined') {
-    getAvgScore()
+    getScore()
   }
 }
 
@@ -20,7 +20,7 @@ function playTrailer(e) {
   figure.append(trailer)
 }
 
-async function getAvgScore() {
+async function getScore() {
   score.classList.add('loading')
   score.title = 'calculating '
 

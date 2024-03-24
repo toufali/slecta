@@ -59,7 +59,7 @@ export const movieCard = data => `
             <dd title='${data.genres.join(', ')}'>${data.genres.join(', ')}</dd>
             <dd>
               <time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>
-              &nbsp;&nbsp;<span title='Review score'></span>
+              &nbsp;&nbsp;<output data-avg-score='${data.score}'>${data.score ? Math.round(data.score) + '%' : ''}</output>
             </dd>
           </dl>
       </article>

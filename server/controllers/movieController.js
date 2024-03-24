@@ -1,12 +1,20 @@
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
-import redis from '../services/redisService.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
 import { movieDetail } from '../views/partials/movieDetail.js'
 
 export async function showMovies(ctx) {
   const data = await tmdb.getMovies(ctx.query)
+
+  const scores = await Promise.allSettled(data.map(movie => {
+    const key = `movies/${movie.id}/score`
+    return scoreService.getScoreFromCache(key)
+  }))
+
+  scores.forEach((score, i) => {
+    if (score.value) data[i].score = score.value.avgScore
+  })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
@@ -18,6 +26,9 @@ export async function showMovies(ctx) {
 
 export async function showMovieDetail(ctx) {
   const data = await tmdb.getMovieDetail(ctx.params.id)
+  const key = `movies/${ctx.params.id}/score`
+  const score = await scoreService.getScoreFromCache(key)
+  data.score = score?.avgScore
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
@@ -49,7 +60,7 @@ export async function getMovieDetail(ctx) {
 export async function getMovieScore(ctx) {
   const key = `movies/${ctx.params.id}/score`
 
-  let data = await scoreService.getAvgScore(key) // cache hit if response OK with key alone
+  let data = await scoreService.getScoreFromCache(key)
 
   if (data) {
     ctx.set('x-server-cache-hit', 'true')
@@ -59,7 +70,7 @@ export async function getMovieScore(ctx) {
   const movie = await tmdb.getMovieDetail(ctx.params.id)
   const { tmdbScore, imdbId, wikiId, title, releaseDate } = movie
 
-  data = await scoreService.getAvgScore(key, {
+  data = await scoreService.getScore(key, {
     tmdbScore,
     imdbId,
     wikiId,

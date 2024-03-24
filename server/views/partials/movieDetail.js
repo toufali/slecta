@@ -44,7 +44,7 @@ export const movieDetail = data => `
   <p>${data.overview}</p>
   <p>
     <label>Review score:</label>
-    <output data-tmdb-score='${data.tmdbScore}' data-avg-score='${data.avgScore}'>${data.avgScore ? Math.round(data.avgScore * 10) + '%' : ''}</output>
+    <output data-avg-score='${data.score}'>${data.score ? Math.round(data.score) + '%' : ''}</output>
   </p>
   <p><label>Running time:</label>${data.runtime} min</p>
   <p><label>Spoken languages:</label>${data.languages}</p>

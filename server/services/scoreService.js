@@ -24,11 +24,15 @@ class ScoreService {
     console.info('Browser connected:', this.browser.isConnected())
   }
 
-  async getAvgScore(key, data) {
-    let score = await redis.getCache(key)
+  async getScoreFromCache(key) {
+    return await redis.getCache(key)
+  }
+
+  async getScore(key, data) {
+    let score = await this.getScoreFromCache(key)
 
     if (score) return score
-    if (!data) return console.warn('Score not found in cache, and lookup data undefined')
+    if (!data) return console.warn('Score not cached and lookup data undefined')
 
     try {
       const [imdbScores, rtScores] = await Promise.allSettled([
