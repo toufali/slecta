@@ -1,5 +1,8 @@
+// TODO: we don't need DSD.  We likely don't need any shadow dom here.
+// TODO: optimize/reuse loading animation
+
 export const movieCard = data => `
-<movie-card>
+<movie-card id='${data.id}'>
   <template shadowrootmode="open">
     <style>
       :host{
@@ -49,6 +52,34 @@ export const movieCard = data => `
         text-overflow: ellipsis;
         font: var(--small-font);
       }
+
+      .loading {
+        display: inline-block;
+        max-height: 100%;
+      }
+      
+      .loading::after {
+        content: "";
+        display: inline-block;
+        aspect-ratio: 1/1;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        border-color: #fff transparent #fff transparent;
+        animation: loading-rotate 1.2s linear infinite;
+        height: 16px;
+        box-sizing: border-box;
+        vertical-align: middle;
+      }
+      
+      @keyframes loading-rotate {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      
     </style>
     
     <a href='/movies/${data.id}'>

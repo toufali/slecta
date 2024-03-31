@@ -10,7 +10,7 @@
   border: 2px solid #fff;
   border-color: #fff transparent #fff transparent;
   animation: loading-rotate 1.2s linear infinite;
-  width: 20px;
+  height: 16px;
   box-sizing: border-box;
   vertical-align: middle;
 }
