@@ -7,7 +7,7 @@
 export function average(arr) {
   let len = arr.length
   const sum = arr.reduce((acc, cur) => {
-    if (Number.isFinite(cur)) return acc + cur
+    if (Number.isFinite(cur)) return acc + cur // include in average if Number is not NaN, Infinity, or -Infinity
 
     len--
     return acc

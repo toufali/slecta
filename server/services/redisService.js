@@ -24,8 +24,9 @@ class RedisService {
   async getCache(key) {
     try {
       let value = await client?.get(JSON.stringify(key))
+      if (!value) return null
       value = JSON.parse(value, this.#jsonReviver)
-      if (value) value.cacheHit = true
+      if (typeof value === 'object') value.cacheHit = true
       return value
     } catch (e) {
       console.warn('Error getting cache value:', e)

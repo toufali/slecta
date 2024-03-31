@@ -140,18 +140,18 @@ class TmdbService {
   async getMovies(query) {
     const params = {
       // TODO: these params were based on deprecated filter and should be revisited
-      page: query.page ?? 1,
+      page: query?.page ?? 1,
       include_adult: this.includeAdult,
       include_video: this.includeVideo,
-      sort_by: query.sort ?? this.sort,
+      sort_by: query?.sort ?? this.sort,
       'primary_release_date.lte': new Date(),
-      'vote_count.gte': query.count ?? this.countMin,
-      with_genres: Array.isArray(query.wg) ? query.wg.join('|') : query.wg,
-      without_genres: query.wog,
-      certification: Array.isArray(query.wr) ? query.wr.join('|') : query.wr,
+      'vote_count.gte': query?.count ?? this.countMin,
+      with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
+      without_genres: query?.wog,
+      certification: Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr,
       certification_country: this.region,
       watch_region: this.region,
-      with_watch_monetization_types: query.streaming ? 'buy|free|flatrate|rent' : ''
+      with_watch_monetization_types: query?.streaming ? 'buy|free|flatrate|rent' : ''
     }
 
     for (const [key, value] of Object.entries(params)) {

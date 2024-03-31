@@ -32,16 +32,22 @@ class ScoreService {
     let score = await this.getScoreFromCache(key)
 
     if (score) return score
+
     if (!data) return console.warn('Score not cached and lookup data undefined')
 
     try {
-      const [imdbScores, rtScores] = await Promise.allSettled([
+      const settled = await Promise.allSettled([
         this.getIMDBScores(data.imdbId),
         this.getRTScores(data.wikiId, data.title, data.releaseDate)
       ])
-      const allScores = [data.tmdbScore, ...Object.values(imdbScores.value), ...Object.values(rtScores.value)]
-      score = { avgScore: average(allScores) }
+
+      const filteredScores = settled.filter(item => item.value).map(item => Object.values(item.value)).flat()
+
+      if (data.tmdbScore) filteredScores.push(data.tmdbScore)
+
+      score = { avgScore: average(filteredScores) }
       redis.setCache(key, score, 43200) // 12 hours (60 * 60 * 12)
+
       return score
     } catch (e) {
       console.error('Error getting average score:', e)
@@ -56,17 +62,26 @@ class ScoreService {
       await page.route('**/*', this.#filterBrowserResource.bind(this))
       await page.goto(this.imdbBaseUrl + imdbId, { waitUntil: 'domcontentloaded' })
 
-      var imdbScore = await page.getByTestId('hero-rating-bar__aggregate-rating__score').getByText(/^\d\d?\.\d$/).first().textContent() // finds IMDB decimal score
-      imdbScore = parseFloat(imdbScore) * 10 // adjusted to 100 scale
+      var scores = {
+        imdbScore: page.getByTestId('hero-rating-bar__aggregate-rating__score').getByText(/^\d\d?\.\d$/).first().textContent(),
+        metaScore: page.locator('.metacritic-score-box').first().textContent()
+      }
 
-      var metaScore = await page.locator('.metacritic-score-box').first().textContent()
-      metaScore = parseInt(metaScore)
+      const settled = await Promise.allSettled(Object.values(scores))
+
+      Object.keys(scores).forEach((key, i) => {
+        const value = settled[i].value
+
+        if (!value) return delete scores[key]
+        if (key === 'imdbScore') scores[key] = parseFloat(value) * 10 // adjusted to 100 scale
+        if (key === 'metaScore') scores[key] = parseInt(value)
+      })
     } catch (e) {
       console.warn(e)
     }
 
     page.close()
-    return { imdbScore, metaScore }
+    return scores
   }
 
   async getRTScores(wikiId, title, releaseDate) {
@@ -79,21 +94,27 @@ class ScoreService {
       await page.goto(this.rtBaseUrl + rtPath, { waitUntil: 'domcontentloaded' });
 
       const element = await page.locator('#scoreboard').first()
-      var rtCriticScore = await element.getAttribute('tomatometerscore')
-      rtCriticScore = parseInt(rtCriticScore)
 
-      var rtAudienceScore = await element.getAttribute('audiencescore')
-      rtAudienceScore = parseInt(rtAudienceScore)
+      var scores = {
+        rtCriticScore: element.getAttribute('tomatometerscore'),
+        rtAudienceScore: element.getAttribute('audiencescore')
+      }
+
+      const settled = await Promise.allSettled(Object.values(scores))
+
+      Object.keys(scores).forEach((key, i) => {
+        const value = settled[i].value
+
+        if (!value) return delete scores[key]
+        scores[key] = parseInt(value)
+      })
     } catch (e) {
       console.warn(e)
     }
 
     page.close()
 
-    return {
-      rtCriticScore,
-      rtAudienceScore,
-    }
+    return scores
   }
 
   async #guessRTPath(wikiId, title, releaseDate) {
