@@ -66,7 +66,7 @@ export const movieCard = data => `
         border: 2px solid #fff;
         border-color: #fff transparent #fff transparent;
         animation: loading-rotate 1.2s linear infinite;
-        height: 16px;
+        height: .875rem;
         box-sizing: border-box;
         vertical-align: middle;
       }

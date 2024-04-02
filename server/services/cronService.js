@@ -17,7 +17,6 @@ const SCHEDULE = '* * 0 * * *'
 class CronService {
   init() {
     if (!cron.validate(SCHEDULE)) return console.info('Cron service initialized:', false)
-
     cron.schedule(SCHEDULE, () => {
       console.info('Cron service: run `cacheScoresTask`');
       cacheScoresTask()
@@ -28,21 +27,22 @@ class CronService {
 
 async function cacheScoresTask() {
   console.info('running cacheScoresTask')
-  const data = await tmdb.getMovies()
+  const movies = await tmdb.getMovies()
 
-  Promise.allSettled(data.map(async movie => {
+  for (const movie of movies) {
+  // get scores in sequence to avoid OOM issues
     const key = `movies/${movie.id}/score`
     const movieDetail = await tmdb.getMovieDetail(movie.id)
     const { tmdbScore, imdbId, wikiId, title, releaseDate } = movieDetail
 
-    return scoreService.getScore(key, {
+    await scoreService.getScore(key, {
       tmdbScore,
       imdbId,
       wikiId,
       title,
       releaseDate
     })
-  }))
+  }
 }
 
 export default new CronService()

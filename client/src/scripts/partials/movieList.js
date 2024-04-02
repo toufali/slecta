@@ -18,15 +18,15 @@ const list = document.querySelector('[data-partial="movieList"] ul')
 //   }
 // })
 
-export default function init() {
+export default async function init() {
   const cards = document.querySelectorAll('movie-card')
 
-  cards.forEach(card => {
+  for (const card of cards) {
     const output = card.shadowRoot.querySelector('[data-avg-score]')
     if (output.dataset.avgScore === 'undefined') {
-      getScore(card.id, output)
+      await getScore(card.id, output)
     }
-  })
+  }
 
   // filterToggle.addEventListener('mousedown', handleMouseEvent)
   // form.elements['score'].addEventListener('input', handleInput)
