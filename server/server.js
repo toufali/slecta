@@ -14,7 +14,7 @@ const { PORT, STATIC_DIR } = env
 await redis.init()
 await tmdb.init()
 await scoreService.init()
-cron.init()
+// cron.init()
 
 // STATIC_DIR set to 'src' if `npm run dev` called. Files are served direct from source without build/bundle
 // Otherwise, STATIC_DIR defaults to 'dist' – client build required to serve files from bundle
