@@ -28,12 +28,13 @@ class ScoreService {
     return await redis.getCache(key)
   }
 
-  async getScore(key, data) {
-    let score = await this.getScoreFromCache(key)
+  async getScore(key, data, tryCache = true) {
+    if (tryCache) {
+      const score = await this.getScoreFromCache(key)
+      if (score) return score
+    }
 
-    if (score) return score
-
-    if (!data) return console.warn('Score not cached and lookup data undefined')
+    if (!data) return console.warn('Score lookup data undefined')
 
     try {
       const settled = await Promise.allSettled([
@@ -45,8 +46,8 @@ class ScoreService {
 
       if (data.tmdbScore) filteredScores.push(data.tmdbScore)
 
-      score = { avgScore: average(filteredScores) }
-      redis.setCache(key, score, 43200) // 12 hours (60 * 60 * 12)
+      const score = { avgScore: average(filteredScores) }
+      redis.setCache(key, score, 86400) // 24 hours (60 * 60 * 24)
 
       return score
     } catch (e) {

@@ -18,8 +18,8 @@ export async function cacheMovieScores() {
       wikiId,
       title,
       releaseDate
-    })
-    console.info(`...finished score ${++i} of ${movies.length}...`)
+    }, false)
+    i++
   }
-  console.info('...cacheMovieScores job complete.')
+  console.info('...cacheMovieScores job complete:', `${i} of ${movies.length} processed.`)
 }
