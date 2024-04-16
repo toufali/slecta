@@ -8,7 +8,6 @@ COPY --chown=node:node ./package*.json ./
 COPY --chown=node:node ./server ./server
 COPY --chown=node:node ./client ./client
 COPY --chown=node:node ./scripts ./scripts
-COPY --chown=node:node ./components ./components
 
 RUN touch .env
 RUN npm ci
