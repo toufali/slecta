@@ -22,9 +22,11 @@ export default async function init() {
   const cards = document.querySelectorAll('movie-card')
 
   for (const card of cards) {
-    const output = card.shadowRoot.querySelector('[data-avg-score]')
-    if (output.dataset.avgScore === 'undefined') {
-      await getScore(card.id, output)
+    const scoreBadge = card.shadowRoot.querySelector('score-badge')
+    if (!scoreBadge.score) {
+      scoreBadge.classList.add('loading')
+      scoreBadge.score = await getScore(card.id)
+      scoreBadge.classList.remove('loading')
     }
   }
 
@@ -36,19 +38,10 @@ export default async function init() {
   // form.addEventListener('submit', handleSubmit)
 }
 
-async function getScore(id, output) {
-  output.classList.add('loading')
-  output.title = 'calculating '
-
+async function getScore(id) {
   const res = await fetch(`/api/v1/movies/${id}/score`)
   const { avgScore } = await res.json()
-
-  output.classList.remove('loading')
-  output.title = ''
-  if (avgScore) {
-    output.dataset.avgScore = avgScore
-    output.textContent = Math.round(avgScore) + '%'
-  }
+  return avgScore
 }
 
 function handleChange(e) {
