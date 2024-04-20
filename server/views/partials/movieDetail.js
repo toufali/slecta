@@ -1,3 +1,5 @@
+import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
+
 function ytTrailer(id) {
   if (!id) return ''
 
@@ -35,6 +37,7 @@ export const movieDetail = data => `
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
     <h1>${data.title}</h1>
+    ${scoreBadge(data.score)}
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
@@ -42,10 +45,6 @@ export const movieDetail = data => `
     </ul>
   </header>
   <p>${data.overview}</p>
-  <p>
-    <label>Review score:</label>
-    <output data-avg-score='${data.score}'>${data.score ? Math.round(data.score) + '%' : ''}</output>
-  </p>
   <p><label>Running time:</label>${data.runtime} min</p>
   <p><label>Spoken languages:</label>${data.languages}</p>
   <div class='providers'>

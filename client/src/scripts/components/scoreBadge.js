@@ -3,7 +3,10 @@ export const scoreBadge = score => `
   <template shadowrootmode="open">
     <style>
       :host{
-        contain: style paint;
+        contain: content;
+        container-type: inline-size;
+        min-width: 50px;
+        --color: var(--gray-50);
       }
 
       :host([hidden]) {
@@ -12,8 +15,13 @@ export const scoreBadge = score => `
 
       figure{
         position: relative;
-        margin: var(--padding-md);
-        animation: scale-in .5s cubic-bezier(0.25, 2, 0.75, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        aspect-ratio: 1/1;
+        margin: 0;
+        animation: scale-in .3s cubic-bezier(0.25, 2, 0.75, 1);
       }
 
       :host([score="undefined"]) figure{
@@ -21,15 +29,15 @@ export const scoreBadge = score => `
       }
       
       .badge {
-        background-color: var(--color, var(--gray-50));
+        background-color: var(--color);
         position: absolute;
         height: 100%;
         width: 100%;
         animation: rotate-loading .75s forwards;
         animation-composition: accumulate;
         transition: background-color .5s ease-out;
-        -webkit-mask: url(../../images/badge.svg) no-repeat;
-        mask: url(../../images/badge.svg) no-repeat;
+        -webkit-mask: url(../../images/badge.svg) no-repeat 50% / 80%;
+        mask: url(../../images/badge.svg) no-repeat 50% / 80%;
       
        }
 
@@ -40,13 +48,10 @@ export const scoreBadge = score => `
       }
 
       output {
-        min-width: 42px;
-        font-weight: bold;
-        aspect-ratio: 1/1;
-        display: flex;
         position: relative;
-        justify-content: center;
-        align-items: center;
+        line-height: 1;
+        font-size: 33cqw;
+        font-weight: bold;
         color: white;
         mix-blend-mode: overlay;
         transform: rotate(5deg);
@@ -59,15 +64,13 @@ export const scoreBadge = score => `
 
       :host(.loading) output::after {
         content: "";
-        display: inline-block;
+        display: block;
+        width: 20cqw;
         aspect-ratio: 1/1;
         border-radius: 50%;
-        border: 2px solid #fff;
+        border: 3cqw solid #fff;
         border-color: #fff transparent #fff transparent;
         animation: rotate-loading 1.2s linear infinite;
-        height: 1rem;
-        box-sizing: border-box;
-        vertical-align: middle;
       }
       
       @keyframes rotate-loading{

@@ -53,6 +53,10 @@ export const movieCard = data => `
         overflow: hidden;
         text-overflow: ellipsis;
         font: var(--small-font);
+      }
+
+      score-badge{
+        margin: var(--padding-md);
       }      
     </style>
     
