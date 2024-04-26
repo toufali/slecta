@@ -7,13 +7,13 @@ import { movieDetail } from '../views/partials/movieDetail.js'
 export async function showMovies(ctx) {
   const data = await tmdb.getMovies(ctx.query)
 
-  const scores = await Promise.allSettled(data.map(movie => {
+  const scores = await Promise.allSettled(data.movies.map(movie => {
     const key = `movies/${movie.id}/score`
     return scoreService.getScoreFromCache(key)
   }))
 
   scores.forEach((score, i) => {
-    if (score.value) data[i].score = score.value.avgScore
+    if (score.value) data.movies[i].score = score.value.avgScore
   })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')

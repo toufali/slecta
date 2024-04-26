@@ -32,11 +32,12 @@ export const mainView = data => `
   <script src='/scripts/index.js' type='module'></script>
 </head>
 <body data-partial='${data.partial.name}'>
+  <header>
+    Slecta
+  </header>
   <main>
     ${data.partial(data.content)}
   </main>
-
-  <footer></footer>
 </body>
 </html>
 `

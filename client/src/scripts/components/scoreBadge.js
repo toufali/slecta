@@ -1,101 +1,98 @@
-export const scoreBadge = score => `
-<score-badge score="${score}">
-  <template shadowrootmode="open">
-    <style>
-      :host{
-        contain: content;
-        container-type: inline-size;
-        min-width: 50px;
-        --color: var(--gray-50);
-      }
+const html = `
+<style>
+  :host{
+    contain: content;
+    container-type: inline-size;
+    min-width: 50px;
+    --color: var(--gray-50);
+  }
 
-      :host([hidden]) {
-        display: none 
-      }
+  :host([hidden]) {
+    display: none
+  }
 
-      figure{
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        aspect-ratio: 1/1;
-        margin: 0;
-        animation: scale-in .3s cubic-bezier(0.25, 2, 0.75, 1);
-      }
+  figure{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1/1;
+    margin: 0;
+    animation: scale-in .3s cubic-bezier(0.25, 2, 0.75, 1);
+  }
 
-      :host([score="undefined"]) figure{
-        animation: none;
-      }
-      
-      .badge {
-        background-color: var(--color);
-        position: absolute;
-        height: 100%;
-        width: 100%;
-        animation: rotate-loading .75s forwards;
-        animation-composition: accumulate;
-        transition: background-color .5s ease-out;
-        -webkit-mask: url(../../images/badge.svg) no-repeat 50% / 80%;
-        mask: url(../../images/badge.svg) no-repeat 50% / 80%;
-      
-       }
+  :host([score="undefined"]) figure{
+    animation: none;
+  }
 
-      :host(.loading) .badge{
-        animation-duration: 1.5s;
-        animation-delay: 0s;
-        animation-iteration-count: infinite;
-      }
+  .badge {
+    background-color: var(--color);
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    animation: rotate-loading .75s forwards;
+    animation-composition: accumulate;
+    transition: background-color .5s ease-out;
+    -webkit-mask: url(../../images/badge.svg) no-repeat 50% / 80%;
+    mask: url(../../images/badge.svg) no-repeat 50% / 80%;
 
-      output {
-        position: relative;
-        line-height: 1;
-        font-size: 33cqw;
-        font-weight: bold;
-        color: white;
-        mix-blend-mode: overlay;
-        transform: rotate(5deg);
-      }
+    }
 
-      :host([score="undefined"]) output::after {
-        content: "-";
-        transform: none;
-      }
+  :host(.loading) .badge{
+    animation-duration: 1.5s;
+    animation-delay: 0s;
+    animation-iteration-count: infinite;
+  }
 
-      :host(.loading) output::after {
-        content: "";
-        display: block;
-        width: 20cqw;
-        aspect-ratio: 1/1;
-        border-radius: 50%;
-        border: 3cqw solid #fff;
-        border-color: #fff transparent #fff transparent;
-        animation: rotate-loading 1.2s linear infinite;
-      }
-      
-      @keyframes rotate-loading{
-        to{
-          transform: rotate(180deg);
-        }
-      }
-            
-      @keyframes scale-in{
-        from{
-          transform: scale(.5);
-        }
-      }
-            
-    </style>
-    
-    <figure>
-      <div class="badge"></div>
-      <output></output>
-    </figure>
-  </template>
-</score-badge>
+  output {
+    position: relative;
+    line-height: 1;
+    font-size: 33cqw;
+    font-weight: bold;
+    color: white;
+    mix-blend-mode: overlay;
+    transform: rotate(5deg);
+  }
+
+  :host([score="undefined"]) output::after {
+    content: "-";
+    transform: none;
+  }
+
+  :host(.loading) output::after {
+    content: "";
+    display: block;
+    width: 20cqw;
+    aspect-ratio: 1/1;
+    border-radius: 50%;
+    border: 3cqw solid #fff;
+    border-color: #fff transparent #fff transparent;
+    animation: rotate-loading 1.2s linear infinite;
+  }
+
+  @keyframes rotate-loading{
+    to{
+      transform: rotate(180deg);
+    }
+  }
+
+  @keyframes scale-in{
+    from{
+      transform: scale(.5);
+    }
+  }
+
+</style>
+
+<figure>
+  <div class="badge"></div>
+  <output></output>
+</figure>
 `
 
 if (typeof HTMLElement !== 'undefined') {
+  // Define custom element for browser environment, ignore for server
   class ScoreBadge extends HTMLElement {
     #score
     #outputEl
@@ -103,9 +100,9 @@ if (typeof HTMLElement !== 'undefined') {
     constructor() {
       super();
 
-      if (!this.shadowRoot) { // DSD did not render...
-        this.shadowRoot = this.attachShadow({ mode: 'open' });
-        this.shadowRoot.innerHTML = scoreBadge('undefined')
+      if (!this.shadowRoot) { // DSD did not render
+        this.attachShadow({ mode: 'open' });
+        this.shadowRoot.innerHTML = html
       }
 
       this.#score = parseFloat(this.getAttribute('score')) || undefined
@@ -142,3 +139,10 @@ if (typeof HTMLElement !== 'undefined') {
 
   customElements.define('score-badge', ScoreBadge)
 }
+
+// Export Declarative Shadow DOM for server-side render
+export const scoreBadge = score => `
+<score-badge score="${score}">
+  <template shadowrootmode="open">${html}</template>
+</score-badge>
+`

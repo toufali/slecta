@@ -130,6 +130,8 @@ class TmdbService {
 
       const { certifications } = await res.json()
       ratings = certifications[this.region]
+      ratings.sort((a, b) => a.order - b.order)
+
       redis.setCache(url, ratings)
     } catch (e) {
       console.error("Error getting TMDB certifications (ratings):", e)
@@ -161,10 +163,12 @@ class TmdbService {
       }
     }
 
-    const url = `${TMDB_API_URL}/discover/movie?${new URLSearchParams(params)}`
+    const urlParams = new URLSearchParams(params)
+    const url = `${TMDB_API_URL}/discover/movie?${urlParams}`
+    const cacheKey = `movies?${urlParams}`
 
-    let movies = await redis.getCache(url)
-    if (movies) return movies
+    let data = await redis.getCache(cacheKey)
+    if (data) return data
 
     try {
       const res = await fetch(url, { headers })
@@ -172,20 +176,29 @@ class TmdbService {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
       const json = await res.json()
-      movies = json.results.map(item => new Object({
-        id: item.id,
-        title: item.title,
-        genres: item.genre_ids.map(id => this.genres.get(id)),
-        releaseDate: item.release_date,
-        posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-        overview: item.overview,
-        tmdbScore: item.vote_average,
-        tmdbScoreCount: item.vote_count,
-        popularity: item.popularity
-      }))
 
-      redis.setCache(url, movies)
-      return movies
+      data = {
+        movies: json.results.map(item => new Object({
+          id: item.id,
+          title: item.title,
+          genres: item.genre_ids.map(id => this.genres.get(id)),
+          releaseDate: item.release_date,
+          posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+          overview: item.overview,
+          tmdbScore: item.vote_average,
+          tmdbScoreCount: item.vote_count,
+          popularity: item.popularity,
+        }))
+      }
+
+      data.allGenres = this.genres
+      data.withGenres = params.with_genres
+      data.allRatings = this.ratings
+      data.withRatings = params.certification
+      data.sort = params.sort_by
+
+      redis.setCache(cacheKey, data)
+      return data
     } catch (e) {
       console.error("Error fetching data:", e);
     }
@@ -196,12 +209,12 @@ class TmdbService {
       append_to_response: 'videos,release_dates,watch/providers,external_ids'
     }
     const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
+    const cacheKey = `movies/${id}`
 
-    let movie = await redis.getCache(url)
+    let movie = await redis.getCache(cacheKey)
     if (movie) return movie
 
     try {
-      // https://api.themoviedb.org/3/movie/157336?append_to_response=videos,images
       const res = await fetch(url, { headers })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -251,7 +264,7 @@ class TmdbService {
         backdropUrl: this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path,
         ytTrailerId: ytTrailer?.key
       }
-      redis.setCache(url, movie)
+      redis.setCache(cacheKey, movie)
       return movie
     } catch (e) {
       console.error("Error fetching data:", e);

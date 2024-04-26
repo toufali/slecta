@@ -4,6 +4,7 @@
 import './app.js'
 import './matchMedia.js'
 import './resizeObserver.js'
+import './components/movieCard.js'
 import './components/scoreBadge.js'
 
 // dynamic import client script associated with partial if it exists
