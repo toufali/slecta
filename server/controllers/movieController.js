@@ -42,6 +42,15 @@ export async function showMovieDetail(ctx) {
 export async function getMovies(ctx) {
   const data = await tmdb.getMovies(ctx.query)
 
+  const scores = await Promise.allSettled(data.movies.map(movie => {
+    const key = `movies/${movie.id}/score`
+    return scoreService.getScoreFromCache(key)
+  }))
+
+  scores.forEach((score, i) => {
+    if (score.value) data.movies[i].score = score.value.avgScore
+  })
+
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
   ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')

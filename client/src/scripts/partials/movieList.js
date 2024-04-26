@@ -1,69 +1,11 @@
-// TODO: this file is a mess
-
-// import '../components/movieCard.js'
-
 const form = document.querySelector('[data-partial="movieList"] form')
 const list = document.querySelector('[data-partial="movieList"] ul')
-// const filterToggle = document.querySelector('.filter-toggle')
-// const state = new Proxy({
-//   searchParams: null,
-// }, {
-//   set(target, key, value) {
-//     if (target[key] !== value) {
-//       target[key] = value
-//       render()
-//     }
+const filterToggle = document.querySelector('.filter-toggle')
 
-//     return true
-//   }
-// })
-
-export default async function init() {
-  const cards = document.querySelectorAll('movie-card')
-
-  for (const card of cards) {
-    const scoreBadge = card.shadowRoot.querySelector('score-badge')
-    if (!scoreBadge.score) {
-      scoreBadge.classList.add('loading')
-      scoreBadge.score = await getScore(card.id)
-      scoreBadge.classList.remove('loading')
-    }
-  }
-
-  // filterToggle.addEventListener('mousedown', handleMouseEvent)
-  // form.elements['score'].addEventListener('input', handleInput)
-  // form.elements['count'].addEventListener('input', handleInput)
-  // form.elements['years'].addEventListener('input', handleInput)
-  // form.addEventListener('change', handleChange)
-  // form.addEventListener('submit', handleSubmit)
-}
-
-async function getScore(id) {
-  const res = await fetch(`/api/v1/movies/${id}/score`)
-  const { avgScore } = await res.json()
-  return avgScore
-}
-
-function handleChange(e) {
-  if (document.documentElement.hasAttribute('desktop')) {
-    handleSubmit() // "live" update on change for desktop only
-  }
-}
-
-function handleInput(e) {
-  const outputEl = e.target.parentElement.querySelector('output')
-
-  switch (e.target.name) {
-    case 'score':
-      outputEl.textContent = `${e.target.value}%`
-      break
-    case 'count':
-      outputEl.textContent = `${e.target.value} reviews`
-      break
-    case 'years':
-      outputEl.textContent = e.target.value.join(' - ')
-      break
-  }
+export default function init() {
+  filterToggle.addEventListener('mousedown', handleMouseEvent)
+  form.addEventListener('submit', handleSubmit)
+  renderScores()
 }
 
 function handleMouseEvent(e) {
@@ -78,6 +20,7 @@ async function handleSubmit(e) {
 
   renderMovieList(data)
   updateUrl(searchParams)
+  renderScores()
   if (!document.documentElement.hasAttribute('desktop')) {
     form.toggleAttribute('hidden', true) // hide filter panel for mobile only
   }
@@ -101,19 +44,32 @@ async function getMovieData(searchParams) {
 }
 
 function renderMovieList(movies) {
-  const movieItems = []
-
-  movies.forEach(movie => {
+  const movieItems = movies.map(movie => {
     const item = document.createElement('li')
     const movieCard = document.createElement('movie-card')
 
     movieCard.data = movie
 
     item.append(movieCard)
-    movieItems.push(item)
+    return item
   });
 
   list.replaceChildren(...movieItems)
+}
+
+async function renderScores() {
+  const cards = document.querySelectorAll('movie-card')
+
+  for (const card of cards) {
+    const scoreBadge = card.shadowRoot.querySelector('score-badge')
+    if (!scoreBadge.score) {
+      scoreBadge.classList.add('loading')
+      scoreBadge.score = await fetch(`/api/v1/movies/${card.id}/score`)
+        .then(res => res.json())
+        .then(json => json.avgScore)
+      scoreBadge.classList.remove('loading')
+    }
+  }
 }
 
 function updateUrl(searchParams) {

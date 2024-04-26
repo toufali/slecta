@@ -1,20 +1,9 @@
 import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 
-const sortingOptions = [
-  {
-    name: 'Most Recent',
-    value: 'primary_release_date.desc'
-  },
-  {
-    name: 'Popularity',
-    value: 'popularity.desc'
-  }
-]
-
-const sortingFields = data => sortingOptions.reduce((acc, cur) => {
+const sortingFields = data => data.allSorting.reduce((acc, cur) => {
   acc += `
   <label class='pill'>
-    <input type='radio' name='sort' value='${cur.value}' ${data.sort?.includes(cur.value) ? 'checked' : ''}>
+    <input type='radio' name='sort' value='${cur.value}' ${data.sortBy?.includes(cur.value) ? 'checked' : ''}>
     <span>${cur.name}</span>
   </label>
   `
@@ -48,27 +37,27 @@ const ratingFields = data => data.allRatings.reduce((acc, cur) => {
 export const movieList = data => `
 <link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
 
-<p class='list-description'>New movies sorted by <output>${sortingOptions.find(opt => opt.value === data.sort).name}</output></p>
+<p class='list-description'>New movies sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></p>
 
-<form class='movies-filter' action='/api/v1/movies'>
-  <fieldset>
-    <h3>Include genres:</h3>
-    ${genreFields(data)}
-  </fieldset>
+<form class='movies-filter' action='/api/v1/movies' hidden>
   <fieldset>
     <h3>Sort by:</h3>
     ${sortingFields(data)}
   </fieldset>
   <fieldset>
-    <h3>Availability:</h3>
-    <label class='pill'>
-      <input type='checkbox' name='streaming' ${data.streaming ? 'checked' : ''}>
-      <span>Streaming now</span>
-    </label>
+    <h3>Include genres:</h3>
+    ${genreFields(data)}
   </fieldset>
   <fieldset>
     <h3>Include ratings:</h3>
     ${ratingFields(data)}
+  </fieldset>
+  <fieldset>
+    <h3>Availability:</h3>
+    <label class='pill'>
+      <input type='checkbox' name='streaming' ${data.streamingNow ? 'checked' : ''}>
+      <span>Streaming now</span>
+    </label>
   </fieldset>
   <button class='primary' type='submit'>APPLY</button>
 </form>
@@ -76,4 +65,6 @@ export const movieList = data => `
 <ul class='movies-list'>
   ${data.movies.map(movie => `<li>${movieCard(movie)}</li>`).join('')}
 </ul>
+
+<button class='filter-toggle primary' type='button'>FILTER</button>
 `

@@ -13,6 +13,7 @@ html {
 
 body {
   min-height: 100%;
+  padding: var(--padding-md);
   font: normal 1rem/1.5 Inter, Inter-fallback, sans-serif;
   background: var(--blue-10) url('../images/irongrip-dark-blue.webp');
   color: var(--gray-90);

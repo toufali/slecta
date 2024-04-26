@@ -12,7 +12,10 @@ class TmdbService {
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc
-  sort = 'primary_release_date.desc'
+  sortingOptions = [
+    { name: 'Most Recent', value: 'primary_release_date.desc' },
+    { name: 'Popularity', value: 'popularity.desc' }
+  ]
   region = 'US'
   providerPriority = [
     8, // Netflix
@@ -145,7 +148,7 @@ class TmdbService {
       page: query?.page ?? 1,
       include_adult: this.includeAdult,
       include_video: this.includeVideo,
-      sort_by: query?.sort ?? this.sort,
+      sort_by: query?.sort ?? this.sortingOptions[0].value,
       'primary_release_date.lte': new Date().toISOString().substring(0, 10),
       'primary_release_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
       'vote_count.gte': query?.count ?? this.countMin,
@@ -192,10 +195,12 @@ class TmdbService {
       }
 
       data.allGenres = this.genres
-      data.withGenres = params.with_genres
+      data.withGenres = query?.wg
       data.allRatings = this.ratings
-      data.withRatings = params.certification
-      data.sort = params.sort_by
+      data.withRatings = query?.wr
+      data.allSorting = this.sortingOptions
+      data.sortBy = params.sort_by
+      data.streamingNow = query?.streaming
 
       redis.setCache(cacheKey, data)
       return data

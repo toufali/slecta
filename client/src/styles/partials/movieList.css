@@ -1,9 +1,13 @@
+.list-description output{
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
 .movies-list {
   display: grid;
   gap: var(--padding-md);
   grid-template-columns: repeat(auto-fill, minmax(var(--min-width), 1fr));
   width: calc(100% - var(--filter-w));
-  padding: var(--padding-md);
   list-style: none;
 }
 
@@ -33,10 +37,6 @@
   border-left: 2px solid black;
   background: none;
   z-index: 1;
-}
-
-header {
-  padding: var(--padding-sm) var(--padding-lg) 0;
 }
 
 fieldset {
@@ -69,10 +69,10 @@ button[type="submit"] {
 }
 
 .filter-toggle {
-  position: fixed;
-  bottom: var(--padding-lg);
-  left: var(--padding-lg);
-  width: calc(100vw - var(--padding-lg) * 2);
+  position: sticky;
+  bottom: var(--padding-md);
+  width: calc(100vw - var(--padding-md) * 2);
+  margin-top: var(--padding-md);
 }
 
 [desktop] .filter-toggle {
