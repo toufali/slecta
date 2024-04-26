@@ -23,10 +23,11 @@ class RedisService {
 
   async getCache(key) {
     try {
-      let value = await client?.get(JSON.stringify(key))
+      let value = await client?.get(key)
       if (!value) return null
       value = JSON.parse(value, this.#jsonReviver)
-      if (typeof value === 'object') value.cacheHit = true
+      // add non-enumerable/non-writable property `cacheHit` to all Objects including Arrays, Maps, etc
+      if (typeof value === 'object') Object.defineProperty(value, 'cacheHit', { value: true })
       return value
     } catch (e) {
       console.warn('Error getting cache value:', e)
@@ -35,7 +36,7 @@ class RedisService {
 
   async setCache(key, value, ttl = TTL_DEFAULT) {
     try {
-      const res = await client?.set(JSON.stringify(key), JSON.stringify(value, this.#jsonReplacer), {
+      const res = await client?.set(key, JSON.stringify(value, this.#jsonReplacer), {
         EX: ttl, // seconds, eg 60 * 60 * 12 -> sec * min * hr
         NX: false, // true -> only set the key if it does not already exist.
       })
@@ -44,10 +45,6 @@ class RedisService {
     } catch (e) {
       console.error('Unable to set Redis cache:', e)
     }
-  }
-
-  clearCache() {
-    client.flushAll('SYNC')
   }
 
   #jsonReplacer(key, value) {
