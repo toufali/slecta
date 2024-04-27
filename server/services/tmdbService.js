@@ -211,7 +211,7 @@ class TmdbService {
 
   async getMovieDetail(id) {
     const params = {
-      append_to_response: 'videos,release_dates,watch/providers,external_ids'
+      append_to_response: 'videos,release_dates,watch/providers,external_ids,credits'
     }
     const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
     const cacheKey = `movies/${id}`
@@ -252,6 +252,8 @@ class TmdbService {
       const rating = json.release_dates.results.find(item => item.iso_3166_1 === this.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
       const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
       const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+      const cast = json.credits.cast.slice(0, 5).map(item => item.name).join(', ')
+      const director = json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
 
       movie = {
         tmdbId: json.id,
@@ -262,6 +264,8 @@ class TmdbService {
         releaseDate: json.release_date,
         tmdbScore: Math.round(json.vote_average * 10),
         rating,
+        cast,
+        director,
         runtime: json.runtime,
         languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
         genres: json.genres.map(genre => genre.name).join(', '),

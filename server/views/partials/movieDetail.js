@@ -45,6 +45,8 @@ export const movieDetail = data => `
     </ul>
   </header>
   <p>${data.overview}</p>
+  <p><label>Cast:</label>${data.cast}</p>
+  <p><label>Director:</label>${data.director}</p>
   <p><label>Running time:</label>${data.runtime} min</p>
   <p><label>Spoken languages:</label>${data.languages}</p>
   <div class='providers'>
