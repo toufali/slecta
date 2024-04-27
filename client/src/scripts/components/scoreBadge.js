@@ -26,6 +26,23 @@ const html = `
     animation: none;
   }
 
+  :host([score="undefined"]) figure::after {
+    content: "-";
+    position: absolute;
+    transform: none;
+  }
+
+  :host(.loading) figure::after {
+    content: "";
+    position: absolute;
+    width: 20cqw;
+    aspect-ratio: 1/1;
+    border-radius: 50%;
+    border: 3cqw solid #fff;
+    border-color: #fff transparent #fff transparent;
+    animation: rotate-loading 1.2s linear infinite;
+  }
+
   .badge {
     background-color: var(--color);
     position: absolute;
@@ -45,30 +62,20 @@ const html = `
     animation-iteration-count: infinite;
   }
 
-  output {
+  svg{
     position: relative;
-    line-height: 1;
-    font-size: 33cqw;
-    font-weight: bold;
-    color: white;
+    width: 100%;
+    height: 100%;
     mix-blend-mode: overlay;
     transform: rotate(5deg);
   }
 
-  :host([score="undefined"]) output::after {
-    content: "-";
-    transform: none;
-  }
-
-  :host(.loading) output::after {
-    content: "";
-    display: block;
-    width: 20cqw;
-    aspect-ratio: 1/1;
-    border-radius: 50%;
-    border: 3cqw solid #fff;
-    border-color: #fff transparent #fff transparent;
-    animation: rotate-loading 1.2s linear infinite;
+  svg text{
+    font-size: 33cqw;
+    font-weight: bold;
+    fill: white;
+    text-anchor: middle;
+    dominant-baseline: central;
   }
 
   @keyframes rotate-loading{
@@ -87,7 +94,9 @@ const html = `
 
 <figure>
   <div class="badge"></div>
-  <output></output>
+  <svg xmlns="http://www.w3.org/2000/svg">
+    <text x="50%" y="50%"></text>
+  </svg>
 </figure>
 `
 
@@ -106,7 +115,7 @@ if (typeof HTMLElement !== 'undefined') {
       }
 
       this.#score = parseFloat(this.getAttribute('score')) || undefined
-      this.#outputEl = this.shadowRoot.querySelector('output')
+      this.#outputEl = this.shadowRoot.querySelector('svg text')
       this.render()
     }
 
