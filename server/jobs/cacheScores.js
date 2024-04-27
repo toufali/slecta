@@ -3,7 +3,7 @@ import scoreService from '../services/scoreService.js'
 
 export async function cacheMovieScores() {
   console.info('running cacheMovieScores job...')
-  const movies = await tmdb.getMovies()
+  const { movies } = await tmdb.getMovies()
   let i = 0
 
   for (const movie of movies) {
