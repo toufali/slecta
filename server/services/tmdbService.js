@@ -8,7 +8,7 @@ const headers = {
 }
 
 class TmdbService {
-  countMin = 10 // minimum vote count
+  countMin = 50 // minimum vote count
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc

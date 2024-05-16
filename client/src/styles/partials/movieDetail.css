@@ -35,6 +35,7 @@ figure button > img{
   width: max(8%, 80px);
   height: auto;
   filter: drop-shadow(0 0 24px white);
+  mix-blend-mode: hard-light;
 }
 
 figure iframe {
@@ -147,6 +148,59 @@ label {
   height: 20px;
   object-fit: contain;
   vertical-align: text-bottom;
+}
+
+.quotes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--padding-md);
+  margin-bottom: var(--padding-lg);
+}
+
+.quotes:empty {
+  display: none;
+}
+
+.quotes > * {
+  flex-grow: 1;
+  flex-basis: calc(( 900px - 100%) * 999);
+}
+
+.quotes blockquote{
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding-sm);
+  padding: var(--padding-md);
+  justify-content: space-evenly;
+  background-color: hsl(0 0 0 / .2);
+  border-radius: var(--border-radius);
+}
+
+.quotes blockquote p{
+  position: relative;
+  font-style: italic;
+  text-indent: 2rem;
+}
+
+.quotes blockquote p::before{
+  content: '“';
+  position: absolute;
+  top: -1rem;
+  left: -.5rem;
+  font-size: 6rem;
+  color: hsl(0 0 100 / .1);
+  line-height: 1;
+  text-indent: initial;
+  font-style: normal;
+}
+
+.quotes blockquote cite{
+  color: var(--blue-90);
+  align-self: end;
+}
+
+.quotes blockquote cite::before{
+  content: '– ';
 }
 
 @keyframes fade-in {

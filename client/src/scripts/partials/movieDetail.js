@@ -1,19 +1,16 @@
+import { reviewQuote } from '../components/reviewQuote.js'
+
 const figure = document.querySelector('figure')
 const trailer = figure.querySelector('iframe')
 const playBtn = figure.querySelector('button')
 const article = document.querySelector('article')
+const scoreBadge = document.querySelector('score-badge')
+const quotes = article.querySelector('.quotes')
 
 export default async function init() {
-  if (trailer) {
-    playBtn.addEventListener('click', playTrailer)
-  }
-
-  const scoreBadge = document.querySelector('score-badge')
-  if (!scoreBadge.score) {
-    scoreBadge.classList.add('loading')
-    scoreBadge.score = await getScore(article.id)
-    scoreBadge.classList.remove('loading')
-  }
+  if (trailer) playBtn.addEventListener('click', playTrailer)
+  if (!scoreBadge.score) getScore()
+  if (!quotes.childElementCount) getQuotes()
 }
 
 function playTrailer(e) {
@@ -23,8 +20,25 @@ function playTrailer(e) {
   figure.append(trailer)
 }
 
-async function getScore(id) {
-  const res = await fetch(`/api/v1/movies/${id}/score`)
-  const { avgScore } = await res.json()
-  return avgScore
+async function getScore() {
+  scoreBadge.classList.add('loading')
+  scoreBadge.score = await fetch(`/api/v1/movies/${article.id}/score`)
+    .then(res => res.json())
+    .then(json => json.avgScore)
+  scoreBadge.classList.remove('loading')
+}
+
+async function getQuotes() {
+  const urlParams = new URLSearchParams({
+    title: article.querySelector('header h1').textContent,
+    releaseDate: article.querySelector('header time').getAttribute('datetime')
+  })
+
+  const res = await fetch(`/api/v1/movies/${article.id}/quotes?${urlParams}`)
+
+  if (!res.ok) return console.error('Error fetching quotes:', res.message)
+
+  const json = await res.json()
+
+  quotes.innerHTML = json.map(item => reviewQuote(item)).join('')
 }

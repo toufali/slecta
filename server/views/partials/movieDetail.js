@@ -1,4 +1,5 @@
 import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
+import { reviewQuote } from '../../../client/src/scripts/components/reviewQuote.js'
 
 function ytTrailer(id) {
   if (!id) return ''
@@ -44,7 +45,8 @@ export const movieDetail = data => `
       <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
     </ul>
   </header>
-  <p>${data.overview}</p>
+  <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>
+  <p><label>Synopsis:</label>${data.overview}</p>
   <p><label>Cast:</label>${data.cast}</p>
   <p><label>Director:</label>${data.director}</p>
   <p><label>Running time:</label>${data.runtime} min</p>

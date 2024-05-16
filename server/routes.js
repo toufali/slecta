@@ -1,5 +1,5 @@
 import Router from '@koa/router';
-import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail } from './controllers/movieController.js'
+import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
 import { cacheMovieScores } from './jobs/cacheScores.js'
 
 const router = new Router();
@@ -13,6 +13,7 @@ router.post('/movies/cache-scores', setDefaultResponse, cacheMovieScores);
 router.get('/api/v1/movies', getMovies);
 router.get('/api/v1/movies/:id', getMovieDetail);
 router.get('/api/v1/movies/:id/score', getMovieScore);
+router.get('/api/v1/movies/:id/quotes', getMovieQuotes);
 
 async function setDefaultResponse(ctx, next) {
   await next();

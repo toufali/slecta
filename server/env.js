@@ -1,11 +1,18 @@
 const requiredKeys = [
   'TMDB_TOKEN',
-  'TMDB_API_URL'
+  'TMDB_API_URL',
+  'GCP_API_URL',
+  'GCP_API_KEY',
+  'GCP_SEARCH_ENGINE'
 ]
 
 const optionalKeys = [
   'PORT',
-  'REDIS_URL'
+  'REDIS_URL',
+  'PPLX_TOKEN',
+  'PPLX_API_URL',
+  'PPLX_SOURCES',
+  'PPLX_MODEL'
 ]
 
 const env = {

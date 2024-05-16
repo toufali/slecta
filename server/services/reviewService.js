@@ -1,118 +1,128 @@
-import { firefox } from 'playwright';
-import { reviewModel } from '../models/reviewModel.js';
-import { average } from '../../scripts/math.js';
+import env from '../env.js'
+import redis from "./redisService.js"
 
-const defaults = {
-    imdbBaseUrl: 'https://www.imdb.com/title/',
-    rtBaseUrl: 'https://www.rottentomatoes.com/',
-    wikiBaseUrl: 'https://www.wikidata.org/w/rest.php/wikibase/v0/entities/items/',
-    wikiRTId: 'P1258',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' + ' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
-}
+const { GCP_API_URL, GCP_API_KEY, GCP_SEARCH_ENGINE, PPLX_TOKEN, PPLX_API_URL, PPLX_MODEL, PPLX_SOURCES } = env
 
-export const reviewService = {
-    async getAvgScore(tmdbId) {
-        const res = await reviewModel.getScores(tmdbId)
-        if (!res) return
+class ReviewService {
+  async getReviewFromCache(id) {
+    return await redis.getCache(`movies/${id}/review`)
+  }
 
-        return average(Object.values(res))
-    },
-    async populateScores(data) {
-        // TODO: get following dataset from new stored table
-        // - migrate reviews table to new "movie" table
-        // - store all movie details in table for future access, instead of storing in html
-        let { title, releaseDate, wikiId, tmdbId, tmdbScore, imdbId } = data
-        wikiId = wikiId === 'null' ? null : wikiId
-        tmdbScore = parseFloat(tmdbScore)
+  async getReview(id, name, date) {
+    if (date > new Date()) return console.log('getReview: release date is after current date')
 
-        const browser = await firefox.launch();
-        const browserCtx = await browser.newContext({
-            userAgent: defaults.userAgent,
-        });
+    let data = await this.getReviewFromCache(id)
+    if (data) return data
 
-        const [imdbScore, rtData] = await Promise.all([
-            this.getIMDBScore(imdbId, browserCtx),
-            this.getRTData(wikiId, title, releaseDate, browserCtx)
-        ])
+    const res = await fetch(PPLX_API_URL, {
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${PPLX_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      method: 'post',
+      body: JSON.stringify({
+        model: PPLX_MODEL || 'sonar-small-online',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a machine that outputs critical sentiment of movies. I will input a movie title and release year. You must output critic sentiment of that movie using data from the following array of sources: ${PPLX_SOURCES.split(',')} If data from those sources is not available, you must respond "Not found". Your output must be less than 100 words.`
+          },
+          {
+            role: 'user',
+            content: `"${name}" released in ${new Date(date).getFullYear()}`
+          }
+        ],
+        temperature: 0
+      })
+    })
 
-        await reviewModel.upsert({
-            title,
-            releaseDate,
-            wikiId,
-            tmdbId,
-            tmdbScore,
-            imdbId,
-            imdbScore,
-            rtPath: rtData?.path,
-            rtScore: rtData?.avgScore
-        })
+    if (!res.ok) return console.error('Error response from PPLX:', res.message)
 
-        await browser.close();
-        return average([imdbScore, rtData?.avgScore])
-    },
-    async getIMDBScore(imdbId, browserCtx) {
-        // tt3915174
-        console.log('getIMDB', imdbId)
-        const page = await browserCtx.newPage();
-        await page.goto(defaults.imdbBaseUrl + imdbId, { waitUntil: 'domcontentloaded' });
+    const json = await res.json()
 
-        // TODO: use page.getByTestId(). Regex can be for validation? Or maybe with 'hasText'?
-        const element = page.getByText(/^\d\d?\.\d$/).first()
-        let score = await element.textContent()
-        score = parseFloat(score)
-        console.log('getIMDBScore:', score);
-        return score
-    },
-    async guessRTPath(wikiId, title, releaseDate) {
-        // https://www.wikidata.org/w/rest.php/wikibase/v0/entities/items/Q192724/statements
-        try {
-            const res = await fetch(`${defaults.wikiBaseUrl}${wikiId}/statements`)
-            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-            const json = await res.json()
-            const path = json[defaults.wikiRTId][0].value.content
-            return path
-        } catch (e) {
-            console.error('Error fetching RTPath from WikiData.', e) // falls through
-        }
-
-        try {
-            const rtPathPrefix = 'm/'
-            const rtPathTitle = title.replace(/ /g, '_').replace(/<>"#%{}\|\\\^~\[\]`;\/\?:@=&/g, '').toLowerCase()
-            const rtPathYear = '_' + new Date(releaseDate).getFullYear()
-
-            let path = rtPathPrefix + rtPathTitle + rtPathYear
-            let res = await fetch(defaults.rtBaseUrl + path, { method: 'HEAD' })
-            if (res.ok) return path
-
-            path = rtPathPrefix + rtPathTitle
-            res = await fetch(defaults.rtBaseUrl + path, { method: 'HEAD' })
-            if (res.ok) return path
-
-            throw new Error(`${res.status} ${res.statusText}`)
-        } catch (e) {
-            console.error('Error guessing RTPath.', e)
-        }
-    },
-    async getRTData(wikiId, title, releaseDate, browserCtx) {
-        let path
-        // TODO: handle timeout error - locator.getAttribute: Timeout 30000ms exceeded.
-        if (wikiId) path = await reviewModel.getRTPath(wikiId)
-        if (!path) path = await this.guessRTPath(wikiId, title, releaseDate)
-        if (!path) return
-
-        const page = await browserCtx.newPage();
-        await page.goto(defaults.rtBaseUrl + path, { waitUntil: 'domcontentloaded' });
-
-        // TODO: parallelize
-        // TODO: handle TimeoutError waiting for locator('#scoreboard').first()
-        const element = await page.locator('#scoreboard').first()
-        const score1 = await element.getAttribute('tomatometerscore')
-        const score2 = await element.getAttribute('audiencescore')
-        const avgScore = average([parseInt(score1), parseInt(score2)]) / 10 || null // handles NaN
-
-        return {
-            avgScore,
-            path
-        }
+    data = {
+      summary: json.choices[0].message.content
     }
+
+    if (data.summary.startsWith("Not found")) {
+      data.summary = "Not available."
+      redis.setCache(`movies/${id}/review`, data, 60 * 60 * 24)
+    } else {
+      redis.setCache(`movies/${id}/review`, data, 60 * 60 * 24 * 7)
+    }
+
+    return data
+  }
+
+  async getQuotesFromCache(id) {
+    const quotes = await redis.getCache(`movies/${id}/quotes`)
+    return quotes ?? []
+  }
+
+  async getQuotes(id, name, date) {
+    let quotes = await this.getQuotesFromCache(id)
+    if (quotes?.length) return quotes
+
+    let dateMinusOneWeek = new Date(date)
+    dateMinusOneWeek.setDate(dateMinusOneWeek.getDate() - 7)
+    dateMinusOneWeek = dateMinusOneWeek.toISOString().substring(0, 10) // yyyy-mm-dd
+
+    if (new Date() < dateMinusOneWeek) return [] // current date is at least a week before release date
+
+    let datePlusOneMonth = new Date(date)
+    datePlusOneMonth.setMonth(datePlusOneMonth.getMonth() + 1)
+    datePlusOneMonth = datePlusOneMonth.toISOString().substring(0, 10) // yyyy-mm-dd
+
+    const params = {
+      q: `intitle:"${name}" intitle:review`,
+      cx: GCP_SEARCH_ENGINE,
+      sort: `date:r:${dateMinusOneWeek.replaceAll('-', '')}:${datePlusOneMonth.replaceAll('-', '')}`,
+      key: GCP_API_KEY
+    }
+
+    const urlParams = new URLSearchParams(params)
+    const url = `${GCP_API_URL}?${urlParams}`
+
+    const res = await fetch(url)
+
+    if (!res.ok) {
+      console.warn('Error response from GCP API:', res.message)
+      return []
+    }
+
+    const json = await res.json()
+
+    const map = json.items?.reduce((acc, cur) => {
+      if (acc.size >= 3) return acc // limit top 3 quotes
+
+      const sourceLink = cur.link
+
+      let quote = cur.pagemap.metatags[0]?.['og:description'] || cur.pagemap.metatags[0]?.['description']
+      if (quote && quote.length < name.length + 20) quote = null // invalidate quotes that are not long enough, e.g. "Dune: Part Two Movie Review"
+
+      let sourceName = cur.pagemap.metatags[0]?.['og:site_name'] || cur.displayLink
+      let i = sourceName.indexOf('www.')
+      if (i >= 0) sourceName = sourceName.substring(i + 4) // strip www subdomain and any protocol text
+      i = sourceName.indexOf('/')
+      if (i >= 0) sourceName = sourceName.substring(0, i) // strip text after slash if present
+
+      if (sourceLink && quote && sourceName && !acc.has(sourceName)) acc.set(sourceName, { quote, sourceLink, sourceName }) // add only if values exist and we don't already have that source
+
+      return acc
+    }, new Map())
+
+    if (map?.size) {
+      var cacheExp = 60 * 60 * 24 * 7 // valid quotes available, cache for 7 days
+      quotes = Array.from(map.values()) // Map used above to store reviews from unique sources. Here it's converted to array for easier API consumption
+    } else {
+      var cacheExp = 60 * 60 * 24 // no quotes, cache for 1 day
+      quotes = []
+    }
+
+    redis.setCache(`movies/${id}/quotes`, quotes, cacheExp)
+    return quotes
+  }
 }
+
+export default new ReviewService()

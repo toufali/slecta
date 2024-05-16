@@ -72,6 +72,7 @@ const html = data => `
 `
 
 if (typeof HTMLElement !== 'undefined') {
+  // TODO: this probably doesn't need to be Shadow DOM + Custom Element. See reviewQuote.js for more basic component example
   // Define custom element for browser environment, ignore for server
 
   class MovieCard extends HTMLElement {
