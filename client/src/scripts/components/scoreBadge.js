@@ -44,16 +44,17 @@ const html = `
   }
 
   .badge {
-    background-color: var(--color);
     position: absolute;
     height: 100%;
     width: 100%;
     animation: rotate-loading .75s forwards;
     animation-composition: accumulate;
     transition: background-color .5s ease-out;
+    background-color: var(--color);
+    background-image: radial-gradient(#ccc, transparent 50%);
+    background-blend-mode: overlay;
     -webkit-mask: url(../../images/badge.svg) no-repeat 50% / 80%;
     mask: url(../../images/badge.svg) no-repeat 50% / 80%;
-
     }
 
   :host(.loading) .badge{
@@ -66,13 +67,14 @@ const html = `
     position: relative;
     width: 100%;
     height: 100%;
-    mix-blend-mode: overlay;
+    filter: drop-shadow(0 0 2px hsl(0 0 0 / .5));
     transform: rotate(5deg);
   }
 
   svg text{
-    font-size: 33cqw;
+    font-size: 38cqw;
     font-weight: bold;
+    letter-spacing: -1px;
     fill: white;
     text-anchor: middle;
     dominant-baseline: central;
