@@ -33,7 +33,7 @@ export const mainView = data => `
 </head>
 <body data-partial='${data.partial.name}'>
   <header>
-    Slecta
+    <a href='/'><img src='/images/logo.svg' alt='SLECTA'></a>
   </header>
   <main>
     ${data.partial(data.content)}

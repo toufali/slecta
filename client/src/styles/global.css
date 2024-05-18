@@ -19,6 +19,10 @@ body {
   color: var(--gray-90);
 }
 
+body > header{
+  height: 50px;
+}
+
 h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;
@@ -51,6 +55,11 @@ a {
   line-height: inherit;
   text-decoration: 2px underline;
   text-underline-position: under;
+}
+
+img{
+  max-width: 100%;
+  max-height: 100%;
 }
 
 button,
