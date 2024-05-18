@@ -83,6 +83,7 @@ function renderlistDescription(data) {
   if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
 
   listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming].filter(item => item))
+  window.scrollTo(0, 0)
 }
 
 function updateUrl(params) {
