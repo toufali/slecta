@@ -41,18 +41,18 @@ function listDescription(data) {
 
   let sort, genres, ratings, streaming
 
-  sort = `<label>Movies sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
+  sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
+  if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
-  if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
 
-  return conjunctionFmt.format([sort, genres, ratings, streaming].filter(item => item))
+  return conjunctionFmt.format([streaming, sort, genres, ratings].filter(item => item))
 }
 
 export const movieList = data => `
 <link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
 
-<h2 class='list-description'>${listDescription(data)}</h2>
+<h2 class='list-description'>Movies ${listDescription(data)}</h2>
 
 <form class='movies-filter' action='/api/v1/movies' hidden>
   <fieldset>
