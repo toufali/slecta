@@ -25,7 +25,7 @@ const html = data => `
     object-fit: contain;
   }
 
-  h3 {
+  .title {
     font: var(--h3-font);
     color: white;
     margin: 0 0 var(--padding-sm);
@@ -59,7 +59,7 @@ const html = data => `
   <article>
     <img title='${data.overview}' src='${data.posterThumb}'>
     <dl>
-      <dt title='${data.overview}'><h3>${data.title}</h3></dt>
+      <dt title='${data.overview}'><h2 class='title'>${data.title}</h2></dt>
       <dd title='${data.genres.join(', ')}'>${data.genres.join(', ')}</dd>
       <dd>
         <time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>

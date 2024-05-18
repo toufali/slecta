@@ -20,6 +20,8 @@ body {
 }
 
 body > header{
+  max-width: var(--max-width);
+  margin: 0 auto var(--padding-md);
   height: 50px;
 }
 

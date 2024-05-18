@@ -52,7 +52,7 @@ function listDescription(data) {
 export const movieList = data => `
 <link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
 
-<h2 class='list-description'>Movies ${listDescription(data)}</h2>
+<h1 class='list-description'>Movies ${listDescription(data)}</h1>
 
 <form class='movies-filter' action='/api/v1/movies' hidden>
   <fieldset>
