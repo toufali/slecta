@@ -195,9 +195,9 @@ class TmdbService {
       }
 
       data.allGenres = this.genres
-      data.withGenres = query?.wg
+      data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
       data.allRatings = this.ratings
-      data.withRatings = query?.wr
+      data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
       data.allSorting = this.sortingOptions
       data.sortBy = params.sort_by
       data.streamingNow = query?.streaming

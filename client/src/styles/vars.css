@@ -6,6 +6,7 @@
   --border-radius: 6px;
   --checkbox-w: 20px;
   --range-h: 36px;
+  --padding-xs: calc(4px * var(--multiplier));
   --padding-sm: calc(8px * var(--multiplier));
   --padding-md: calc(16px * var(--multiplier));
   --padding-lg: calc(32px * var(--multiplier));
@@ -13,7 +14,7 @@
   --gap: calc(32px * var(--multiplier));
 
   --h1-font: 500 2.5rem/1 'Barlow Semi Condensed','Inter', sans-serif;
-  --h2-font: 500 1.75rem/1 'Barlow Semi Condensed','Inter', sans-serif;
+  --h2-font: 500 1.5rem/1 'Barlow Semi Condensed','Inter', sans-serif;
   --h3-font: normal 1.25rem/1 'Barlow Semi Condensed','Inter', sans-serif;
   --h4-font: 500 1.125rem/1.2 'Inter', sans-serif;
   --small-font: normal .875rem/1.2 'Inter', sans-serif;
@@ -26,6 +27,7 @@
   --yellow-50: #9d9041;
   --green-50: #3d9e7c;
   --gray-90: #edeae0;
+  --gray-70: #c7c5bc;
   --gray-50: #808080;
 }
 

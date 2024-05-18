@@ -47,6 +47,8 @@ export async function showMovieDetail(ctx) {
 export async function getMovies(ctx) {
   const data = await tmdb.getMovies(ctx.query)
 
+  data.allGenres = Array.from(data.allGenres.entries()) // can't send type Map via JSON :(
+
   const scores = await Promise.allSettled(data.movies.map(movie => {
     const key = `movies/${movie.id}/score`
     return scoreService.getScoreFromCache(key)

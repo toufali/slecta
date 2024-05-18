@@ -114,7 +114,7 @@ class ReviewService {
 
     if (map?.size) {
       var cacheExp = 60 * 60 * 24 * 7 // valid quotes available, cache for 7 days
-      quotes = Array.from(map.values()) // Map used above to store reviews from unique sources. Here it's converted to array for easier API consumption
+      quotes = Array.from(map.values()) // Map used above to store reviews from unique sources. Here it's converted to array for JSON API consumption
     } else {
       var cacheExp = 60 * 60 * 24 // no quotes, cache for 1 day
       quotes = []

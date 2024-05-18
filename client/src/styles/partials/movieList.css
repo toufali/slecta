@@ -1,6 +1,18 @@
+.list-description{
+  display: flex;
+  flex-wrap: wrap;
+  width: calc(100% - var(--filter-w));
+  line-height: 1.4;
+  color: var(--gray-70);
+  white-space: pre-wrap;
+}
+
 .list-description output{
   text-transform: uppercase;
   font-weight: bold;
+  background-color: hsl(0 0 0 / .5);
+  padding: var(--padding-xs) var(--padding-sm);
+  color: var(--gray-90);
 }
 
 .movies-list {

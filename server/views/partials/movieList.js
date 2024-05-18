@@ -34,10 +34,25 @@ const ratingFields = data => data.allRatings.reduce((acc, cur) => {
   return acc
 }, ``)
 
+function listDescription(data) {
+  // TODO: this is almost the same function as `client/scripts/movieList.js` – any way to DRY?
+  const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
+  const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
+
+  let sort, genres, ratings, streaming
+
+  sort = `<label>Movies sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
+  if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
+  if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
+
+  return conjunctionFmt.format([sort, genres, ratings, streaming].filter(item => item))
+}
+
 export const movieList = data => `
 <link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
 
-<p class='list-description'>New movies sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></p>
+<h2 class='list-description'>${listDescription(data)}</h2>
 
 <form class='movies-filter' action='/api/v1/movies' hidden>
   <fieldset>

@@ -1,5 +1,6 @@
 const form = document.querySelector('[data-partial="movieList"] form')
 const list = document.querySelector('[data-partial="movieList"] ul')
+const listDescription = document.querySelector('.list-description')
 const filterToggle = document.querySelector('.filter-toggle')
 
 export default function init() {
@@ -15,32 +16,30 @@ function handleMouseEvent(e) {
 async function handleSubmit(e) {
   if (e) e.preventDefault()
 
-  const searchParams = new URLSearchParams(new FormData(form))
-  const data = await getMovieData(searchParams)
+  const params = new URLSearchParams(new FormData(form))
+  const data = await getMovieData(params)
 
-  renderMovieList(data)
-  updateUrl(searchParams)
+  renderMovieList(data.movies)
+  renderlistDescription(data)
   renderScores()
+  updateUrl(params)
   if (!document.documentElement.hasAttribute('desktop')) {
     form.toggleAttribute('hidden', true) // hide filter panel for mobile only
   }
 }
 
-async function getMovieData(searchParams) {
-  let movieData
-
+async function getMovieData(params) {
   try {
-    const res = await fetch(`${form.action}?${searchParams}`)
-
+    var res = await fetch(`${form.action}?${params}`)
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-
-    const { movies } = await res.json()
-    movieData = movies
   } catch (e) {
     console.error(e)
   }
 
-  return movieData
+  const json = await res.json()
+  json.allGenres = new Map(json.allGenres) // genres was converted from Map to Array for JSON compatibility. Here we convert back to Map
+
+  return json
 }
 
 function renderMovieList(movies) {
@@ -72,6 +71,20 @@ async function renderScores() {
   }
 }
 
-function updateUrl(searchParams) {
-  history.replaceState(null, "", `${location.protocol}//${location.host}${location.pathname}?${searchParams}`)
+function renderlistDescription(data) {
+  const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
+  const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
+
+  let sort, genres, ratings, streaming
+
+  sort = `<label>Movies sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
+  if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
+  if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
+
+  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming].filter(item => item))
+}
+
+function updateUrl(params) {
+  history.replaceState(null, "", `${location.protocol}//${location.host}${location.pathname}?${params}`)
 }
