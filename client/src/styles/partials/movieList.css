@@ -1,6 +1,7 @@
 .list-description{
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   width: calc(100% - var(--filter-w));
   font: var(--h3-font);
   line-height: 1.4;

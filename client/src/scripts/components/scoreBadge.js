@@ -135,7 +135,7 @@ if (typeof HTMLElement !== 'undefined') {
       this.#outputEl.textContent = Math.round(this.#score) || ''
 
       switch (true) {
-        case this.#score >= 80:
+        case this.#score >= 75:
           this.style.setProperty('--color', 'var(--green-50)')
           break
         case this.#score >= 60:
