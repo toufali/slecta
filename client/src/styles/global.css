@@ -25,6 +25,10 @@ body > header{
   height: 50px;
 }
 
+body > header .logo{
+  height: 100%;
+}
+
 h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;
