@@ -1,5 +1,5 @@
 const resizeObserver = new ResizeObserver(handleResize)
-const filter = document.querySelector('.movies-filter')
+const filter = document.querySelector('.movie-filter')
 
 function handleResize(entries) {
   let size

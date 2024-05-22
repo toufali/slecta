@@ -1,7 +1,7 @@
 :root{
   --multiplier: 1;
   --min-width: 360px;
-  --max-width: 1200px;
+  --max-width: 1400px;
   --mobile-breakpoint: 1024px;
   --border-radius: 6px;
   --checkbox-w: 20px;

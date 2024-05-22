@@ -54,7 +54,7 @@ export const movieList = data => `
 
 <h1 class='list-description'>Movies ${listDescription(data)}</h1>
 
-<form class='movies-filter' action='/api/v1/movies' hidden>
+<form class='movie-filter' action='/api/v1/movies' hidden>
   <fieldset>
     <h3>Sort by:</h3>
     ${sortingFields(data)}
@@ -77,7 +77,7 @@ export const movieList = data => `
   <button class='primary' type='submit'>APPLY</button>
 </form>
 
-<ul class='movies-list'>
+<ul class='movie-list'>
   ${data.movies.map(movie => `<li>${movieCard(movie)}</li>`).join('')}
 </ul>
 
