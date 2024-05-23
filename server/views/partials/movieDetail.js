@@ -24,7 +24,7 @@ function providers(items) {
 
   const limit = 6
 
-  return items.map(item => `<li><img src='${item.logoUrl}' alt=''> ${item.provider_name}</li>`)
+  return items.map(item => `<li><img src='${item.logoUrl}' alt='${item.provider_name} logo'> <span>${item.provider_name}</span></li>`)
     .slice(0, limit)
     .join('')
 }
