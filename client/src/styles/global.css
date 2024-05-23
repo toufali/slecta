@@ -18,7 +18,7 @@ body {
   padding: var(--padding-md);
   font: normal 1rem/1.5 Inter, Inter-fallback, sans-serif;
   background-color: var(--blue-10);
-  background-image: radial-gradient(circle, transparent 1000px, rgba(0 0 0 / .4)), url('../images/irongrip-dark-blue.webp');
+  background-image: radial-gradient(circle, transparent 1000px, rgb(0 0 0 / .33)), url('../images/irongrip-dark-blue.webp');
   color: var(--gray-90);
 }
 

@@ -82,7 +82,7 @@ score-badge{
   top: -16px;
   right: -16px;
   width: 90px;
-  filter: drop-shadow(0 0 2px hsl(0 0 0 / .5));
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
 label {
@@ -172,7 +172,7 @@ label {
   gap: var(--padding-sm);
   padding: var(--padding-md);
   justify-content: space-evenly;
-  background-color: hsl(0 0 0 / .2);
+  background-color: rgb(0 0 0 / .2);
   border-radius: var(--border-radius);
 }
 
@@ -188,7 +188,7 @@ label {
   top: -1rem;
   left: -.5rem;
   font-size: 6rem;
-  color: hsl(0 0 100 / .1);
+  color: hsl(0 0% 100% / .1);
   line-height: 1;
   text-indent: initial;
   font-style: normal;

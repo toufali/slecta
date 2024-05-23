@@ -67,7 +67,7 @@ const html = `
     position: relative;
     width: 100%;
     height: 100%;
-    filter: drop-shadow(0 0 2px hsl(0 0 0 / .5));
+    filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
     transform: rotate(5deg);
   }
 

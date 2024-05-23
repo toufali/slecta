@@ -16,7 +16,7 @@ body{
 .list-description output{
   text-transform: uppercase;
   font-weight: bold;
-  background-color: hsl(0 0 0 / .5);
+  background-color: rgb(0 0 0 / .5);
   padding: var(--padding-xs) var(--padding-sm);
   color: var(--gray-90);
 }
