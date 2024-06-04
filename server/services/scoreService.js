@@ -47,7 +47,7 @@ class ScoreService {
       if (data.tmdbScore) filteredScores.push(data.tmdbScore)
 
       const score = { avgScore: average(filteredScores) }
-      redis.setCache(key, score, 86400) // 24 hours (60 * 60 * 24)
+      redis.setCache(key, score, 172800) // 48 hours (60 * 60 * 48)
 
       return score
     } catch (e) {
