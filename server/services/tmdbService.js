@@ -254,6 +254,7 @@ class TmdbService {
       const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
       const cast = json.credits.cast.slice(0, 5).map(item => item.name).join(', ')
       const director = json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+      const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
 
       movie = {
         tmdbId: json.id,
@@ -270,7 +271,7 @@ class TmdbService {
         languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
         genres: json.genres.map(genre => genre.name).join(', '),
         providers,
-        backdropUrl: this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path,
+        backdropUrl,
         ytTrailerId: ytTrailer?.key
       }
       redis.setCache(cacheKey, movie)

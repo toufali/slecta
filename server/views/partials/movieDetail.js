@@ -31,10 +31,7 @@ function providers(items) {
 
 export const movieDetail = data => `
 <link rel='stylesheet' href='/styles/partials/movieDetail.css' type='text/css'>
-<figure>
-  <img src='${data.backdropUrl}'>
-  ${ytTrailer(data.ytTrailerId)}
-</figure>
+<figure>${data.backdropUrl ? `<img src='${data.backdropUrl}' alt=''>` : ''}${ytTrailer(data.ytTrailerId)}</figure>
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
     <h1>${data.title}</h1>
