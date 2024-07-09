@@ -54,32 +54,36 @@ export const movieList = data => `
 
 <h1 class='list-description'>Movies ${listDescription(data)}</h1>
 
-<form class='movie-filter' action='/api/v1/movies' hidden>
-  <fieldset>
-    <h3>Sort by:</h3>
-    ${sortingFields(data)}
-  </fieldset>
-  <fieldset>
-    <h3>Include genres:</h3>
-    ${genreFields(data)}
-  </fieldset>
-  <fieldset>
-    <h3>Include ratings:</h3>
-    ${ratingFields(data)}
-  </fieldset>
-  <fieldset>
-    <h3>Availability:</h3>
-    <label class='pill'>
-      <input type='checkbox' name='streaming' ${data.streamingNow ? 'checked' : ''}>
-      <span>Streaming now</span>
-    </label>
-  </fieldset>
-  <button class='primary' type='submit'>APPLY</button>
-</form>
-
 <ul class='movie-list'>
   ${data.movies.map(movie => `<li>${movieCard(movie)}</li>`).join('')}
 </ul>
 
 <button class='filter-toggle primary' type='button'>FILTER</button>
+
+<div class='filter-panel hidden'>
+  <form name='movie-filter' action='/api/v1/movies'>
+    <fieldset>
+      <h3>Sort by:</h3>
+      ${sortingFields(data)}
+    </fieldset>
+    <fieldset>
+      <h3>Include genres:</h3>
+      ${genreFields(data)}
+    </fieldset>
+    <fieldset>
+      <h3>Include ratings:</h3>
+      ${ratingFields(data)}
+    </fieldset>
+    <fieldset>
+      <h3>Availability:</h3>
+      <label class='pill'>
+        <input type='checkbox' name='streaming' ${data.streamingNow ? 'checked' : ''}>
+        <span>Streaming now</span>
+      </label>
+    </fieldset>
+    <fieldset>
+      <button class='primary' type='submit'>APPLY</button>
+    </fieldset>
+  </form>
+</div>
 `

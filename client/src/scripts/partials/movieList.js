@@ -1,34 +1,38 @@
-const form = document.querySelector('[data-partial="movieList"] form')
 const list = document.querySelector('[data-partial="movieList"] ul')
 const listDescription = document.querySelector('.list-description')
+const filterPanel = document.querySelector('.filter-panel')
+const filterForm = document.querySelector('form[name="movie-filter"]')
 const filterToggle = document.querySelector('.filter-toggle')
 
 export default function init() {
   filterToggle.addEventListener('mousedown', handleMouseEvent)
-  form.addEventListener('submit', handleSubmit)
+  filterForm.addEventListener('submit', handleSubmit)
   renderScores()
 }
 
 function handleMouseEvent(e) {
-  form.toggleAttribute('hidden', form.getAttribute('hidden') === null)
+  switch (true) {
+    case e.target.matches('.filter-toggle'):
+      filterPanel.classList.toggle('hidden', !filterPanel.classList.contains('hidden'))
+      break
+  }
 }
 
 async function handleSubmit(e) {
   if (e) e.preventDefault()
 
-  const params = new URLSearchParams(new FormData(form))
-  const data = await getMovieData(params)
+  const params = new URLSearchParams(new FormData(e.target))
+  const data = await getMovieData(e.target, params) // this is more complex (passing form arg) in anticipation of adding TV functionality
+
+  filterPanel.classList.toggle('hidden', true)
 
   renderMovieList(data.movies)
   renderlistDescription(data)
   renderScores()
   updateUrl(params)
-  if (!document.documentElement.hasAttribute('desktop')) {
-    form.toggleAttribute('hidden', true) // hide filter panel for mobile only
-  }
 }
 
-async function getMovieData(params) {
+async function getMovieData(form, params) {
   try {
     var res = await fetch(`${form.action}?${params}`)
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)

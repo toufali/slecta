@@ -24,11 +24,12 @@
   --blue-50: #3e79b4;
   --blue-90: #a9c6e3;
   --red-50: #935851;
-  --yellow-50: #9d9041;
-  --green-50: #3d9e7c;
+  --yellow-50: #9c7f47;
+  --green-50: #38a47e;
   --gray-90: #edeae0;
   --gray-70: #c7c5bc;
   --gray-50: #808080;
+  --gray-30: #586068;
 }
 
 @media (width <= 1024px) {

@@ -15,7 +15,7 @@ body {
   min-height: 100%;
   max-width: var(--max-width);
   margin: auto;
-  padding: var(--padding-md);
+  padding: 0 var(--padding-md);
   font: normal 1rem/1.5 Inter, Inter-fallback, sans-serif;
   background-color: var(--blue-10);
   background-image: radial-gradient(circle, transparent 1000px, rgb(0 0 0 / .33)), url('../images/irongrip-dark-blue.webp');
@@ -23,12 +23,52 @@ body {
 }
 
 body > header{
-  margin: 0 auto var(--padding-md);
-  height: 50px;
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  padding: var(--padding-md) 0;
 }
 
 body > header .logo{
-  height: 100%;
+  display: block;
+  height: 50px;
+  mix-blend-mode: color-dodge;
+}
+
+body > header > nav{
+  display: flex;
+  gap: var(--padding-lg);
+}
+
+body > header > nav a{
+  display: flex;
+  align-items: center;
+  gap: var(--padding-xs);
+  text-decoration: none;
+  color: var(--blue-90);
+}
+
+body > header > nav a::before{
+  content: '';
+  display: inline-block;
+  height: 20px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-url) no-repeat;
+  mask: var(--icon-url) no-repeat;
+}
+
+body > header::after{
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  width: 100vw;
+  border-top: 4px solid black;
+  border-bottom: 1px solid #ccc;
+  mix-blend-mode: soft-light;
 }
 
 h1 {
@@ -85,8 +125,19 @@ button.primary,
   transition: filter .3s;
 }
 
+button.secondary,
+.button.secondary {
+  padding: var(--padding-md);
+  color: var(--gray-90);
+  background: var(--gray-30);
+  box-shadow: 2px 2px 6px -2px #0008;
+  transition: filter .3s;
+}
+
 button.primary:enabled:hover,
-.button.primary:enabled:hover {
+button.secondary:enabled:hover,
+.button.primary:enabled:hover,
+.button.secondary:enabled:hover {
   filter: brightness(1.3);
 }
 
