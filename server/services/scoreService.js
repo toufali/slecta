@@ -1,5 +1,5 @@
 import { firefox } from 'playwright';
-import { average } from '../../scripts/math.js';
+import { average } from '../utils/math.js';
 import redis from "./redisService.js"
 
 class ScoreService {
