@@ -280,6 +280,38 @@ class TmdbService {
       console.error("Error fetching data:", e);
     }
   }
+
+  async getTitlesByString(str) {
+    const limit = 10
+    const urlParams = new URLSearchParams({
+      query: str,
+      language: this.language,
+      region: this.region,
+      include_adult: this.includeAdult,
+    })
+    const url = `${TMDB_API_URL}/search/multi?${urlParams}`
+
+    try {
+      const res = await fetch(url, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const json = await res.json()
+
+      return json.results.filter(item => (item.media_type === 'tv' && item.first_air_date) || item.media_type === 'movie' && item.release_date)
+        .slice(0, limit)
+        .map(item => ({
+          id: item.id,
+          title: item.title || item.name,
+          mediaType: item.media_type,
+          mediaTypeText: item.media_type === 'tv' ? 'TV Show' : 'Movie',
+          releaseDate: item.release_date || item.first_air_date,
+          genres: item.genre_ids.map(id => this.genres.get(id)),
+        }))
+    } catch (e) {
+      console.error("Error fetching data:", e);
+    }
+  }
 }
 
 export default new TmdbService()

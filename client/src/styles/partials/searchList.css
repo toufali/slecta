@@ -1,0 +1,77 @@
+[data-partial="searchList"] h1 {
+  font: var(--h2-font);
+}
+
+[data-partial="searchList"] search{
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding-md);
+}
+
+.result-list {
+  display: grid;
+  gap: var(--padding-md);
+  grid-template-columns: repeat(auto-fill, minmax(var(--min-width), 1fr));
+  list-style: none;
+}
+
+.result-list  article {
+  display: flex;
+  padding: var(--padding-md);
+  gap: var(--padding-sm);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  color: var(--blue-90);
+  background: radial-gradient(at top left, var(--blue-30), var(--blue-10));
+  box-shadow: 3px 3px 12px -3px black;
+}
+
+.result-list article::before {
+  content: '';
+  height: 20px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background-color: var(--blue-90);
+  -webkit-mask: var(--icon-url) no-repeat;
+  mask: var(--icon-url) no-repeat;
+}
+
+.result-list a {
+  display: contents;
+  color: inherit;
+}
+
+.result-list dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--padding-sm);
+  overflow: hidden;
+}
+
+.result-list dt {
+  flex-basis: 100%;
+}
+
+.result-list dt .title {
+  font: var(--h3-font);
+  color: white;
+  margin: 0;
+}
+
+.result-list dd {
+  display: inline-block;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: var(--small-font);
+}
+
+.result-list dd:not(:first-of-type)::before{
+  content: '•︎';
+  margin-right: var(--padding-sm);
+}
+
+.result-list:not(:empty) ~ .no-results{
+  display: none;
+}
