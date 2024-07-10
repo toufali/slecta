@@ -1,7 +1,7 @@
 export const searchList = data => `
 <link rel='stylesheet' href='/styles/partials/searchList.css' type='text/css'>
 
-<h1>Search movies and shows by title</h1>
+<h1>Search movies and TV shows by title</h1>
 
 <search>
   <input name="title" type="search" placeholder="Enter movie or show title" autocomplete="off" autofocus>

@@ -36,7 +36,7 @@ export const mainView = data => `
     <a href='/'><img class='logo' src='/images/logo.svg' alt='SLECTA'></a>
     <nav>
       <a href='/movies' style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
-      <a href='/shows' style="--icon-url:url(/images/tv-icon.svg)">TV</a>
+      <a href='/shows' style="--icon-url:url(/images/tv-icon.svg)">Show</a>
       <a href='/search' style="--icon-url:url(/images/search-icon.svg)">Search</a>
     </nav>
   </header>

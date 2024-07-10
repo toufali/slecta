@@ -17,6 +17,7 @@
 
 .result-list  article {
   display: flex;
+  height: 100%;
   padding: var(--padding-md);
   gap: var(--padding-sm);
   border-radius: var(--border-radius);
@@ -24,6 +25,9 @@
   color: var(--blue-90);
   background: radial-gradient(at top left, var(--blue-30), var(--blue-10));
   box-shadow: 3px 3px 12px -3px black;
+  animation: fade-in .2s var(--delay) forwards;
+  opacity: 0;
+  filter: brightness(.3);
 }
 
 .result-list article::before {
@@ -44,6 +48,7 @@
 .result-list dl {
   display: flex;
   flex-wrap: wrap;
+  align-content: start;
   gap: var(--padding-sm);
   overflow: hidden;
 }

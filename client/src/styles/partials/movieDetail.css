@@ -206,9 +206,3 @@ label {
 .quotes blockquote cite::before{
   content: '– ';
 }
-
-@keyframes fade-in {
-  to {
-    opacity: 1;
-  }
-}
