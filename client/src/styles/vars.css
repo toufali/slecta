@@ -2,7 +2,7 @@
   --multiplier: 1;
   --min-width: 360px;
   --max-width: 1400px;
-  --mobile-breakpoint: 1024px;
+  --mobile-breakpoint: 768px;
   --border-radius: 6px;
   --checkbox-w: 20px;
   --range-h: 36px;
@@ -32,7 +32,7 @@
   --gray-30: #586068;
 }
 
-@media (width <= 1024px) {
+@media (width <= 768px) {
   :root {
     --multiplier: 0.75;
   }

@@ -25,9 +25,16 @@ body {
 body > header{
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: end;
+  gap: var(--padding-sm);
   padding: var(--padding-md) 0;
+}
+
+[mobile] body > header{
+  flex-direction: column;
+  align-items: center;
 }
 
 body > header .logo{
