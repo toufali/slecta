@@ -1,12 +1,13 @@
+import { debounce } from '../utils/time.js'
+
 const searchInput = document.querySelector('input[type="search"]')
 const searchOutput = document.querySelector('search ol')
 
 export default function init() {
-  searchInput.addEventListener('input', handleInput)
+  searchInput.addEventListener('input', debounce(handleInput))
 }
 
 async function handleInput(e) {
-  if (e) e.preventDefault()
   if (e.target.value.length < 2) return searchOutput.replaceChildren()
 
   const params = new URLSearchParams({ [searchInput.name]: searchInput.value })
