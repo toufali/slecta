@@ -13,7 +13,8 @@ export default function init() {
 function handleMouseEvent(e) {
   switch (true) {
     case e.target.matches('.filter-toggle'):
-      filterPanel.classList.toggle('hidden', !filterPanel.classList.contains('hidden'))
+      filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
+      document.documentElement.scroll(0, 0)
       break
   }
 }
@@ -24,7 +25,7 @@ async function handleSubmit(e) {
   const params = new URLSearchParams(new FormData(e.target))
   const data = await getMovieData(e.target, params) // this is more complex (passing form arg) in anticipation of adding TV functionality
 
-  filterPanel.classList.toggle('hidden', true)
+  filterPanel.classList.toggle('visible', false)
 
   renderMovieList(data.movies)
   renderlistDescription(data)

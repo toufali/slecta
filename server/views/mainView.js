@@ -35,9 +35,9 @@ export const mainView = data => `
   <header>
     <a href='/'><img class='logo' src='/images/logo.svg' alt='SLECTA'></a>
     <nav>
-      <a href='/movies' style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
-      <a href='/shows' style="--icon-url:url(/images/tv-icon.svg)">Show</a>
-      <a href='/search' style="--icon-url:url(/images/search-icon.svg)">Search</a>
+      <a href='/movies' class="${data.partial.name === 'movieList' ? 'current' : ''}"  style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
+      <a href='/shows' class="${data.partial.name === 'showList' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
+      <a href='/search' class="${data.partial.name === 'searchList' ? 'current' : ''}" style="--icon-url:url(/images/search-icon.svg)">Search</a>
     </nav>
   </header>
   <main>

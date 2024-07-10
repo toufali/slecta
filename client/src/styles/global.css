@@ -1,3 +1,7 @@
+@view-transition {
+  navigation: auto;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -9,6 +13,11 @@ html {
   height: 100%;
   min-width: var(--min-width);
   overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+html:has(.filter-panel.visible){
+  overflow-y: hidden;
 }
 
 body {
@@ -28,8 +37,7 @@ body > header{
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: end;
-  gap: var(--padding-sm);
-  padding: var(--padding-md) 0;
+  padding-top: var(--padding-md);
 }
 
 [mobile] body > header{
@@ -40,20 +48,20 @@ body > header{
 body > header .logo{
   display: block;
   height: 50px;
-  mix-blend-mode: color-dodge;
-}
-
-body > header > nav{
-  display: flex;
-  gap: var(--padding-lg);
+  mix-blend-mode: hard-light;
+  margin-bottom: var(--padding-sm);
 }
 
 body > header > nav a{
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--padding-xs);
+  gap: 2px;
   text-decoration: none;
-  color: var(--blue-90);
+  color: var(--gray-90);
+  padding: 0 var(--padding-sm) var(--padding-sm) 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 4px;
+  transition: color .3s;
 }
 
 body > header > nav a::before{
@@ -65,6 +73,17 @@ body > header > nav a::before{
   background-color: currentColor;
   -webkit-mask: var(--icon-url) no-repeat;
   mask: var(--icon-url) no-repeat;
+}
+
+body > header > nav a:hover{
+  color: var(--blue-90);
+}
+
+body > header > nav a.current{
+  color: var(--gray-90);
+  animation: nav-item-current .3s forwards;
+  pointer-events: none;
+  cursor: default;
 }
 
 body > header::after{
@@ -262,5 +281,16 @@ input[type=range]::-moz-range-thumb {
   to {
     opacity: 1;
     filter: none;
+  }
+}
+
+@keyframes nav-item-current {
+  from{
+    box-shadow: none;
+    border-bottom-color: transparent; 
+  }
+  to{
+    box-shadow: 0 8px 16px -8px var(--blue-90), inset 0 -10px 16px -12px var(--blue-90);
+    border-bottom-color: var(--blue-90);  
   }
 }

@@ -11,7 +11,7 @@ function handleResize(entries) {
   entries.forEach((entry) => {
     switch (entry.target) {
       case header:
-        document.documentElement.style.setProperty('--header-bottom', `${header.getBoundingClientRect().bottom}px`)
+        document.documentElement.style.setProperty('--header-height', `${header.getBoundingClientRect().height}px`)
         break
       case filter:
         size = entry.borderBoxSize[0].inlineSize

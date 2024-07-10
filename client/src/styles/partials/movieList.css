@@ -25,19 +25,23 @@
 
 .filter-panel {
   position: fixed;
-  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
-  transition: transform .2s;
-  z-index: 1;
-  overflow-y: auto;
-  top: var(--header-bottom);
+  top: var(--header-height);
   bottom: 0;
   left: 0;
   width: 100vw;
+  z-index: 1;
+  overflow-y: auto;
+  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(50%);
+  transition: transform .4s, opacity .2s ease-in;
 }
 
-.filter-panel.hidden {
-  transform: translateY(100%);
-  pointer-events: none;
+.filter-panel.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: all;
 }
 
 .filter-panel > form{
