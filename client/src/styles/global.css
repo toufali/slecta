@@ -40,7 +40,7 @@ body > header{
   padding-top: var(--padding-md);
 }
 
-[mobile] body > header{
+.mobile body > header{
   flex-direction: column;
   align-items: center;
 }
