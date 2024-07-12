@@ -4,6 +4,7 @@
 import './mainView.js'
 import './matchMedia.js'
 import './resizeObserver.js'
+import './scrollObserver.js'
 import './components/movieCard.js'
 import './components/scoreBadge.js'
 
