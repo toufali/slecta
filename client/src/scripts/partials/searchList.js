@@ -1,7 +1,7 @@
 import { debounce } from '../utils/time.js'
 
 const searchInput = document.querySelector('input[type="search"]')
-const searchOutput = document.querySelector('search ol')
+const searchOutput = document.querySelector('.result-list')
 
 export default function init() {
   searchInput.addEventListener('input', debounce(handleInput))

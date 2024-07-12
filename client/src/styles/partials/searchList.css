@@ -1,11 +1,19 @@
-[data-partial="searchList"] h1 {
-  font: var(--h2-font);
-}
-
 [data-partial="searchList"] search{
   display: flex;
   flex-direction: column;
   gap: var(--padding-md);
+  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
+  margin-bottom: var(--padding-md);
+  padding: var(--padding-lg) var(--padding-md);
+  border-radius: var(--border-radius);
+  box-shadow: 3px 3px 12px -3px black;
+  align-items: center;
+}
+
+[data-partial="searchList"] h1 {
+  font: var(--h3-font);
+  color: var(--blue-90);
+  margin: 0;
 }
 
 .result-list {
@@ -79,4 +87,8 @@
 
 .result-list:not(:empty) ~ .no-results{
   display: none;
+}
+
+.no-results{
+  padding: var(--padding-md);
 }
