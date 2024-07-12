@@ -32,13 +32,15 @@ export const mainView = data => `
   <script src='/scripts/index.js' type='module'></script>
 </head>
 <body data-partial='${data.partial.name}'>
-  <header>
-    <a href='/'><img class='logo' src='/images/logo.svg' alt='SLECTA'></a>
-    <nav>
-      <a href='/movies' class="${data.partial.name === 'movieList' ? 'current' : ''}"  style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
-      <a href='/shows' class="${data.partial.name === 'showList' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
-      <a href='/search' class="${data.partial.name === 'searchList' ? 'current' : ''}" style="--icon-url:url(/images/search-icon.svg)">Search</a>
-    </nav>
+  <header class='primary'>
+    <div>
+      <a href='/'><img class='logo' src='/images/logo.svg' alt='SLECTA'></a>
+      <nav class='primary'>
+        <a href='/movies' class="${data.partial.name === 'movieList' ? 'current' : ''}"  style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
+        <a href='/shows' class="${data.partial.name === 'showList' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
+        <a href='/search' class="${data.partial.name === 'searchList' ? 'current' : ''}" style="--icon-url:url(/images/search-icon.svg)">Search</a>
+      </nav>
+    </div>
   </header>
   <main>
     ${data.partial(data.content)}

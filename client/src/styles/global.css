@@ -21,7 +21,6 @@ html:has(.filter-panel.visible){
 }
 
 body {
-  min-height: 100%;
   max-width: var(--max-width);
   margin: auto;
   padding: 0 var(--padding-md);
@@ -31,40 +30,58 @@ body {
   color: var(--gray-90);
 }
 
-body > header{
-  position: relative;
+header.primary{
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  z-index: 2;
+  background-color: var(--blue-10);
+  background-image: radial-gradient(ellipse at top, rgba(155, 200, 255, 0.2), transparent 75%), url('../images/irongrip-dark-blue.webp');
+  box-shadow: inset 0 -2px black, 0 0 6px black;
+  transition: transform .3s cubic-bezier(0,.25,.25,1);
+  ;
+}
+
+[data-scroll-dir="down"]:not(:has(.filter-panel.visible)) header.primary{
+  transform: translateY(-110%);
+  transition-timing-function: ease-in;
+}
+
+header.primary > div{
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: end;
-  padding-top: var(--padding-md);
+  width: min(100%, var(--max-width));
+  margin: auto;
+  padding: var(--padding-md) var(--padding-md) 0;
 }
 
-.mobile body > header{
+.mobile header.primary > div{
   flex-direction: column;
   align-items: center;
 }
 
-body > header .logo{
+header.primary .logo{
   display: block;
   height: 50px;
   mix-blend-mode: hard-light;
   margin-bottom: var(--padding-sm);
 }
 
-body > header > nav a{
+nav.primary a{
   display: inline-flex;
   align-items: center;
   gap: 2px;
   text-decoration: none;
   color: var(--gray-90);
   padding: 0 var(--padding-sm) var(--padding-sm) 0;
-  border-bottom: 3px solid transparent;
-  border-radius: 4px;
+  border-radius: 2px;
   transition: color .3s;
 }
 
-body > header > nav a::before{
+nav.primary a::before{
   content: '';
   display: inline-block;
   height: 20px;
@@ -75,25 +92,31 @@ body > header > nav a::before{
   mask: var(--icon-url) no-repeat;
 }
 
-body > header > nav a:hover{
+nav.primary a:hover{
   color: var(--blue-90);
 }
 
-body > header > nav a.current{
+nav.primary a.current{
   color: var(--gray-90);
-  animation: nav-item-current .3s forwards;
+  animation: nav-item-current .4s ease-out forwards;
   pointer-events: none;
   cursor: default;
 }
 
-body > header::after{
+body > main{
+  position: relative;
+  margin-top: var(--header-height);
+  padding-top: var(--padding-md);
+}
+
+body > main::before{
   content: '';
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: calc(50% - 50vw);
   width: 100vw;
   border-top: 4px solid black;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid white;
   mix-blend-mode: soft-light;
 }
 
@@ -286,11 +309,9 @@ input[type=range]::-moz-range-thumb {
 
 @keyframes nav-item-current {
   from{
-    box-shadow: none;
-    border-bottom-color: transparent; 
+    box-shadow: 0 4px 0 transparent, inset 0 -12px 12px -10px transparent, 0 8px 6px -2px transparent;
   }
   to{
-    box-shadow: 0 8px 16px -8px var(--blue-90), inset 0 -10px 16px -12px var(--blue-90);
-    border-bottom-color: var(--blue-90);  
+    box-shadow: 0 4px 0 var(--blue-90), inset 0 -12px 12px -10px var(--blue-50), 0 8px 6px -2px var(--blue-50);
   }
 }
