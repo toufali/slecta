@@ -30,6 +30,16 @@ body {
   color: var(--gray-90);
 }
 
+hr.header-groove{
+  position: absolute;
+  top: var(--header-height);
+  left: calc(50% - 50vw);
+  width: 100vw;
+  border-top: 4px solid black;
+  border-bottom: 1px solid white;
+  mix-blend-mode: soft-light;
+}
+
 header.primary{
   position: fixed;
   top: 0;
@@ -104,20 +114,7 @@ nav.primary a.current{
 }
 
 body > main{
-  position: relative;
-  margin-top: var(--header-height);
-  padding-top: var(--padding-md);
-}
-
-body > main::before{
-  content: '';
-  position: absolute;
-  top: 0;
-  left: calc(50% - 50vw);
-  width: 100vw;
-  border-top: 4px solid black;
-  border-bottom: 1px solid white;
-  mix-blend-mode: soft-light;
+  margin-top: calc(var(--header-height) + var(--padding-lg));
 }
 
 h1 {

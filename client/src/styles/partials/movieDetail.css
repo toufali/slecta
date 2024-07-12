@@ -1,6 +1,4 @@
 main {
-  max-width: var(--max-width);
-  margin: auto;
   background: var(--blue-30);
   border-radius: var(--border-radius);
   box-shadow: 0 0 12px black;

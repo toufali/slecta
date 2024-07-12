@@ -42,6 +42,7 @@ export const mainView = data => `
       </nav>
     </div>
   </header>
+  <hr class='header-groove'>
   <main>
     ${data.partial(data.content)}
   </main>
