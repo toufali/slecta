@@ -14,6 +14,7 @@ function handleMouseEvent(e) {
   switch (true) {
     case e.target.matches('.filter-toggle'):
       filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
+      filterPanel.scroll(0, 0)
       break
   }
 }
