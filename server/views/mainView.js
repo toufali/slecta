@@ -1,6 +1,6 @@
 export const mainView = data => `
 <!doctype html>
-<html lang=en>
+<html lang=en class='mobile'>
 <head>
   <title>SLECTA</title>
 
