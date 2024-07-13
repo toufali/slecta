@@ -41,6 +41,7 @@ hr.header-groove{
 }
 
 header.primary{
+  container: header / inline-size;
   position: fixed;
   top: 0;
   left: 0;
@@ -60,17 +61,19 @@ header.primary{
 
 header.primary > div{
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: end;
+  flex-flow: column wrap;
+  align-items: center;
   width: min(100%, var(--max-width));
   margin: auto;
   padding: var(--padding-md) var(--padding-md) 0;
 }
 
-.mobile header.primary > div{
-  flex-direction: column;
-  align-items: center;
+@container header (width > 768px) {
+  header.primary > div {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: end;
+  }
 }
 
 header.primary .logo{
