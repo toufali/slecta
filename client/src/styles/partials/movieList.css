@@ -71,6 +71,8 @@ fieldset:last-of-type > button{
 }
 
 .filter-toggle {
+  /* note Firefox Android hit area bug */
+  /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */
   position: sticky;
   bottom: var(--padding-md);
   width: min(100%, 640px);

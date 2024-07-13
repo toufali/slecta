@@ -120,6 +120,26 @@ body > main{
   margin-top: calc(var(--header-height) + var(--padding-lg));
 }
 
+footer{
+  position: relative;
+  margin-top: var(--padding-lg);
+  padding: var(--padding-lg) var(--padding-md);
+  text-align: center;
+  color: var(--gray-70);
+  font: var(--small-font);
+}
+
+footer::before{
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(50% - 50vw);
+  width: 100vw;
+  border-top: 4px solid black;
+  border-bottom: 1px solid white;
+  mix-blend-mode: soft-light;
+}
+
 h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;

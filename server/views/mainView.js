@@ -46,6 +46,9 @@ export const mainView = data => `
   <main>
     ${data.partial(data.content)}
   </main>
+  <footer>
+    <a href='/about'>About Slecta</a>
+  </footer>
 </body>
 </html>
 `
