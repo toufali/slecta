@@ -36,16 +36,18 @@ class TmdbService {
     3, // Google Play Movies
   ]
   imgConfig
-  genres
+  genres = {}
   ratings
 
   async init() {
     const [imgConfig, genres, ratings] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings()])
     this.imgConfig = imgConfig
-    this.genres = genres
+    this.genres.all = genres.all
+    this.genres.movie = genres.movie
+    this.genres.show = genres.show
     this.ratings = ratings
     console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
-    console.info('- from cache:', Boolean(this.imgConfig.cacheHit && this.genres.cacheHit && this.ratings.cacheHit))
+    console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
   }
 
   async #getImgConfig() {
@@ -89,44 +91,18 @@ class TmdbService {
         const res = await fetch(url, { headers });
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
         const { genres } = await res.json()
-        return genres
+        return new Map(genres.map(genre => [genre.id, genre.name]))
       }));
 
-      const genresConcat = movieGenres.value.concat(showGenres.value)
-      genres = new Map(genresConcat.map(genre => [genre.id, genre.name]))
+      genres = {
+        movie: movieGenres.value,
+        show: showGenres.value,
+        all: new Map([...movieGenres.value, ...showGenres.value])
+      }
+
       redis.setCache(`${TMDB_API_URL}/genre`, genres, 60 * 60 * 24)
     } catch (e) {
       console.error("Error getting TMDB genres:", e)
-      console.info('Fallback using mock genres data.')
-      genres = new Map([
-        [28, 'Action'],
-        [12, 'Adventure'],
-        [16, 'Animation'],
-        [35, 'Comedy'],
-        [80, 'Crime'],
-        [99, 'Documentary'],
-        [18, 'Drama'],
-        [10751, 'Family'],
-        [14, 'Fantasy'],
-        [36, 'History'],
-        [27, 'Horror'],
-        [10402, 'Music'],
-        [9648, 'Mystery'],
-        [10749, 'Romance'],
-        [878, 'Science Fiction'],
-        [10770, 'TV Movie'],
-        [53, 'Thriller'],
-        [10752, 'War'],
-        [37, 'Western'],
-        [10759, 'Action & Adventure'],
-        [10762, 'Kids'],
-        [10763, 'News'],
-        [10764, 'Reality'],
-        [10765, 'Sci-Fi & Fantasy'],
-        [10766, 'Soap'],
-        [10767, 'Talk'],
-        [10768, 'War & Politics']
-      ])
     }
     return genres
   }
@@ -195,7 +171,7 @@ class TmdbService {
         movies: json.results.map(item => new Object({
           id: item.id,
           title: item.title,
-          genres: item.genre_ids.map(id => this.genres.get(id)),
+          genres: item.genre_ids.map(id => this.genres.movie.get(id)),
           releaseDate: item.release_date,
           posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
           overview: item.overview,
@@ -205,7 +181,7 @@ class TmdbService {
         }))
       }
 
-      data.allGenres = this.genres
+      data.allGenres = this.genres.movie
       data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
       data.allRatings = this.ratings
       data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
@@ -317,7 +293,7 @@ class TmdbService {
           mediaType: item.media_type,
           mediaTypeText: item.media_type === 'tv' ? 'TV Show' : 'Movie',
           releaseDate: item.release_date || item.first_air_date,
-          genres: item.genre_ids.map(id => this.genres.get(id)),
+          genres: item.genre_ids.map(id => this.genres.all.get(id)),
         }))
     } catch (e) {
       console.error("Error fetching data:", e);
