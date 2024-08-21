@@ -79,20 +79,22 @@ class TmdbService {
   }
 
   async #getGenres() {
-    const url = `${TMDB_API_URL}/genre/movie/list?language=${this.language}`
+    const urls = [`${TMDB_API_URL}/genre/movie/list?language=${this.language}`, `${TMDB_API_URL}/genre/tv/list?language=${this.language}`]
 
-    let genres = await redis.getCache(url)
+    let genres = await redis.getCache(`${TMDB_API_URL}/genre`)
     if (genres) return genres
 
     try {
-      const res = await fetch(url, { headers })
+      const [movieGenres, showGenres] = await Promise.allSettled(urls.map(async url => {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+        const { genres } = await res.json()
+        return genres
+      }));
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-
-      const { genres: genresArr } = await res.json()
-
-      genres = new Map(genresArr.map(genre => [genre.id, genre.name]))
-      redis.setCache(url, genres, 60 * 60 * 24)
+      const genresConcat = movieGenres.value.concat(showGenres.value)
+      genres = new Map(genresConcat.map(genre => [genre.id, genre.name]))
+      redis.setCache(`${TMDB_API_URL}/genre`, genres, 60 * 60 * 24)
     } catch (e) {
       console.error("Error getting TMDB genres:", e)
       console.info('Fallback using mock genres data.')
@@ -115,7 +117,16 @@ class TmdbService {
         [10770, 'TV Movie'],
         [53, 'Thriller'],
         [10752, 'War'],
-        [37, 'Western']])
+        [37, 'Western'],
+        [10759, 'Action & Adventure'],
+        [10762, 'Kids'],
+        [10763, 'News'],
+        [10764, 'Reality'],
+        [10765, 'Sci-Fi & Fantasy'],
+        [10766, 'Soap'],
+        [10767, 'Talk'],
+        [10768, 'War & Politics']
+      ])
     }
     return genres
   }
