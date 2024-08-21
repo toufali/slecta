@@ -12,10 +12,16 @@ class TmdbService {
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc
-  sortingOptions = [
-    { name: 'Most Recent', value: 'primary_release_date.desc' },
-    { name: 'Popularity', value: 'popularity.desc' }
-  ]
+  sortingOptions = {
+    movies: [
+      { name: 'Most Recent', value: 'primary_release_date.desc' },
+      { name: 'Popularity', value: 'popularity.desc' }
+    ],
+    shows: [
+      { name: 'Most Recent', value: 'first_air_date.desc' },
+      { name: 'Popularity', value: 'popularity.desc' }
+    ]
+  }
   region = 'US'
   providerPriority = [
     8, // Netflix
@@ -135,7 +141,7 @@ class TmdbService {
       page: query?.page ?? 1,
       include_adult: this.includeAdult,
       include_video: this.includeVideo,
-      sort_by: query?.sort ?? this.sortingOptions[0].value,
+      sort_by: query?.sort ?? this.sortingOptions.movies[0].value,
       'primary_release_date.lte': new Date().toISOString().substring(0, 10),
       'primary_release_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
       'vote_count.gte': query?.count ?? this.countMin,
@@ -185,7 +191,7 @@ class TmdbService {
       data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
       data.allRatings = this.ratings
       data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
-      data.allSorting = this.sortingOptions
+      data.allSorting = this.sortingOptions.movies
       data.sortBy = params.sort_by
       data.streamingNow = query?.streaming
 
