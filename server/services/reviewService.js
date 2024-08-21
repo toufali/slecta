@@ -64,6 +64,7 @@ class ReviewService {
     let quotes = await this.getQuotesFromCache(id)
     if (quotes?.length) return quotes
 
+    if (!date || date === 'undefined') return [] // TODO: why is this undefined for TV? Clean this up on the client
     let dateMinusOneWeek = new Date(date)
     dateMinusOneWeek.setDate(dateMinusOneWeek.getDate() - 7)
     dateMinusOneWeek = dateMinusOneWeek.toISOString().substring(0, 10) // yyyy-mm-dd

@@ -184,6 +184,7 @@ class TmdbService {
           tmdbScore: item.vote_average,
           tmdbScoreCount: item.vote_count,
           popularity: item.popularity,
+          detailPath: `/movies/${item.id}`
         }))
       }
 
@@ -305,6 +306,139 @@ class TmdbService {
       console.error("Error fetching data:", e);
     }
   }
+  async getTvShows(query) {
+    const params = {
+      // TODO: these params were based on deprecated filter and should be revisited
+      page: query?.page ?? 1,
+      include_adult: this.includeAdult,
+      sort_by: query?.sort ?? this.sortingOptions.shows[0].value,
+      'first_air_date.lte': new Date().toISOString().substring(0, 10),
+      'first_air_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
+      'vote_count.gte': query?.count ?? this.countMin,
+      with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
+      without_genres: query?.wog,
+      watch_region: this.region,
+      with_watch_monetization_types: query?.streaming ? 'buy|free|flatrate|rent|ads' : ''
+    }
+
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === '') {
+        delete params[key]
+      }
+    }
+
+    const urlParams = new URLSearchParams(params)
+    const url = `${TMDB_API_URL}/discover/tv?${urlParams}`
+    const cacheKey = `shows?${urlParams}`
+
+    let data = await redis.getCache(cacheKey)
+    if (data) return data
+
+    try {
+      const res = await fetch(url, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const json = await res.json()
+
+      data = {
+        shows: json.results.map(item => new Object({
+          id: item.id,
+          title: item.name,
+          genres: item.genre_ids.map(id => this.genres.show.get(id)),
+          releaseDate: item.first_air_date,
+          posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+          overview: item.overview,
+          tmdbScore: item.vote_average,
+          tmdbScoreCount: item.vote_count,
+          popularity: item.popularity,
+          detailPath: `/shows/${item.id}`
+        }))
+      }
+
+      data.allGenres = this.genres.show
+      data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
+      data.allSorting = this.sortingOptions.shows
+      data.sortBy = params.sort_by
+      data.streamingNow = query?.streaming
+
+      redis.setCache(cacheKey, data)
+      return data
+    } catch (e) {
+      console.error("Error fetching data:", e);
+    }
+  }
+
+  async getTvShowDetail(id) {
+    const params = {
+      append_to_response: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings'
+    }
+    const url = `${TMDB_API_URL}/tv/${id}?${new URLSearchParams(params)}`
+    const cacheKey = `shows/${id}`
+
+    let show = await redis.getCache(cacheKey)
+    if (show) return show
+
+    try {
+      const res = await fetch(url, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const json = await res.json()
+      let providers = json['watch/providers'].results[this.region]
+
+      if (providers) {
+        // reshape, reduce, and mutate data
+        const providerPriority = this.providerPriority.toReversed()
+        const thisClass = this
+
+        providers = Object.values(providers)
+          .flat()
+          .filter(function (item) {
+            if (!item.provider_id) return // not a valid provider if no ID
+            if (this.has(item.provider_id)) return // already in set
+            if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
+
+            item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
+            this.add(item.provider_id)
+            return true
+          }, new Set())
+          .sort((a, b) => {
+            const j = providerPriority.indexOf(a.provider_id)
+            const k = providerPriority.indexOf(b.provider_id)
+            return k - j
+          })
+      }
+      const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
+      const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+      const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
+      const director = json.aggregate_credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+      const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
+
+      show = {
+        tmdbId: json.id,
+        imdbId: json.external_ids.imdb_id,
+        wikiId: json.external_ids.wikidata_id,
+        title: json.name,
+        overview: json.overview,
+        releaseDate: json.release_date,
+        tmdbScore: Math.round(json.vote_average * 10),
+        cast,
+        director,
+        runtime: json.episode_run_time,
+        languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
+        genres: json.genres.map(genre => genre.name).join(', '),
+        providers,
+        backdropUrl,
+        ytTrailerId: ytTrailer?.key
+      }
+      redis.setCache(cacheKey, show)
+      return show
+    } catch (e) {
+      console.error("Error fetching data:", e);
+    }
+  }
+
 }
 
 export default new TmdbService()

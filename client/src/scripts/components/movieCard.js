@@ -55,7 +55,7 @@ const html = data => `
   }
 </style>
 
-<a href='/movies/${data.id}'>
+<a href='${data.detailPath}'>
   <article>
     <img title='${data.overview}' src='${data.posterThumb}'>
     <dl>
