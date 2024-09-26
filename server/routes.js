@@ -3,10 +3,12 @@ import { showSearch, getTitles } from './controllers/searchController.js'
 import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
 import { getTvShows, getTvShowDetail, showTvShows, showTvShowDetail, getTvShowScore, getTvShowQuotes } from './controllers/tvShowController.js'
 import { cacheMovieScores } from './jobs/cacheScores.js'
+import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
 
 router.get('/', showMovies);
+router.get('/about', showAbout);
 router.get('/search', showSearch);
 router.get('/movies', showMovies);
 router.get('/movies/:id', showMovieDetail);
