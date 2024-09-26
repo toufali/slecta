@@ -23,7 +23,7 @@ async function handleInput(e) {
 
   const outputHtml = results.map((item, i) => `
   <li>
-    <a href="/movies/${item.id}">
+    <a href="/${item.mediaType === 'tv' ? 'shows' : 'movies'}/${item.id}">
       <article data-type="${item.mediaType}" style="--delay:${30 * i}ms; --icon-url:url(/images/${item.mediaType}-icon.svg)">
         <dl>
           <dt><h3 class='title'>${item.title}</h3></dt>
