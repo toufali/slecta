@@ -1,3 +1,7 @@
+/**
+ * Slider with 2 buttons to return a range
+ */
+
 const html = data => `
 <style>
   :host{
