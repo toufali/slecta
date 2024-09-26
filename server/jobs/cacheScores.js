@@ -1,3 +1,8 @@
+/**
+ * Cronjob to cache scores for default (landing page) list of movies
+ * Triggered via GCP Cloud Scheduler, daily at midnight
+ */
+
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
 
