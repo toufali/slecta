@@ -4,6 +4,7 @@ import { createGunzip } from 'node:zlib'
 import { Readable } from 'node:stream'
 import { createInterface } from 'node:readline'
 import redis from './redisService.js'
+import log from '../utils/logger.js'
 
 const DATASET_URL = 'https://datasets.imdbws.com/title.ratings.tsv.gz'
 const KEY_PREFIX = 'imdb/ratings/'
@@ -63,7 +64,7 @@ class ImdbService {
     const meta = { titles: kept, buckets: buckets.size, lastModified: res.headers.get('last-modified') }
     if (!await redis.setCache(META_KEY, meta, TTL)) throw new Error('IMDb metadata write to Redis failed')
 
-    console.info('IMDb ratings refreshed:', { ...meta, scanned: total, seconds: Math.round((Date.now() - started) / 1000) })
+    log.info('IMDb ratings refreshed', { ...meta, scanned: total, seconds: Math.round((Date.now() - started) / 1000) })
     return meta
   }
 
