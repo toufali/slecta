@@ -3,6 +3,7 @@ import { showSearch, getTitles } from './controllers/searchController.js'
 import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
 import { getTvShows, getTvShowDetail, showTvShows, showTvShowDetail, getTvShowScore, getTvShowQuotes } from './controllers/tvShowController.js'
 import { cacheScores } from './jobs/cacheScores.js'
+import { verifyScheduler } from './middleware/verifyScheduler.js'
 import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
@@ -12,7 +13,10 @@ router.get('/about', showAbout);
 router.get('/search', showSearch);
 router.get('/movies', showMovies);
 router.get('/movies/:id', showMovieDetail);
-router.post('/movies/cache-scores', setDefaultResponse, cacheScores); // renamed alongside the scheduler in the infra PR
+// The job covers both media types, so `/movies/...` is a misnomer. Both are served for one
+// release so the scheduler URI can move without a gap; the old one goes in Phase 2.
+router.post('/cache-scores', verifyScheduler, setDefaultResponse, cacheScores);
+router.post('/movies/cache-scores', verifyScheduler, setDefaultResponse, cacheScores);
 router.get('/shows', showTvShows);
 router.get('/shows/:id', showTvShowDetail);
 

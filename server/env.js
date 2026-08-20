@@ -12,7 +12,9 @@ const optionalKeys = [
   'PPLX_TOKEN',
   'PPLX_API_URL',
   'PPLX_SOURCES',
-  'PPLX_MODEL'
+  'PPLX_MODEL',
+  'SCHEDULER_AUDIENCE',
+  'SCHEDULER_SERVICE_ACCOUNT'
 ]
 
 const env = {
