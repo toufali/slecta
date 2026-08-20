@@ -55,23 +55,34 @@ class ReviewService {
     return data
   }
 
-  async getQuotesFromCache(id) {
-    const quotes = await redis.getCache(`movies/${id}/quotes`)
+  async getQuotesFromCache(id, mediaType = 'movie') {
+    // Namespaced by type: TMDB ids are per-type, so movie 1396 and show 1396 differ
+    const quotes = await redis.getCache(`${mediaType}s/${id}/quotes`)
     return quotes ?? []
   }
 
-  async getQuotes(id, name, date) {
-    let quotes = await this.getQuotesFromCache(id)
+  async getQuotes(id, name, date, mediaType = 'movie') {
+    // Koa yields an array for a repeated query param, which would make `name.length` below an
+    // element count rather than a string length, and stringify commas into the search query
+    name = first(name)
+    date = first(date)
+
+    let quotes = await this.getQuotesFromCache(id, mediaType)
     if (quotes?.length) return quotes
 
-    if (!date || date === 'undefined') return [] // TODO: why is this undefined for TV? Clean this up on the client
-    let dateMinusOneWeek = new Date(date)
+    // Clients can send anything, and TV details cached before the first_air_date fix still
+    // stringify to 'undefined'. Unvalidated, the arithmetic below throws RangeError -> 500.
+    const released = new Date(date)
+
+    if (isNaN(released)) return []
+
+    let dateMinusOneWeek = new Date(released)
     dateMinusOneWeek.setDate(dateMinusOneWeek.getDate() - 7)
     dateMinusOneWeek = dateMinusOneWeek.toISOString().substring(0, 10) // yyyy-mm-dd
 
     if (new Date() < dateMinusOneWeek) return [] // current date is at least a week before release date
 
-    let datePlusOneMonth = new Date(date)
+    let datePlusOneMonth = new Date(released)
     datePlusOneMonth.setMonth(datePlusOneMonth.getMonth() + 1)
     datePlusOneMonth = datePlusOneMonth.toISOString().substring(0, 10) // yyyy-mm-dd
 
@@ -121,9 +132,13 @@ class ReviewService {
       quotes = []
     }
 
-    redis.setCache(`movies/${id}/quotes`, quotes, cacheExp)
+    redis.setCache(`${mediaType}s/${id}/quotes`, quotes, cacheExp)
     return quotes
   }
 }
 
 export default new ReviewService()
+
+function first(value) {
+  return Array.isArray(value) ? value[0] : value
+}

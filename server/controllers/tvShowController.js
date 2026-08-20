@@ -28,7 +28,7 @@ export async function showTvShows(ctx) {
 export async function showTvShowDetail(ctx) {
   const data = await tmdb.getTvShowDetail(ctx.params.id)
   const score = await scoreService.getScoreFromCache(`shows/${ctx.params.id}/score`)
-  const quotes = await reviewService.getQuotesFromCache(ctx.params.id)
+  const quotes = await reviewService.getQuotesFromCache(ctx.params.id, 'tv')
 
   data.score = score?.avgScore
   data.quotes = quotes
@@ -91,15 +91,15 @@ export async function getTvShowScore(ctx) {
     imdbId,
     wikiId,
     title,
-    releaseDate
+    releaseDate,
+    mediaType: 'tv'
   })
 
   return ctx.body = data
 }
 
 export async function getTvShowQuotes(ctx) {
-  console.log(ctx.query.releaseDate)
-  const data = await reviewService.getQuotes(ctx.params.id, ctx.query.title, ctx.query.releaseDate)
+  const data = await reviewService.getQuotes(ctx.params.id, ctx.query.title, ctx.query.releaseDate, 'tv')
 
   if (data.cacheHit) {
     ctx.set('x-server-cache-hit', 'true')
