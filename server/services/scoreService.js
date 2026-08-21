@@ -10,8 +10,7 @@ const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
 
-// Metacritic scores TV per season too; only whole-title types, so a season page can never
-// pass as the series score.
+// Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
 
 // Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
@@ -75,8 +74,8 @@ class ScoreService {
         log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
       }
 
-      // Awaited so a failed write is visible: setCache hides Redis errors, and the nightly job
-      // must not report a warmed cache that was never written. Mirrors getCache's `cacheHit`.
+      // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
+      // `cached` mirrors getCache's `cacheHit` flag.
       const cached = await redis.setCache(key, score, SCORE_TTL)
 
       Object.defineProperty(score, 'cached', { value: Boolean(cached) })
@@ -93,7 +92,7 @@ class ScoreService {
   }
 
   // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
-  // A `tv/<slug>` path with no season suffix returns RT's cross-season average.
+  // A `tv/<slug>` path with no season suffix returns RT's cross-season average, not one season's.
   async getRTScores(path) {
     if (!path) return
 
@@ -151,8 +150,7 @@ class ScoreService {
       if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate))
       if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], '/')
 
-      // An empty result may just be a transient failure, so it expires quickly rather than
-      // hiding a source for a month
+      // An empty result may just be a transient failure, so it expires quickly rather than hiding a source for a month
       redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
       log.warn('Error resolving slugs', { title, mediaType, error: e })

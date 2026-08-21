@@ -46,9 +46,14 @@ Step 4 is two independent checks, and the reason for both is that either alone c
   many were built from TMDB alone, how many failed, how many never persisted. Catches a source
   failing broadly while the three reference titles happen to still work.
 
-Either failing logs at `ERROR`, which is what the Cloud Monitoring alert policies match, and
-makes the job exit non-zero. That last part matters twice: Cloud Scheduler reports the failure,
-and the post-deploy step in `cloudbuild.yaml` fails the build.
+Either failing logs at `ERROR` and makes the job exit non-zero. The alert policy matches **any
+`ERROR` from the job**, not specific message text — an earlier version matched exact strings and
+renaming a function silently disarmed it. Rename freely; just keep failures at `ERROR`.
+
+The non-zero exit is what fails the post-deploy step in `cloudbuild.yaml`. Note that Cloud
+Scheduler cannot see it: triggering a job through the Cloud Run Admin API returns as soon as the
+execution starts, so the scheduler reports success regardless of outcome. Job failures are
+caught by the log alert, not by the scheduler.
 
 This exists because the previous scrapers broke silently and served plausible-looking wrong
 numbers.

@@ -1,5 +1,4 @@
-// Refreshes the IMDb dataset and warms score caches for the default movie and TV lists, then
-// verifies the result. Runs as a Cloud Run Job — see server/job.js for the entrypoint.
+// Refreshes the IMDb dataset, warms score caches for both default lists, then verifies.
 
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'

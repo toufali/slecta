@@ -1,12 +1,6 @@
-// Entrypoint for the Cloud Run Job. Starts what the job needs, runs it, exits.
-//
-// This replaced an authenticated HTTP endpoint on the public service. A job has no network
-// surface, so there is nothing to authenticate, and no scheduler request deadline to fit in.
-//
-// Exits non-zero when verification fails, so a failed execution is visible both to Cloud
-// Scheduler and to the post-deploy check in cloudbuild.yaml. The job is configured with no
-// retries — a rerun would repeat every external call, and verification failures are rarely
-// transient.
+// Cloud Run Job entrypoint, the batch counterpart to server.js. No HTTP surface to authenticate.
+// The exit status gates the awaited `jobs execute` step in cloudbuild.yaml.
+// Cloud Scheduler cannot see it, so a failed nightly run is caught by the log alert instead.
 
 import redis from './services/redisService.js'
 import tmdb from './services/tmdbService.js'
@@ -19,8 +13,12 @@ try {
 
   const { coverage, reference } = await cacheScores()
 
-  process.exit(coverage.ok && reference.ok ? 0 : 1)
+  // exitCode, not process.exit(): stdout is a pipe here and exiting discards buffered logs
+  process.exitCode = coverage.ok && reference.ok ? 0 : 1
 } catch (e) {
   log.error('cacheScores job threw', { error: e })
-  process.exit(1)
+  process.exitCode = 1
+} finally {
+  // Without this the open connection keeps the process alive until Cloud Run's task timeout
+  await redis.quit()
 }

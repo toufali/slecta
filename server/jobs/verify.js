@@ -1,11 +1,6 @@
-// Checks whether a nightly run actually worked, in two independent ways.
-//
-// checkReferenceTitles scores a few long-settled titles and compares each source against a
-// known value. checkRunCoverage looks at every title in the run and asks how often each
-// source resolved. Both are needed: three reference titles can keep passing while the rest
-// of the batch fails, and healthy-looking rates can still hide wrong numbers.
-//
-// Either failing logs at ERROR, which is what the Cloud Monitoring alert policies match.
+// Reference titles catch a source returning wrong numbers.
+// Coverage rates catch a source failing broadly while those few titles happen to still pass.
+// Either failing logs at ERROR, which is what the Cloud Monitoring alert matches.
 
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
@@ -23,15 +18,13 @@ const REFERENCE_TITLES = [
 
 const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
 
-// How often each source must resolve across the whole run. Set below observed rates — new
-// releases genuinely lack critic reviews, and an alert that cries wolf gets muted.
+// Set below observed rates: new releases genuinely lack critic reviews
 const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.25, rtAudience: 0.45, tmdb: 0.95 }
 
 // A score from TMDB alone is the signature of every other source failing
 const MAX_TMDB_ONLY_RATE = 0.1
 
-// Source rates divide by titles actually scored, so they stay meaningful when a few titles
-// drop out — but that hides a batch where almost everything failed. Checked separately.
+// Source rates divide by titles scored, which hides a batch where almost everything failed
 const MAX_FAILED_RATE = 0.1
 
 /** Score known titles and compare every source against its expected value. */
