@@ -10,6 +10,7 @@
   "description": "",
   "scripts": {
     "prestart": "npm run build -w client",
+    "test": "node --test",
     "start": "node --env-file=.env server/server.js",
     "dev": "nodemon --env-file=.env server/server.js",
     "convert:webp": "sh scripts/webp.sh",

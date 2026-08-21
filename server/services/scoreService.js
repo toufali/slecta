@@ -1,4 +1,5 @@
-import { average } from '../utils/math.js'
+import { average, toScore } from '../utils/math.js'
+import { slugify } from '../utils/slug.js'
 import redis from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
@@ -27,23 +28,6 @@ const WIKI_MC_PROP = 'P1712'
 const PATHS = {
   movie: { rt: 'm/', mc: 'movie/' },
   tv: { rt: 'tv/', mc: 'tv/' }
-}
-
-// Accents flatten, apostrophes vanish so possessives stay whole, other punctuation runs
-// collapse. Live-checked: `the_devil_s_mouth` and `sara___woman_in_the_shadow` both 404.
-function slugify(title, separator) {
-  return title
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/['\u2019]/g, '')
-    .replace(/[^a-z0-9]+/g, separator)
-    .replace(new RegExp(`^${separator}+|${separator}+$`, 'g'), '')
-}
-
-function toScore(value) {
-  const score = parseInt(value)
-  return Number.isFinite(score) ? score : undefined
 }
 
 class ScoreService {
