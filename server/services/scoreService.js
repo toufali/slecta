@@ -1,6 +1,7 @@
 import { average } from '../utils/math.js'
 import redis from './redisService.js'
 import imdb from './imdbService.js'
+import log from '../utils/logger.js'
 
 const SCORE_TTL = 60 * 60 * 48 // 48 hours
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
@@ -57,7 +58,7 @@ class ScoreService {
       if (score) return score
     }
 
-    if (!data) return console.warn('Score lookup data undefined')
+    if (!data) return log.warn('Score lookup data undefined', { key })
 
     const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
@@ -87,7 +88,7 @@ class ScoreService {
       const score = { avgScore: average(Object.values(scores)), scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
-        console.warn('Score resolved from TMDB alone:', { key, title, slugs, imdbId })
+        log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
       }
 
       // Awaited so a failed write is visible: setCache hides Redis errors, and the nightly job
@@ -98,7 +99,7 @@ class ScoreService {
 
       return score
     } catch (e) {
-      console.error('Error getting average score:', e)
+      log.error('Error getting average score', { key, title, error: e })
     }
   }
 
@@ -123,7 +124,7 @@ class ScoreService {
 
       return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score) }
     } catch (e) {
-      console.warn('Error getting RT scores:', path, e)
+      log.warn('Error getting RT scores', { path, error: e })
     }
   }
 
@@ -142,7 +143,7 @@ class ScoreService {
         if (MC_TYPES.includes(type) && aggregateRating?.ratingValue != null) return toScore(aggregateRating.ratingValue)
       }
     } catch (e) {
-      console.warn('Error getting Metacritic score:', path, e)
+      log.warn('Error getting Metacritic score', { path, error: e })
     }
   }
 
@@ -170,7 +171,7 @@ class ScoreService {
       // hiding a source for a month
       redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
-      console.warn('Error resolving slugs:', title, e)
+      log.warn('Error resolving slugs', { title, mediaType, error: e })
     }
 
     return slugs
@@ -197,7 +198,7 @@ class ScoreService {
 
   async #fetchText(url) {
     const res = await this.#fetch(url)
-    if (!res.ok) return console.warn(`${res.status} ${res.statusText}:`, url)
+    if (!res.ok) return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
     return await res.text()
   }
 
@@ -212,7 +213,7 @@ class ScoreService {
       res = await this.#fetch(url)
     }
 
-    if (!res.ok) return console.warn(`${res.status} ${res.statusText}:`, url)
+    if (!res.ok) return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
     return await res.json()
   }
 }

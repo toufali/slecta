@@ -2,7 +2,7 @@ import Router from '@koa/router';
 import { showSearch, getTitles } from './controllers/searchController.js'
 import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
 import { getTvShows, getTvShowDetail, showTvShows, showTvShowDetail, getTvShowScore, getTvShowQuotes } from './controllers/tvShowController.js'
-import { cacheMovieScores } from './jobs/cacheScores.js'
+import { cacheScores } from './jobs/cacheScores.js'
 import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
@@ -12,7 +12,7 @@ router.get('/about', showAbout);
 router.get('/search', showSearch);
 router.get('/movies', showMovies);
 router.get('/movies/:id', showMovieDetail);
-router.post('/movies/cache-scores', setDefaultResponse, cacheMovieScores);
+router.post('/movies/cache-scores', setDefaultResponse, cacheScores); // renamed alongside the scheduler in the infra PR
 router.get('/shows', showTvShows);
 router.get('/shows/:id', showTvShowDetail);
 
