@@ -9,5 +9,16 @@ steps:
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run', 'deploy', 'slector', '--image', 'gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA', '--region', 'us-central1']
+# Point the nightly job at the same image. Env vars and other settings are kept from the
+# existing job, so they live in one place rather than in this file.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args: ['run', 'jobs', 'update', 'cache-scores', '--image', 'gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA', '--region', 'us-central1']
+# Run it once now. The job exits non-zero if the scores it produces fail verification, so a
+# deploy that breaks scoring fails the build instead of surfacing at midnight UTC.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args: ['run', 'jobs', 'execute', 'cache-scores', '--wait', '--region', 'us-central1']
 images:
 - gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA
+timeout: 1200s

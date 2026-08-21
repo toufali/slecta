@@ -1,24 +1,11 @@
-// Nightly job: refresh the IMDb dataset, warm score caches for the default movie and TV
-// lists, then check the results. Triggered by Cloud Scheduler at midnight.
+// Refreshes the IMDb dataset and warms score caches for the default movie and TV lists, then
+// verifies the result. Runs as a Cloud Run Job — see server/job.js for the entrypoint.
 
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import log from '../utils/logger.js'
-import { runSmokeTest } from './smokeTest.js'
-
-const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
-
-// How often each source must resolve across the whole run; the smoke test's few titles can
-// pass while the rest fail. Set below observed rates — new releases genuinely lack reviews.
-const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.25, rtAudience: 0.45, tmdb: 0.95 }
-
-// A score from TMDB alone is the signature of every other source failing
-const MAX_TMDB_ONLY_RATE = 0.1
-
-// Source rates divide by titles actually scored, so they stay meaningful when a few titles
-// drop out — but that hides a batch where almost everything failed. Checked separately.
-const MAX_FAILED_RATE = 0.1
+import { checkReferenceTitles, checkRunCoverage } from './verify.js'
 
 export async function cacheScores() {
   log.info('cacheScores job started')
@@ -43,12 +30,12 @@ export async function cacheScores() {
     await cacheScoresFor('tv', 'shows', shows)
   ]
 
-  const coverage = checkCoverage(stats, imdbRefreshed)
-  const smoke = await runSmokeTest()
+  const coverage = checkRunCoverage(stats, imdbRefreshed)
+  const reference = await checkReferenceTitles()
 
-  log.info('cacheScores job complete', { stats, coverageOk: coverage.ok, smokeTestPassed: smoke.passed })
+  log.info('cacheScores job complete', { stats, coverageOk: coverage.ok, referenceOk: reference.ok })
 
-  return { stats, coverage, smoke }
+  return { stats, coverage, reference }
 }
 
 async function cacheScoresFor(mediaType, pathSegment, titles) {
@@ -90,53 +77,4 @@ async function cacheScoresFor(mediaType, pathSegment, titles) {
   }
 
   return stats
-}
-
-export function checkCoverage(allStats, imdbRefreshed) {
-  const problems = []
-
-  // A failed refresh leaves yesterday's data in place, so every source rate still looks fine
-  if (!imdbRefreshed) problems.push({ reason: 'IMDb dataset refresh failed' })
-
-  for (const stats of allStats) {
-    if (!stats.processed) {
-      problems.push({ mediaType: stats.mediaType, reason: 'nothing processed' })
-      continue
-    }
-
-    for (const source of SOURCES) {
-      const rate = (stats.sources[source] ?? 0) / stats.processed
-      const min = MIN_SOURCE_RATE[source]
-
-      if (rate < min) problems.push({ mediaType: stats.mediaType, source, rate: round(rate), min })
-    }
-
-    const tmdbOnlyRate = stats.tmdbOnly / stats.processed
-
-    if (tmdbOnlyRate > MAX_TMDB_ONLY_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'aggregates built from TMDB alone', rate: round(tmdbOnlyRate), max: MAX_TMDB_ONLY_RATE })
-    }
-
-    const failedRate = stats.failed / stats.total
-
-    if (failedRate > MAX_FAILED_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'titles failed to score', rate: round(failedRate), max: MAX_FAILED_RATE })
-    }
-
-    // Scoring can succeed while the Redis write fails, leaving the cache cold but every rate green
-    const notCachedRate = stats.notCached / stats.processed
-
-    if (notCachedRate > MAX_FAILED_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'scores not persisted', rate: round(notCachedRate), max: MAX_FAILED_RATE })
-    }
-  }
-
-  if (problems.length) log.error('Score coverage check FAILED', { problems })
-  else log.info('Score coverage check passed')
-
-  return { ok: problems.length === 0, problems }
-}
-
-function round(value) {
-  return Math.round(value * 100) / 100
 }
