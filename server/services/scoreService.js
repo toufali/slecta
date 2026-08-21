@@ -1,34 +1,57 @@
-import { firefox } from 'playwright';
-import { average } from '../utils/math.js';
-import redis from "./redisService.js"
+import { average } from '../utils/math.js'
+import redis from './redisService.js'
+import imdb from './imdbService.js'
+
+const SCORE_TTL = 60 * 60 * 48 // 48 hours
+const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
+const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
+const FETCH_TIMEOUT = 8000
+const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
+
+// Metacritic scores TV per season too; only whole-title types, so a season page can never
+// pass as the series score.
+const MC_TYPES = ['Movie', 'TVSeries']
+
+// Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
+const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
+const HEADERS = { 'user-agent': USER_AGENT }
+
+const RT_BASE_URL = 'https://www.rottentomatoes.com/'
+const MC_BASE_URL = 'https://www.metacritic.com/'
+const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
+const WIKI_RT_PROP = 'P1258'
+const WIKI_MC_PROP = 'P1712'
+
+// RT and Metacritic use different path prefixes and different slug separators per media type
+const PATHS = {
+  movie: { rt: 'm/', mc: 'movie/' },
+  tv: { rt: 'tv/', mc: 'tv/' }
+}
+
+// Accents flatten, apostrophes vanish so possessives stay whole, other punctuation runs
+// collapse. Live-checked: `the_devil_s_mouth` and `sara___woman_in_the_shadow` both 404.
+function slugify(title, separator) {
+  return title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['\u2019]/g, '')
+    .replace(/[^a-z0-9]+/g, separator)
+    .replace(new RegExp(`^${separator}+|${separator}+$`, 'g'), '')
+}
+
+function toScore(value) {
+  const score = parseInt(value)
+  return Number.isFinite(score) ? score : undefined
+}
 
 class ScoreService {
-  defaultTimeout = 2000
-  defaultNavigationTimeout = 7000
-  blockedBrowserResources = ['stylesheet', 'image', 'images', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other']
-  imdbBaseUrl = 'https://www.imdb.com/title/'
-  rtBaseUrl = 'https://www.rottentomatoes.com/'
-  wikiBaseUrl = 'https://www.wikidata.org/w/rest.php/wikibase/v0/entities/items/'
-  wikiRTId = 'P1258'
-  userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' + ' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
-  browser
-  browserCtx
-
-  async init() {
-    this.browser = await firefox.launch()
-    this.browserCtx = await this.browser.newContext({
-      userAgent: this.userAgent
-    })
-    this.browserCtx.setDefaultTimeout(this.defaultTimeout)
-    this.browserCtx.setDefaultNavigationTimeout(this.defaultNavigationTimeout)
-    console.info('Browser connected:', this.browser.isConnected())
-  }
-
   async getScoreFromCache(key) {
     return await redis.getCache(key)
   }
 
   async getScore(key, data, tryCache = true) {
+    // TODO: a more sophisticated caching strategy
     if (tryCache) {
       const score = await this.getScoreFromCache(key)
       if (score) return score
@@ -36,18 +59,42 @@ class ScoreService {
 
     if (!data) return console.warn('Score lookup data undefined')
 
+    const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
+
     try {
-      const settled = await Promise.allSettled([
-        this.getIMDBScores(data.imdbId),
-        this.getRTScores(data.wikiId, data.title, data.releaseDate)
+      const slugs = await this.#getSlugs(wikiId, title, releaseDate, mediaType)
+      const [imdbScore, rtScores, mcScore] = await Promise.all([
+        this.getIMDBScore(imdbId),
+        this.getRTScores(slugs?.rt),
+        this.getMetacriticScore(slugs?.mc)
       ])
 
-      const filteredScores = settled.filter(item => item.value).map(item => Object.values(item.value)).flat()
+      // Omitted rather than nulled, so key count is source count
+      const scores = {
+        imdb: imdbScore,
+        metacritic: mcScore,
+        rtCritic: rtScores?.critic,
+        rtAudience: rtScores?.audience,
+        // TMDB reports 0 when a title has no votes — absence, not a score
+        tmdb: tmdbScore ? toScore(tmdbScore) : undefined
+      }
 
-      if (data.tmdbScore) filteredScores.push(data.tmdbScore)
+      for (const [name, value] of Object.entries(scores)) {
+        if (value === undefined) delete scores[name]
+      }
 
-      const score = { avgScore: average(filteredScores) }
-      redis.setCache(key, score, 172800) // 48 hours (60 * 60 * 48)
+      const sources = Object.keys(scores)
+      const score = { avgScore: average(Object.values(scores)), scores }
+
+      if (sources.length === 1 && sources[0] === 'tmdb') {
+        console.warn('Score resolved from TMDB alone:', { key, title, slugs, imdbId })
+      }
+
+      // Awaited so a failed write is visible: setCache hides Redis errors, and the nightly job
+      // must not report a warmed cache that was never written. Mirrors getCache's `cacheHit`.
+      const cached = await redis.setCache(key, score, SCORE_TTL)
+
+      Object.defineProperty(score, 'cached', { value: Boolean(cached) })
 
       return score
     } catch (e) {
@@ -55,118 +102,118 @@ class ScoreService {
     }
   }
 
-  async getIMDBScores(imdbId) {
-    if (!imdbId) return // tt3915174
-
-    try {
-      var page = await this.browserCtx.newPage()
-      await page.route('**/*', this.#filterBrowserResource.bind(this))
-      await page.goto(this.imdbBaseUrl + imdbId, { waitUntil: 'domcontentloaded' })
-
-      var scores = {
-        imdbScore: page.getByTestId('hero-rating-bar__aggregate-rating__score').getByText(/^\d\d?\.\d$/).first().textContent(),
-        metaScore: page.locator('.metacritic-score-box').first().textContent()
-      }
-
-      const settled = await Promise.allSettled(Object.values(scores))
-
-      Object.keys(scores).forEach((key, i) => {
-        const value = settled[i].value
-
-        if (!value) return delete scores[key]
-        if (key === 'imdbScore') scores[key] = parseFloat(value) * 10 // adjusted to 100 scale
-        if (key === 'metaScore') scores[key] = parseInt(value)
-      })
-    } catch (e) {
-      console.warn(e)
-    }
-
-    page.close()
-    return scores
+  async getIMDBScore(imdbId) {
+    const rating = await imdb.getRating(imdbId)
+    return rating && Math.round(rating.rating * 10) // adjusted to 100 scale
   }
 
-  async getRTScores(wikiId, title, releaseDate) {
-    const rtPath = await this.#guessRTPath(wikiId, title, releaseDate)
-    if (!rtPath) return
+  // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
+  // A `tv/<slug>` path with no season suffix returns RT's cross-season average.
+  async getRTScores(path) {
+    if (!path) return
 
     try {
-      var page = await this.browserCtx.newPage();
-      await page.route('**/*', this.#filterBrowserResource.bind(this))
-      await page.goto(this.rtBaseUrl + rtPath, { waitUntil: 'domcontentloaded' });
+      const html = await this.#fetchText(RT_BASE_URL + path)
+      if (!html) return
 
-      const element = await page.locator('#scoreboard').first()
+      const json = html.match(/<script[^>]+id="media-scorecard-json"[^>]*>([\s\S]*?)<\/script>/)
+      if (!json) throw new Error('media-scorecard-json not found')
 
-      var scores = {
-        rtCriticScore: element.getAttribute('tomatometerscore'),
-        rtAudienceScore: element.getAttribute('audiencescore')
-      }
+      const { criticsScore, audienceScore } = JSON.parse(json[1])
 
-      const settled = await Promise.allSettled(Object.values(scores))
-
-      Object.keys(scores).forEach((key, i) => {
-        const value = settled[i].value
-
-        if (!value) return delete scores[key]
-        scores[key] = parseInt(value)
-      })
+      return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score) }
     } catch (e) {
-      console.warn(e)
-    }
-
-    page.close()
-
-    return scores
-  }
-
-  async #guessRTPath(wikiId, title, releaseDate) {
-    const key = `rtpath/${wikiId}/${title}/${releaseDate}`
-    const ttl = 2592000 // 30 days (60 * 60 * 24 * 30)
-    const pathCached = await redis.getCache(key)
-
-    if (pathCached) return pathCached
-
-    try {
-      const rtPathPrefix = 'm/'
-      const rtPathTitle = title.toLowerCase().replace(/ /g, '_').replace(/[^a-z0-9_]/g, '')
-      const rtPathYear = '_' + new Date(releaseDate).getFullYear()
-
-      const path1 = rtPathPrefix + rtPathTitle
-      const path2 = rtPathPrefix + rtPathTitle + rtPathYear
-      const [wikiRes, path1Res, path2Res] = await Promise.all([
-        fetch(`${this.wikiBaseUrl}${wikiId}/statements`),
-        fetch(this.rtBaseUrl + path1, { method: 'HEAD' }),
-        fetch(this.rtBaseUrl + path2, { method: 'HEAD' })
-      ])
-
-      if (wikiRes.ok) {
-        const json = await wikiRes.json()
-        const pathWiki = json[this.wikiRTId]?.[0]?.value?.content
-        if (pathWiki) {
-          redis.setCache(key, pathWiki, ttl)
-          return pathWiki
-        }
-      }
-
-      if (path1Res.ok) {
-        redis.setCache(key, path1, ttl)
-        return path1
-      }
-
-      if (path2Res.ok) {
-        redis.setCache(key, path2, ttl)
-        return path2
-      }
-    } catch (e) {
-      console.warn('Error guessing RTPath.', e)
+      console.warn('Error getting RT scores:', path, e)
     }
   }
 
-  async #filterBrowserResource(route, req) {
-    if (this.blockedBrowserResources.includes(req.resourceType())) {
-      route.abort()
-    } else {
-      route.continue()
+  // Metascore ships as standard schema.org JSON-LD
+  async getMetacriticScore(path) {
+    if (!path) return
+
+    try {
+      const html = await this.#fetchText(`${MC_BASE_URL}${path}/`)
+      if (!html) return
+
+      const blocks = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)
+
+      for (const [, block] of blocks) {
+        const { '@type': type, aggregateRating } = JSON.parse(block)
+        if (MC_TYPES.includes(type) && aggregateRating?.ratingValue != null) return toScore(aggregateRating.ratingValue)
+      }
+    } catch (e) {
+      console.warn('Error getting Metacritic score:', path, e)
     }
+  }
+
+  // One Wikidata call yields both slugs; guessing is only a fallback for items it lacks.
+  async #getSlugs(wikiId, title, releaseDate, mediaType) {
+    const key = `slugs/${mediaType}/${wikiId}/${title}/${releaseDate}`
+    const cached = await redis.getCache(key)
+
+    if (cached) return cached
+
+    const prefixes = PATHS[mediaType] ?? PATHS.movie
+    const slugs = {}
+
+    try {
+      if (wikiId) {
+        const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`)
+        slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
+        slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content
+      }
+
+      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate))
+      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], '/')
+
+      // An empty result may just be a transient failure, so it expires quickly rather than
+      // hiding a source for a month
+      redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
+    } catch (e) {
+      console.warn('Error resolving slugs:', title, e)
+    }
+
+    return slugs
+  }
+
+  #rtCandidates(prefix, title, releaseDate) {
+    const slug = prefix + slugify(title, '_')
+    const year = new Date(releaseDate).getFullYear()
+
+    return Number.isFinite(year) ? [slug, `${slug}_${year}`] : [slug]
+  }
+
+  async #probe(baseUrl, candidates, suffix = '') {
+    const settled = await Promise.allSettled(candidates.map(path =>
+      this.#fetch(`${baseUrl}${path}${suffix}`, { method: 'HEAD' })
+    ))
+
+    return candidates.find((path, i) => settled[i].value?.ok)
+  }
+
+  async #fetch(url, options) {
+    return await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT), ...options })
+  }
+
+  async #fetchText(url) {
+    const res = await this.#fetch(url)
+    if (!res.ok) return console.warn(`${res.status} ${res.statusText}:`, url)
+    return await res.text()
+  }
+
+  // Retries once on 429; the nightly job walks titles back to back and Wikidata throttles it
+  async #fetchJson(url) {
+    let res = await this.#fetch(url)
+
+    if (res.status === 429) {
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after')) || 2, RETRY_AFTER_MAX)
+
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+      res = await this.#fetch(url)
+    }
+
+    if (!res.ok) return console.warn(`${res.status} ${res.statusText}:`, url)
+    return await res.json()
   }
 }
 

@@ -91,7 +91,8 @@ export async function getMovieScore(ctx) {
     imdbId,
     wikiId,
     title,
-    releaseDate
+    releaseDate,
+    mediaType: 'movie'
   })
 
   return ctx.body = data

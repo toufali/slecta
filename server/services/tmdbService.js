@@ -421,7 +421,7 @@ class TmdbService {
         wikiId: json.external_ids.wikidata_id,
         title: json.name,
         overview: json.overview,
-        releaseDate: json.release_date,
+        releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
         tmdbScore: Math.round(json.vote_average * 10),
         cast,
         director,
