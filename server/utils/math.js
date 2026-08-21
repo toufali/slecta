@@ -17,3 +17,14 @@ export function average(arr) {
 
   return sum / len
 }
+
+/**
+ * Coerce an external score to an integer, or undefined when there is no usable number.
+ * A genuine 0 is kept — Rotten Tomatoes can legitimately report 0%.
+ * @param {*} value
+ * @return {(number|undefined)}
+ */
+export function toScore(value) {
+  const score = parseInt(value)
+  return Number.isFinite(score) ? score : undefined
+}
