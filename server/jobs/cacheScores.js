@@ -92,7 +92,7 @@ async function cacheScoresFor(mediaType, pathSegment, titles) {
   return stats
 }
 
-function checkCoverage(allStats, imdbRefreshed) {
+export function checkCoverage(allStats, imdbRefreshed) {
   const problems = []
 
   // A failed refresh leaves yesterday's data in place, so every source rate still looks fine
