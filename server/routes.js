@@ -6,6 +6,15 @@ import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
 
+// One check for every `:id` route. The value reaches both the TMDB request path
+// and the Redis cache key, so a raw route param could retarget either.
+router.param('id', (value, ctx, next) => {
+  const id = Number(value)
+  if (!Number.isInteger(id) || id < 1) ctx.throw(400)
+  ctx.params.id = id
+  return next()
+})
+
 router.get('/', showMovies);
 router.get('/about', showAbout);
 router.get('/search', showSearch);
