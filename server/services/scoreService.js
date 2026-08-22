@@ -9,6 +9,12 @@ const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
+const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
+
+// Undici holds the connection until a body is read or cancelled, and every path here
+// throws bodies away: probes read only the status, and both readers bail on !ok. A
+// sustained outage would otherwise starve the pool. Cleanup must never mask a real error.
+const discard = res => res?.body?.cancel().catch(() => {})
 
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
@@ -171,16 +177,39 @@ class ScoreService {
       this.#fetch(`${baseUrl}${path}${suffix}`, { method: 'HEAD' })
     ))
 
-    return candidates.find((path, i) => settled[i].value?.ok)
+    const match = candidates.find((path, i) => settled[i].value?.ok)
+    await Promise.all(settled.map(result => discard(result.value)))
+
+    return match
   }
 
+  // Sources blip. A single timeout used to drop that source's score for the title and
+  // trip the nightly smoke test, so one retry before giving up. Only transient failures
+  // qualify: a 4xx is a real answer, and the slug probes 404 by design.
   async #fetch(url, options) {
-    return await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT), ...options })
+    const send = () => fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT), ...options })
+
+    try {
+      const res = await send()
+      if (res.status < 500) return res
+
+      await discard(res)
+    } catch {
+      // fall through; if it is not transient the retry throws too and the caller logs it
+    }
+
+    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+    return await send()
   }
 
   async #fetchText(url) {
     const res = await this.#fetch(url)
-    if (!res.ok) return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
+
+    if (!res.ok) {
+      await discard(res)
+      return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
+    }
+
     return await res.text()
   }
 
@@ -191,11 +220,16 @@ class ScoreService {
     if (res.status === 429) {
       const retryAfter = Math.min(parseInt(res.headers.get('retry-after')) || 2, RETRY_AFTER_MAX)
 
+      await discard(res)
       await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
       res = await this.#fetch(url)
     }
 
-    if (!res.ok) return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
+    if (!res.ok) {
+      await discard(res)
+      return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
+    }
+
     return await res.json()
   }
 }
