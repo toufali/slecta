@@ -7,8 +7,8 @@
   "description": "Slector back-end code, packages, and npm scripts",
   "main": "./server.js",
   "dependencies": {
-    "@koa/router": "^12.0.0",
-    "koa": "^2.14.2",
+    "@koa/router": "^15.7.0",
+    "koa": "^3.2.1",
     "koa-static": "^5.0.0",
     "redis": "^4.6.7"
   },
