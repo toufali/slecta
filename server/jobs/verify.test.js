@@ -8,7 +8,8 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 // Imported after the env is set — static imports are hoisted and would run env.js first
-const { checkRunCoverage } = await import('./verify.js')
+const { checkRunCoverage, checkReferenceTitles } = await import('./verify.js')
+const { default: tmdb } = await import('../services/tmdbService.js')
 
 // A run where every source resolved for every title
 const healthy = (over = {}) => ({
@@ -63,4 +64,25 @@ test('a failed IMDb refresh is a problem even when every rate looks green', () =
 test('an empty run is a problem, not a vacuous pass', () => {
   const stats = healthy({ total: 20, processed: 0, failed: 20, sources: {} })
   assert.ok(reasons(checkRunCoverage([stats], true)).includes('nothing processed'))
+})
+
+
+// getMovieDetail/getTvShowDetail throw on an upstream failure. checkReferenceTitles only
+// retries a returned failure array, so an escaped rejection would abort the whole job.
+test('an upstream lookup failure fails the title, not the run', async () => {
+  const boom = async () => { throw new Error('TMDB 503 Service Unavailable') }
+  const [movie, tv] = [tmdb.getMovieDetail, tmdb.getTvShowDetail]
+  tmdb.getMovieDetail = boom
+  tmdb.getTvShowDetail = boom
+
+  try {
+    const { ok, failures } = await checkReferenceTitles()
+
+    assert.equal(ok, false)
+    assert.ok(failures.length > 0, 'the failure should be reported, not swallowed')
+    assert.ok(failures.every(f => f.reason === 'lookup failed'), 'every title should report the lookup failure')
+  } finally {
+    tmdb.getMovieDetail = movie
+    tmdb.getTvShowDetail = tv
+  }
 })

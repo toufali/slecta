@@ -49,9 +49,17 @@ export async function checkReferenceTitles() {
 
 async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
   const failures = []
-  const detail = mediaType === 'movie'
-    ? await tmdb.getMovieDetail(tmdbId)
-    : await tmdb.getTvShowDetail(tmdbId)
+
+  // Returned as a failure rather than rethrown, so the caller's retry still applies and a
+  // title that stays broken is reported instead of aborting the run.
+  let detail
+  try {
+    detail = mediaType === 'movie'
+      ? await tmdb.getMovieDetail(tmdbId)
+      : await tmdb.getTvShowDetail(tmdbId)
+  } catch (e) {
+    return [{ title: name, source: 'tmdb', reason: 'lookup failed', error: e.message }]
+  }
 
   if (!detail) return [{ title: name, source: 'tmdb', reason: 'no detail returned' }]
 

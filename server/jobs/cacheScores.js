@@ -42,9 +42,17 @@ async function cacheScoresFor(mediaType, pathSegment, titles) {
 
   for (const title of titles) {
     // one at a time, to avoid running out of memory
-    const detail = mediaType === 'movie'
-      ? await tmdb.getMovieDetail(title.id)
-      : await tmdb.getTvShowDetail(title.id)
+
+    // Null means TMDB genuinely has no such title; a throw means the lookup itself failed.
+    // Both count as one failed title — neither should abandon the rest of the run.
+    let detail
+    try {
+      detail = mediaType === 'movie'
+        ? await tmdb.getMovieDetail(title.id)
+        : await tmdb.getTvShowDetail(title.id)
+    } catch (e) {
+      log.warn('TMDB detail lookup failed', { mediaType, id: title.id, error: e })
+    }
 
     if (!detail) {
       stats.failed++
