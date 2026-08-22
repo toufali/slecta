@@ -213,66 +213,65 @@ class TmdbService {
     let movie = await redis.getCache(cacheKey)
     if (movie) return movie
 
-    try {
-      const res = await fetch(url, { headers })
+    const res = await fetch(url, { headers })
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    // A 404 is the real answer that the title does not exist. Every other failure is
+    // transient or ours, and callers must not see it as a missing title.
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
 
-      const json = await res.json()
-      let providers = json['watch/providers'].results[this.region]
+    const json = await res.json()
+    let providers = json['watch/providers'].results[this.region]
 
-      if (providers) {
-        // reshape, reduce, and mutate data
-        const providerPriority = this.providerPriority.toReversed()
-        const thisClass = this
+    if (providers) {
+      // reshape, reduce, and mutate data
+      const providerPriority = this.providerPriority.toReversed()
+      const thisClass = this
 
-        providers = Object.values(providers)
-          .flat()
-          .filter(function (item) {
-            if (!item.provider_id) return // not a valid provider if no ID
-            if (this.has(item.provider_id)) return // already in set
-            if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
+      providers = Object.values(providers)
+        .flat()
+        .filter(function (item) {
+          if (!item.provider_id) return // not a valid provider if no ID
+          if (this.has(item.provider_id)) return // already in set
+          if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
-            item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
-            this.add(item.provider_id)
-            return true
-          }, new Set())
-          .sort((a, b) => {
-            const j = providerPriority.indexOf(a.provider_id)
-            const k = providerPriority.indexOf(b.provider_id)
-            return k - j
-          })
-      }
-      const rating = json.release_dates.results.find(item => item.iso_3166_1 === this.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
-      const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
-      const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
-      const cast = json.credits.cast.slice(0, 5).map(item => item.name).join(', ')
-      const director = json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
-      const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
-
-      movie = {
-        tmdbId: json.id,
-        imdbId: json.external_ids.imdb_id,
-        wikiId: json.external_ids.wikidata_id,
-        title: json.title,
-        overview: json.overview,
-        releaseDate: json.release_date,
-        tmdbScore: Math.round(json.vote_average * 10),
-        rating,
-        cast,
-        director,
-        runtime: json.runtime,
-        languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
-        genres: json.genres.map(genre => genre.name).join(', '),
-        providers,
-        backdropUrl,
-        ytTrailerId: ytTrailer?.key
-      }
-      redis.setCache(cacheKey, movie)
-      return movie
-    } catch (e) {
-      console.error("Error fetching data:", e);
+          item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
+          this.add(item.provider_id)
+          return true
+        }, new Set())
+        .sort((a, b) => {
+          const j = providerPriority.indexOf(a.provider_id)
+          const k = providerPriority.indexOf(b.provider_id)
+          return k - j
+        })
     }
+    const rating = json.release_dates.results.find(item => item.iso_3166_1 === this.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
+    const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
+    const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+    const cast = json.credits.cast.slice(0, 5).map(item => item.name).join(', ')
+    const director = json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+    const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
+
+    movie = {
+      tmdbId: json.id,
+      imdbId: json.external_ids.imdb_id,
+      wikiId: json.external_ids.wikidata_id,
+      title: json.title,
+      overview: json.overview,
+      releaseDate: json.release_date,
+      tmdbScore: Math.round(json.vote_average * 10),
+      rating,
+      cast,
+      director,
+      runtime: json.runtime,
+      languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
+      genres: json.genres.map(genre => genre.name).join(', '),
+      providers,
+      backdropUrl,
+      ytTrailerId: ytTrailer?.key
+    }
+    redis.setCache(cacheKey, movie)
+    return movie
   }
 
   async getTitlesByString(str) {
@@ -379,64 +378,63 @@ class TmdbService {
     let show = await redis.getCache(cacheKey)
     if (show) return show
 
-    try {
-      const res = await fetch(url, { headers })
+    const res = await fetch(url, { headers })
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    // A 404 is the real answer that the title does not exist. Every other failure is
+    // transient or ours, and callers must not see it as a missing title.
+    if (res.status === 404) return null
+    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
 
-      const json = await res.json()
-      let providers = json['watch/providers'].results[this.region]
+    const json = await res.json()
+    let providers = json['watch/providers'].results[this.region]
 
-      if (providers) {
-        // reshape, reduce, and mutate data
-        const providerPriority = this.providerPriority.toReversed()
-        const thisClass = this
+    if (providers) {
+      // reshape, reduce, and mutate data
+      const providerPriority = this.providerPriority.toReversed()
+      const thisClass = this
 
-        providers = Object.values(providers)
-          .flat()
-          .filter(function (item) {
-            if (!item.provider_id) return // not a valid provider if no ID
-            if (this.has(item.provider_id)) return // already in set
-            if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
+      providers = Object.values(providers)
+        .flat()
+        .filter(function (item) {
+          if (!item.provider_id) return // not a valid provider if no ID
+          if (this.has(item.provider_id)) return // already in set
+          if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
-            item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
-            this.add(item.provider_id)
-            return true
-          }, new Set())
-          .sort((a, b) => {
-            const j = providerPriority.indexOf(a.provider_id)
-            const k = providerPriority.indexOf(b.provider_id)
-            return k - j
-          })
-      }
-      const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
-      const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
-      const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
-      const director = json.aggregate_credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
-      const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
-
-      show = {
-        tmdbId: json.id,
-        imdbId: json.external_ids.imdb_id,
-        wikiId: json.external_ids.wikidata_id,
-        title: json.name,
-        overview: json.overview,
-        releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
-        tmdbScore: Math.round(json.vote_average * 10),
-        cast,
-        director,
-        runtime: json.episode_run_time,
-        languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
-        genres: json.genres.map(genre => genre.name).join(', '),
-        providers,
-        backdropUrl,
-        ytTrailerId: ytTrailer?.key
-      }
-      redis.setCache(cacheKey, show)
-      return show
-    } catch (e) {
-      console.error("Error fetching data:", e);
+          item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
+          this.add(item.provider_id)
+          return true
+        }, new Set())
+        .sort((a, b) => {
+          const j = providerPriority.indexOf(a.provider_id)
+          const k = providerPriority.indexOf(b.provider_id)
+          return k - j
+        })
     }
+    const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
+    const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+    const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
+    const director = json.aggregate_credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+    const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
+
+    show = {
+      tmdbId: json.id,
+      imdbId: json.external_ids.imdb_id,
+      wikiId: json.external_ids.wikidata_id,
+      title: json.name,
+      overview: json.overview,
+      releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
+      tmdbScore: Math.round(json.vote_average * 10),
+      cast,
+      director,
+      runtime: json.episode_run_time,
+      languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
+      genres: json.genres.map(genre => genre.name).join(', '),
+      providers,
+      backdropUrl,
+      ytTrailerId: ytTrailer?.key
+    }
+    redis.setCache(cacheKey, show)
+    return show
   }
 
 }
