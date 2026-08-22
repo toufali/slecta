@@ -13,6 +13,7 @@
     "test": "node --test",
     "start": "node --env-file=.env server/server.js",
     "dev": "nodemon --env-file=.env server/server.js",
+    "job": "node --env-file=.env server/job.js",
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
     "db:migrate": "npm run db:migrate -w server",

@@ -21,6 +21,17 @@ class RedisService {
     }
   }
 
+  // Batch processes must close this or it keeps the event loop alive.
+  // Never throws: it runs in the job's `finally`, where an error would mask the real exit status.
+  async quit() {
+    try {
+      await client?.quit()
+    } catch (e) {
+      console.warn('Error closing Redis connection:', e)
+    }
+    client = null
+  }
+
   async getCache(key) {
     try {
       let value = await client?.get(key)

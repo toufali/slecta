@@ -1,8 +1,7 @@
 // Cloud Logging parses single-line JSON on stdout and reads `severity` and `message`.
-// Bare console calls were arriving with no payload at all.
 
-// Cloud Run sets K_SERVICE. Locally, plain console output stays readable.
-const structured = Boolean(process.env.K_SERVICE)
+// K_SERVICE on services, CLOUD_RUN_JOB on jobs. Neither locally, where plain output reads better.
+const structured = Boolean(process.env.K_SERVICE || process.env.CLOUD_RUN_JOB)
 
 // JSON.stringify renders an Error as `{}`
 function serialise(value) {
