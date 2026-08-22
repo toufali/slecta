@@ -27,6 +27,9 @@ export async function showMovies(ctx) {
 
 export async function showMovieDetail(ctx) {
   const data = await tmdb.getMovieDetail(ctx.params.id)
+
+  if (!data) return ctx.throw(404)
+
   const score = await scoreService.getScoreFromCache(`movies/${ctx.params.id}/score`)
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id)
 
@@ -68,6 +71,8 @@ export async function getMovies(ctx) {
 export async function getMovieDetail(ctx) {
   const data = await tmdb.getMovieDetail(ctx.params.id)
 
+  if (!data) return ctx.throw(404)
+
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
   return ctx.body = data
@@ -84,6 +89,9 @@ export async function getMovieScore(ctx) {
   }
 
   const movie = await tmdb.getMovieDetail(ctx.params.id)
+
+  if (!movie) return ctx.throw(404)
+
   const { tmdbScore, imdbId, wikiId, title, releaseDate } = movie
 
   data = await scoreService.getScore(key, {
