@@ -31,35 +31,43 @@ const MAX_FAILED_RATE = 0.1
 export async function checkReferenceTitles() {
   const failures = []
 
-  for (const { mediaType, tmdbId, name, expected } of REFERENCE_TITLES) {
-    const detail = mediaType === 'movie'
-      ? await tmdb.getMovieDetail(tmdbId)
-      : await tmdb.getTvShowDetail(tmdbId)
+  for (const title of REFERENCE_TITLES) {
+    // Retried once: a single flaky response from one source should not page anyone
+    const attempt = await scoreReferenceTitle(title)
 
-    if (!detail) {
-      failures.push({ title: name, source: 'tmdb', reason: 'no detail returned' })
-      continue
-    }
-
-    const result = await scoreService.getScore(`verify/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
-
-    for (const [source, want] of Object.entries(expected)) {
-      const got = result?.scores?.[source]
-
-      if (got === undefined) failures.push({ title: name, source, want, reason: 'absent' })
-      else if (Math.abs(got - want) > TOLERANCE) failures.push({ title: name, source, want, got, reason: 'out of tolerance' })
-    }
-
-    // TMDB drifts too much to pin a value, but a dropped component should still fail
-    if (result?.scores?.tmdb === undefined) failures.push({ title: name, source: 'tmdb', reason: 'absent' })
+    failures.push(...(attempt.length ? await scoreReferenceTitle(title) : attempt))
   }
 
   const ok = failures.length === 0
+  const summary = failures.map(f => `${f.source} ${f.reason} for ${f.title}`).join('; ')
 
   if (ok) log.info('Reference titles passed', { titles: REFERENCE_TITLES.length, tolerance: TOLERANCE })
-  else log.error('Reference titles FAILED', { titles: REFERENCE_TITLES.length, tolerance: TOLERANCE, failures })
+  else log.error('Reference titles FAILED', { summary, titles: REFERENCE_TITLES.length, tolerance: TOLERANCE, failures })
 
   return { ok, failures }
+}
+
+async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
+  const failures = []
+  const detail = mediaType === 'movie'
+    ? await tmdb.getMovieDetail(tmdbId)
+    : await tmdb.getTvShowDetail(tmdbId)
+
+  if (!detail) return [{ title: name, source: 'tmdb', reason: 'no detail returned' }]
+
+  const result = await scoreService.getScore(`verify/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
+
+  for (const [source, want] of Object.entries(expected)) {
+    const got = result?.scores?.[source]
+
+    if (got === undefined) failures.push({ title: name, source, want, reason: 'absent' })
+    else if (Math.abs(got - want) > TOLERANCE) failures.push({ title: name, source, want, got, reason: 'out of tolerance' })
+  }
+
+  // TMDB drifts too much to pin a value, but a dropped component should still fail
+  if (result?.scores?.tmdb === undefined) failures.push({ title: name, source: 'tmdb', reason: 'absent' })
+
+  return failures
 }
 
 /** Judge the run as a whole from the tallies the scoring loop produced. */
@@ -102,7 +110,9 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
     }
   }
 
-  if (problems.length) log.error('Run coverage FAILED', { problems })
+  const summary = problems.map(p => [p.mediaType, p.reason ?? `${p.source} resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')
+
+  if (problems.length) log.error('Run coverage FAILED', { summary, problems })
   else log.info('Run coverage passed')
 
   return { ok: problems.length === 0, problems }
