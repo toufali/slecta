@@ -214,7 +214,9 @@ class TmdbService {
     if (movie) return movie
 
     try {
-      const res = await fetch(url, { headers })
+      const res = await fetch(url, {
+        headers,
+      })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
@@ -380,7 +382,9 @@ class TmdbService {
     if (show) return show
 
     try {
-      const res = await fetch(url, { headers })
+      const res = await fetch(url, {
+        headers,
+      })
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
