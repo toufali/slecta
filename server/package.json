@@ -10,7 +10,7 @@
     "@koa/router": "^15.7.0",
     "koa": "^3.2.1",
     "koa-static": "^5.0.0",
-    "redis": "^4.6.7"
+    "redis": "^6.2.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
