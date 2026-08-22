@@ -50,7 +50,10 @@ Either failing logs at `ERROR` and makes the job exit non-zero. The alert policy
 `ERROR` from the job**, not specific message text — an earlier version matched exact strings and
 renaming a function silently disarmed it. Rename freely; just keep failures at `ERROR`.
 
-The non-zero exit is what fails the post-deploy step in `cloudbuild.yaml`. Note that Cloud
+The non-zero exit is what fails the post-deploy step in `cloudbuild.yaml`. That step runs after
+the service is deployed, not before — verification also fails when a third-party source is down,
+and gating the deploy on it would block the very change that fixes such an outage. It reports, it
+does not prevent. Note that Cloud
 Scheduler cannot see it: triggering a job through the Cloud Run Admin API returns as soon as the
 execution starts, so the scheduler reports success regardless of outcome. Job failures are
 caught by the log alert, not by the scheduler.
@@ -100,7 +103,7 @@ server/
 ## Deployment
 
 Push to `main` → Cloud Build → build image → deploy the service → point the job at the same
-image → run the job once and fail the build if verification fails.
+image → run the job once, failing the build if verification fails.
 
 Both the service and the job run the same image with different commands. Their env vars are set
 on the Cloud Run resources, not in `cloudbuild.yaml`, so credentials stay out of the repo.

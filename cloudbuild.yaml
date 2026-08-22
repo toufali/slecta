@@ -14,11 +14,12 @@ steps:
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run', 'jobs', 'update', 'cache-scores', '--image', 'gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA', '--region', 'us-central1']
-# Run it once now. The job exits non-zero if the scores it produces fail verification, so a
-# deploy that breaks scoring fails the build instead of surfacing at midnight UTC.
+# Run it once now, so a deploy that breaks scoring shows up within minutes rather than at
+# midnight UTC. Deliberately after the deploy, not before: verification also fails when a
+# third-party source is down, and gating on that would block the very deploy that fixes it.
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run', 'jobs', 'execute', 'cache-scores', '--wait', '--region', 'us-central1']
 images:
 - gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA
-timeout: 1200s
+timeout: 1800s # build is ~3min, but must also outlast the job's own task timeout

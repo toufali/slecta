@@ -1,5 +1,5 @@
 // Cloud Run Job entrypoint, the batch counterpart to server.js. No HTTP surface to authenticate.
-// The exit status gates the awaited `jobs execute` step in cloudbuild.yaml.
+// The exit status is what the awaited `jobs execute` step in cloudbuild.yaml reports.
 // Cloud Scheduler cannot see it, so a failed nightly run is caught by the log alert instead.
 
 import redis from './services/redisService.js'
