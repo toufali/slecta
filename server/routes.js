@@ -6,6 +6,16 @@ import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
 
+// One canonical id per film: coercing means `0550` and `550` share one cache key
+// and one TMDB call instead of two, and `..%2F` can't rewrite the upstream path.
+// Digits only, since `Number()` alone would also accept `1e2`, `0x10` and `+550`.
+router.param('id', (value, ctx, next) => {
+  const id = Number(value)
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id < 1) ctx.throw(400)
+  ctx.params.id = id
+  return next()
+})
+
 router.get('/', showMovies);
 router.get('/about', showAbout);
 router.get('/search', showSearch);
