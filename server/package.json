@@ -11,16 +11,5 @@
     "koa": "^3.2.1",
     "koa-static": "^5.0.0",
     "redis": "^6.2.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.3"
-  },
-  "nodemonConfig": {
-    "watch": [
-      "./*",
-      "../.env",
-      "../scripts/*"
-    ],
-    "ext": "js,json,env"
   }
 }

@@ -12,7 +12,7 @@
     "prestart": "npm run build -w client",
     "test": "node --test",
     "start": "node --env-file=.env server/server.js",
-    "dev": "nodemon --env-file=.env server/server.js",
+    "dev": "node --watch --env-file=.env server/server.js",
     "job": "node --env-file=.env server/job.js",
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
