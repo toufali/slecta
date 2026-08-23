@@ -13,14 +13,8 @@ const CONNECT_TIMEOUT = 2000
 const COMMAND_TIMEOUT = 2000
 const TIMED_OUT = Symbol('timed out')
 
-// A command that times out means the connection is lying about being ready. Without a pause,
-// every later request pays the timeout again and leaves another command pending on a socket that
-// will never answer. The first command after the pause probes whether the server is back.
-const COMMAND_COOLDOWN = 30000
-
 let client
 let degraded = false
-let unusableUntil = 0
 
 class RedisService {
   // Reports whether Redis is usable, so a batch process can refuse to run without a cache
@@ -57,7 +51,7 @@ class RedisService {
   async close() {
     try {
       // close() waits for pending commands, which never arrive from an absent or wedged connection
-      if (usable()) await bounded(client.close())
+      if (client?.isReady) await bounded(client.close())
       else client?.destroy()
     } catch (e) {
       log.warn('Error closing the Redis connection', { error: e })
@@ -67,12 +61,11 @@ class RedisService {
     }
     client = null
     degraded = false
-    unusableUntil = 0
   }
 
   async getCache(key) {
-    // undefined, not null: an outage is not a cache miss
-    if (!usable()) return
+    // undefined, not null: an outage is not a cache miss. Logged on transition, not per key.
+    if (!client?.isReady) return
 
     try {
       let value = await bounded(client.get(key))
@@ -87,7 +80,7 @@ class RedisService {
   }
 
   async setCache(key, value, ttl = TTL_DEFAULT) {
-    if (!usable()) return false
+    if (!client?.isReady) return false
 
     try {
       const res = await bounded(client.set(key, JSON.stringify(value, this.#jsonReplacer), {
@@ -123,20 +116,12 @@ class RedisService {
   }
 }
 
-// Ready is not the same as answering: a half-open connection reports both as healthy
-function usable() {
-  return Boolean(client?.isReady) && Date.now() >= unusableUntil
-}
-
 // An in-flight command cannot be cancelled — node-redis drops its abort listener once the command
 // is on the wire — so bound the wait and let the caller's catch treat it as a miss.
 async function bounded(command) {
   const result = await Promise.race([command, delay(COMMAND_TIMEOUT, TIMED_OUT, { ref: false })])
-
-  if (result !== TIMED_OUT) return result
-
-  unusableUntil = Date.now() + COMMAND_COOLDOWN
-  throw new Error(`Redis did not respond within ${COMMAND_TIMEOUT}ms`)
+  if (result === TIMED_OUT) throw new Error(`Redis did not respond within ${COMMAND_TIMEOUT}ms`)
+  return result
 }
 
 export default new RedisService()

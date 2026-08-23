@@ -6,10 +6,6 @@ import imdb from '../services/imdbService.js'
 import log from '../utils/logger.js'
 import { checkReferenceTitles, checkRunCoverage } from './verify.js'
 
-// Redis lost mid-run makes every remaining title pure waste — the lookups still cost third-party
-// requests and nothing can be stored. High enough that one transient write failure cannot trip it.
-const ABORT_AFTER_UNCACHED = 5
-
 export async function cacheScores() {
   log.info('cacheScores job started')
 
@@ -43,7 +39,6 @@ export async function cacheScores() {
 
 async function cacheScoresFor(mediaType, pathSegment, titles) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {} }
-  let uncachedRun = 0
 
   for (const title of titles) {
     // one at a time, to avoid running out of memory
@@ -81,12 +76,7 @@ async function cacheScoresFor(mediaType, pathSegment, titles) {
 
     const sources = Object.keys(score.scores)
 
-    if (score.cached) {
-      uncachedRun = 0
-    } else {
-      stats.notCached++
-      if (++uncachedRun >= ABORT_AFTER_UNCACHED) throw new Error(`${uncachedRun} consecutive scores failed to persist, abandoning the run`)
-    }
+    if (!score.cached) stats.notCached++
 
     for (const source of sources) stats.sources[source] = (stats.sources[source] ?? 0) + 1
     if (sources.length === 1 && sources[0] === 'tmdb') stats.tmdbOnly++
