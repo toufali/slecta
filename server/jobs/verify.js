@@ -16,6 +16,12 @@ const REFERENCE_TITLES = [
   { mediaType: 'tv', tmdbId: 1396, name: 'Breaking Bad', expected: { imdb: 95, metacritic: 87, rtCritic: 96, rtAudience: 97 } }
 ]
 
+// Detail fields the page renders. A settled title missing one means TMDB moved a field
+const REQUIRED_DETAIL = {
+  movie: ['title', 'overview', 'cast', 'director', 'runtime', 'rating', 'languages', 'genres'],
+  tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'languages', 'genres']
+}
+
 const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
 
 // Set below observed rates: new releases genuinely lack critic reviews
@@ -62,6 +68,10 @@ async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
   }
 
   if (!detail) return [{ title: name, source: 'tmdb', reason: 'no detail returned' }]
+
+  for (const field of REQUIRED_DETAIL[mediaType]) {
+    if (!detail[field]) failures.push({ title: name, source: field, reason: 'detail field empty' })
+  }
 
   const result = await scoreService.getScore(`verify/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
 

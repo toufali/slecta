@@ -86,3 +86,26 @@ test('an upstream lookup failure fails the title, not the run', async () => {
     tmdb.getTvShowDetail = tv
   }
 })
+
+// A field TMDB stops populating is invisible otherwise — `director` was empty on every TV page
+// for months. This is the path that catches it, so it needs its own cover.
+test('a detail field TMDB stops populating fails the title', async () => {
+  const [movie, tv] = [tmdb.getMovieDetail, tmdb.getTvShowDetail]
+  const detail = extra => async () => ({
+    title: 't', overview: 'o', cast: 'c', rating: 'R', languages: 'l', genres: 'g', ...extra
+  })
+  tmdb.getMovieDetail = detail({ director: '', runtime: 120 })
+  tmdb.getTvShowDetail = detail({ creator: '', seasons: 2 })
+
+  try {
+    const { ok, failures } = await checkReferenceTitles()
+    const empty = failures.filter(f => f.reason === 'detail field empty').map(f => f.source)
+
+    assert.equal(ok, false)
+    assert.ok(empty.includes('director'), `expected an empty director, got ${JSON.stringify(empty)}`)
+    assert.ok(empty.includes('creator'), `expected an empty creator, got ${JSON.stringify(empty)}`)
+  } finally {
+    tmdb.getMovieDetail = movie
+    tmdb.getTvShowDetail = tv
+  }
+})

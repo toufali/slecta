@@ -92,6 +92,13 @@ label {
   margin-right: var(--padding-sm);
 }
 
+/* Hide a detail field whose value is missing. TMDB routinely omits these — no series-level
+   director credit, no runtime for an unreleased film. The value is wrapped so :empty has an
+   element to test; label and value both stay real text, which generated content would not be. */
+p:has(span:empty) {
+  display: none;
+}
+
 .details {
   display: flex;
   flex-wrap: wrap;

@@ -7,6 +7,11 @@ const headers = {
   Authorization: `Bearer ${TMDB_TOKEN}`
 }
 
+// Bump when the cached detail shape changes, so a deploy cannot serve objects the views no
+// longer understand. Scoped to detail deliberately: a global version would also discard the
+// IMDb dataset and every score record, which Phase 4 makes expensive to rebuild.
+const DETAIL_CACHE_VERSION = 2
+
 class TmdbService {
   countMin = 50 // minimum vote count
   language = 'en-US' // TODO: base on user/browser preference
@@ -208,7 +213,7 @@ class TmdbService {
       append_to_response: 'videos,release_dates,watch/providers,external_ids,credits'
     }
     const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `movies/${id}`
+    const cacheKey = `movies/${id}/v${DETAIL_CACHE_VERSION}`
 
     let movie = await redis.getCache(cacheKey)
     if (movie) return movie
@@ -263,7 +268,7 @@ class TmdbService {
       rating,
       cast,
       director,
-      runtime: json.runtime,
+      runtime: json.runtime || null, // TMDB reports 0 for an unreleased film
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
@@ -373,7 +378,7 @@ class TmdbService {
       append_to_response: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings'
     }
     const url = `${TMDB_API_URL}/tv/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `shows/${id}`
+    const cacheKey = `shows/${id}/v${DETAIL_CACHE_VERSION}`
 
     let show = await redis.getCache(cacheKey)
     if (show) return show
@@ -412,8 +417,9 @@ class TmdbService {
     }
     const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
     const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+    const rating = json.content_ratings.results.find(item => item.iso_3166_1 === this.region)?.rating ?? ''
     const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
-    const director = json.aggregate_credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+    const creator = json.created_by.map(item => item.name).join(', ')
     const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
 
     show = {
@@ -425,8 +431,9 @@ class TmdbService {
       releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
       tmdbScore: Math.round(json.vote_average * 10),
       cast,
-      director,
-      runtime: json.episode_run_time,
+      creator,
+      rating,
+      seasons: json.number_of_seasons,
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
