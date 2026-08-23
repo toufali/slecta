@@ -7,6 +7,11 @@ const headers = {
   Authorization: `Bearer ${TMDB_TOKEN}`
 }
 
+// Bump when the cached detail shape changes, so a deploy cannot serve objects the views no
+// longer understand. Scoped to detail deliberately: a global version would also discard the
+// IMDb dataset and every score record, which Phase 4 makes expensive to rebuild.
+const DETAIL_CACHE_VERSION = 2
+
 class TmdbService {
   countMin = 50 // minimum vote count
   language = 'en-US' // TODO: base on user/browser preference
@@ -208,7 +213,7 @@ class TmdbService {
       append_to_response: 'videos,release_dates,watch/providers,external_ids,credits'
     }
     const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `movies/${id}`
+    const cacheKey = `movies/${id}/v${DETAIL_CACHE_VERSION}`
 
     let movie = await redis.getCache(cacheKey)
     if (movie) return movie
@@ -373,7 +378,7 @@ class TmdbService {
       append_to_response: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings'
     }
     const url = `${TMDB_API_URL}/tv/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `shows/${id}`
+    const cacheKey = `shows/${id}/v${DETAIL_CACHE_VERSION}`
 
     let show = await redis.getCache(cacheKey)
     if (show) return show

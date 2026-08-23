@@ -16,8 +16,7 @@ const REFERENCE_TITLES = [
   { mediaType: 'tv', tmdbId: 1396, name: 'Breaking Bad', expected: { imdb: 95, metacritic: 87, rtCritic: 96, rtAudience: 97 } }
 ]
 
-// Detail fields the page renders. A settled title missing one means TMDB moved a field, which
-// is otherwise invisible — `director` was empty on every TV page for months before anyone saw it.
+// Detail fields the page renders. A settled title missing one means TMDB moved a field
 const REQUIRED_DETAIL = {
   movie: ['title', 'overview', 'cast', 'director', 'runtime', 'rating', 'languages', 'genres'],
   tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'languages', 'genres']
