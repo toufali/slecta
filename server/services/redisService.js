@@ -8,6 +8,11 @@ const TTL_DEFAULT = 60 * 60 * 24 // seconds
 // node-redis retries a refused connection forever, so connect() never rejects — cap the wait
 const CONNECT_TIMEOUT = 2000
 
+// isReady only turns false once the socket notices a failure, so an unresponsive Redis holding
+// the connection open leaves a command pending indefinitely. Real commands take single-digit ms.
+const COMMAND_TIMEOUT = 2000
+const TIMED_OUT = Symbol('timed out')
+
 let client
 let degraded = false
 
@@ -15,7 +20,8 @@ class RedisService {
   async init() {
     if (client) return log.info('Redis client was already initialised')
 
-    client = createClient({ url: env.REDIS_URL })
+    // disableOfflineQueue: a command racing a dropped socket fails now, rather than replaying on reconnect
+    client = createClient({ url: env.REDIS_URL, disableOfflineQueue: true })
 
     // Thrown, this would be an uncaught exception. Fires per retry, so log only the transition.
     client.on('error', e => {
@@ -53,7 +59,7 @@ class RedisService {
     if (!client?.isReady) return
 
     try {
-      let value = await client.get(key)
+      let value = await bounded(client.get(key))
       if (!value) return null
       value = JSON.parse(value, this.#jsonReviver)
       // add non-enumerable/non-writable property `cacheHit` to all Objects including Arrays, Maps, etc
@@ -68,10 +74,10 @@ class RedisService {
     if (!client?.isReady) return false
 
     try {
-      const res = await client.set(key, JSON.stringify(value, this.#jsonReplacer), {
+      const res = await bounded(client.set(key, JSON.stringify(value, this.#jsonReplacer), {
         EX: ttl, // seconds, eg 60 * 60 * 12 -> sec * min * hr
         NX: false, // true -> only set the key if it does not already exist.
-      })
+      }))
       if (res !== 'OK') throw new Error(res)
       return true
     } catch (e) {
@@ -99,6 +105,13 @@ class RedisService {
     }
     return value;
   }
+}
+
+// Turns a command that would never settle into an error the caller already handles as a miss
+async function bounded(command) {
+  const result = await Promise.race([command, delay(COMMAND_TIMEOUT, TIMED_OUT, { ref: false })])
+  if (result === TIMED_OUT) throw new Error(`Redis did not respond within ${COMMAND_TIMEOUT}ms`)
+  return result
 }
 
 export default new RedisService()
