@@ -44,11 +44,14 @@ class RedisService {
   // Never throws: it runs in the job's `finally`, where an error would mask the real exit status.
   async close() {
     try {
-      // close() waits for pending commands, which never arrive if the client never connected
-      if (client?.isReady) await client.close()
+      // close() waits for pending commands, which never arrive from an absent or wedged connection
+      if (client?.isReady) await bounded(client.close())
       else client?.destroy()
     } catch (e) {
       log.warn('Error closing the Redis connection', { error: e })
+      // close() already marked the client closed, so destroy() would throw. unref instead, so a
+      // socket still waiting on an unresponsive server cannot hold the process open.
+      client?.unref()
     }
     client = null
     degraded = false
@@ -107,7 +110,8 @@ class RedisService {
   }
 }
 
-// Turns a command that would never settle into an error the caller already handles as a miss
+// An in-flight command cannot be cancelled — node-redis drops its abort listener once the command
+// is on the wire — so bound the wait and let the caller's catch treat it as a miss.
 async function bounded(command) {
   const result = await Promise.race([command, delay(COMMAND_TIMEOUT, TIMED_OUT, { ref: false })])
   if (result === TIMED_OUT) throw new Error(`Redis did not respond within ${COMMAND_TIMEOUT}ms`)
