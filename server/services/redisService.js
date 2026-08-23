@@ -17,8 +17,12 @@ let client
 let degraded = false
 
 class RedisService {
+  // Reports whether Redis is usable, so a batch process can refuse to run without a cache
   async init() {
-    if (client) return log.info('Redis client was already initialised')
+    if (client) {
+      log.info('Redis client was already initialised')
+      return client.isReady
+    }
 
     // disableOfflineQueue: a command racing a dropped socket fails now, rather than replaying on reconnect
     client = createClient({ url: env.REDIS_URL, disableOfflineQueue: true })
@@ -38,6 +42,8 @@ class RedisService {
     await Promise.race([client.connect().catch(() => {}), delay(CONNECT_TIMEOUT, null, { ref: false })])
 
     if (client.isReady) log.info('Redis client connected')
+
+    return client.isReady
   }
 
   // Batch processes must close this or it keeps the event loop alive.
