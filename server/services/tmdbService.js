@@ -268,7 +268,7 @@ class TmdbService {
       rating,
       cast,
       director,
-      runtime: json.runtime || '', // 0 for unreleased films, which is absence not a length
+      runtime: json.runtime || null, // TMDB reports 0 for an unreleased film
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,

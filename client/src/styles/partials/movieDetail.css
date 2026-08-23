@@ -92,20 +92,10 @@ label {
   margin-right: var(--padding-sm);
 }
 
-/* Detail fields carry their label as an attribute so the element is genuinely empty when the
-   value is missing, which lets :empty hide the whole line. TMDB routinely omits these — no
-   series-level director credit, no runtime for an unreleased film. */
-p[data-label]::before {
-  content: attr(data-label) ':';
-  color: var(--blue-90);
-  margin-right: var(--padding-sm);
-}
-
-p[data-unit]::after {
-  content: ' ' attr(data-unit);
-}
-
-p[data-label]:empty {
+/* Hide a detail field whose value is missing. TMDB routinely omits these — no series-level
+   director credit, no runtime for an unreleased film. The value is wrapped so :empty has an
+   element to test; label and value both stay real text, which generated content would not be. */
+p:has(span:empty) {
   display: none;
 }
 

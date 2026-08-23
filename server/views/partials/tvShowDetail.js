@@ -44,10 +44,10 @@ export const tvShowDetail = data => `
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>
-  <p data-label='Synopsis'>${data.overview}</p>
-  <p data-label='Cast'>${data.cast}</p>
-  <p data-label='Creator'>${data.creator}</p>
-  <p data-label='Spoken languages'>${data.languages}</p>
+  <p><label>Synopsis:</label><span>${data.overview}</span></p>
+  <p><label>Cast:</label><span>${data.cast}</span></p>
+  <p><label>Creator:</label><span>${data.creator}</span></p>
+  <p><label>Spoken languages:</label><span>${data.languages}</span></p>
   <div class='providers'>
     <p><label>Available on:</label></p>
     <ul>${providers(data.providers)}</ul>
