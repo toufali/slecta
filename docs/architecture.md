@@ -111,3 +111,17 @@ on the Cloud Run resources, not in `cloudbuild.yaml`, so credentials stay out of
 Redis is `volatile-lru`, so under memory pressure it evicts keys rather than rejecting writes.
 Everything Slecta stores has a TTL, which makes that survivable but means the IMDb dataset
 competes with cached scores for space — hence the minimum vote count filter in `imdbService`.
+
+Redis is optional at runtime *for the web service*. If it is unreachable the service still
+starts and every read falls through to the source uncached; the connection re-establishes itself
+in the background and caching resumes. Only the transitions in and out of that state are logged,
+since the underlying client retries about once a second.
+
+The nightly job is the opposite: it exists to fill the cache, so it refuses to run without one
+rather than spending the IMDb download and ~160 third-party requests on results it cannot store.
+That check is at startup only. Losing Redis part-way through is left to run its course: a write
+skipped during a brief stall looks identical to a dead cache from inside the loop, so any
+mid-run abort risks throwing away a good night over a two-second blip. Coverage fails the run
+either way; the cost of not bailing is the third-party requests already in flight.
+Missing one run is safe by design — score TTLs are 48h and the IMDb dataset's is 78h, both
+chosen to outlive a missed run.

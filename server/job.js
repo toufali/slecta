@@ -8,7 +8,10 @@ import log from './utils/logger.js'
 import { cacheScores } from './jobs/cacheScores.js'
 
 try {
-  await redis.init()
+  // The job exists to fill the cache. Without one it would still download the IMDb dataset and
+  // spend ~160 third-party requests scoring titles, then throw all of it away.
+  if (!await redis.init()) throw new Error('Redis unavailable, skipping the run')
+
   await tmdb.init()
 
   const { coverage, reference } = await cacheScores()
@@ -20,5 +23,5 @@ try {
   process.exitCode = 1
 } finally {
   // Without this the open connection keeps the process alive until Cloud Run's task timeout
-  await redis.quit()
+  await redis.close()
 }
