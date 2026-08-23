@@ -263,7 +263,7 @@ class TmdbService {
       rating,
       cast,
       director,
-      runtime: json.runtime,
+      runtime: json.runtime || '', // 0 for unreleased films, which is absence not a length
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
@@ -412,8 +412,9 @@ class TmdbService {
     }
     const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
     const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
+    const rating = json.content_ratings.results.find(item => item.iso_3166_1 === this.region)?.rating ?? ''
     const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
-    const director = json.aggregate_credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
+    const creator = json.created_by.map(item => item.name).join(', ')
     const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
 
     show = {
@@ -425,8 +426,9 @@ class TmdbService {
       releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
       tmdbScore: Math.round(json.vote_average * 10),
       cast,
-      director,
-      runtime: json.episode_run_time,
+      creator,
+      rating,
+      seasons: json.number_of_seasons,
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,

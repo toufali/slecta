@@ -43,11 +43,11 @@ export const movieDetail = data => `
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>
-  <p><label>Synopsis:</label>${data.overview}</p>
-  <p><label>Cast:</label>${data.cast}</p>
-  <p><label>Director:</label>${data.director}</p>
-  <p><label>Running time:</label>${data.runtime} min</p>
-  <p><label>Spoken languages:</label>${data.languages}</p>
+  <p data-label='Synopsis'>${data.overview}</p>
+  <p data-label='Cast'>${data.cast}</p>
+  <p data-label='Director'>${data.director}</p>
+  <p data-label='Running time' data-unit='min'>${data.runtime}</p>
+  <p data-label='Spoken languages'>${data.languages}</p>
   <div class='providers'>
     <p><label>Available on:</label></p>
     <ul>${providers(data.providers)}</ul>

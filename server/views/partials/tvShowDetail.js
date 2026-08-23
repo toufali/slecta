@@ -39,15 +39,15 @@ export const tvShowDetail = data => `
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
+      <li title='Seasons'>${data.seasons > 1 ? `${data.seasons} seasons` : ''}</li>
       <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>
-  <p><label>Synopsis:</label>${data.overview}</p>
-  <p><label>Cast:</label>${data.cast}</p>
-  <p><label>Director:</label>${data.director}</p>
-  <p><label>Running time:</label>${data.runtime} min</p>
-  <p><label>Spoken languages:</label>${data.languages}</p>
+  <p data-label='Synopsis'>${data.overview}</p>
+  <p data-label='Cast'>${data.cast}</p>
+  <p data-label='Creator'>${data.creator}</p>
+  <p data-label='Spoken languages'>${data.languages}</p>
   <div class='providers'>
     <p><label>Available on:</label></p>
     <ul>${providers(data.providers)}</ul>
