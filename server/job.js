@@ -20,5 +20,5 @@ try {
   process.exitCode = 1
 } finally {
   // Without this the open connection keeps the process alive until Cloud Run's task timeout
-  await redis.quit()
+  await redis.close()
 }

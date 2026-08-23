@@ -111,3 +111,8 @@ on the Cloud Run resources, not in `cloudbuild.yaml`, so credentials stay out of
 Redis is `volatile-lru`, so under memory pressure it evicts keys rather than rejecting writes.
 Everything Slecta stores has a TTL, which makes that survivable but means the IMDb dataset
 competes with cached scores for space — hence the minimum vote count filter in `imdbService`.
+
+Redis is optional at runtime. If it is unreachable, both processes still start and every read
+falls through to the source uncached; the connection re-establishes itself in the background and
+caching resumes. Only the transitions in and out of that state are logged, since the underlying
+client retries about once a second.
