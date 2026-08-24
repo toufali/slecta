@@ -57,9 +57,9 @@ const html = data => `
 
 <a href='${data.detailPath}'>
   <article>
-    <img title='${data.overview}' src='${data.posterThumb}'>
+    <img src='${data.posterThumb}'>
     <dl>
-      <dt title='${data.overview}'><h2 class='title'>${data.title}</h2></dt>
+      <dt><h2 class='title'>${data.title}</h2></dt>
       <dd title='${data.genres.join(', ')}'>${data.genres.join(', ')}</dd>
       <dd>
         <time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>
