@@ -8,8 +8,7 @@ process.env.REDIS_URL = ''
 
 const { cacheScores } = await import('./cacheScores.js')
 
-// A list lookup that throws must not abandon the run: the empty batch reports as
-// "nothing processed", which the coverage check already fails on.
+// The run has to survive a thrown lookup and report it, not abort before the coverage check
 test('a failed list lookup is reported, not fatal', async () => {
   globalThis.fetch = async () => new Response('', { status: 503 })
 
