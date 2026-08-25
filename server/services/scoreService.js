@@ -74,7 +74,9 @@ class ScoreService {
       }
 
       const sources = Object.keys(scores)
-      const score = { avgScore: average(Object.values(scores)), scores }
+      // Rounded, and absent when nothing resolved: the badge shows this number and lists will
+      // sort on it, and `average([])` is NaN, which caches as a null that sorts and renders wrong
+      const score = { avgScore: sources.length ? Math.round(average(Object.values(scores))) : undefined, scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
         log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })

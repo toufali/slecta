@@ -9,7 +9,7 @@ const headers = {
 
 // Bump when the cached detail shape changes, so a deploy cannot serve objects the views no
 // longer understand. Scoped to detail deliberately: a global version would also discard the
-// IMDb dataset and every score record, which Phase 4 makes expensive to rebuild.
+// IMDb dataset and every score record, which are expensive to rebuild.
 const DETAIL_CACHE_VERSION = 2
 
 class TmdbService {
