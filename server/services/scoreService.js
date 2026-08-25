@@ -11,7 +11,7 @@ const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
-const NO_SUCH_PAGE = new Set([404, 410]) // the source answering about the title; any other failure is ours
+const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -196,8 +196,8 @@ class ScoreService {
 
     const match = candidates.find((path, i) => settled[i].value?.ok)
 
-    // Only a "no such page" answer tells us a guessed slug is wrong; anything else went unanswered
-    if (!match && settled.some(result => !NO_SUCH_PAGE.has(result.value?.status))) {
+    // Only a not-found answer tells us a guessed slug is wrong; anything else went unanswered
+    if (!match && settled.some(result => !PAGE_NOT_FOUND.has(result.value?.status))) {
       this.#unreadable(attempt, baseUrl, { reason: 'probe went unanswered' })
     }
 
@@ -257,7 +257,7 @@ class ScoreService {
 
       // Blocks arrive as whatever status a CDN picked — 403, 429, a challenge, even a 2xx — so
       // trust only the two that say the page is gone, and read anything else as prevented
-      if (NO_SUCH_PAGE.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
+      if (PAGE_NOT_FOUND.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
 
       return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
     }
