@@ -5,7 +5,7 @@ import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
 const SCORE_TTL = 60 * 60 * 48 // 48 hours
-const PARTIAL_TTL = 60 * 30 // 30 min, for a score built while a source was unreadable
+const PARTIAL_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000

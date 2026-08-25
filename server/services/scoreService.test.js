@@ -157,7 +157,7 @@ test('a score missing a source that refused expires early', async () => {
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
-  assert.equal(ttlOf('test/movie/27205'), 60 * 30)
+  assert.equal(ttlOf('test/movie/27205'), 60 * 60)
 })
 
 // A 404 is the title's own answer, so the thinner score is settled and keeps the full life
@@ -189,7 +189,7 @@ test('a block on any status shortens the record, a 404 does not', async () => {
       tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(ttlOf(`test/movie/${status}`), 60 * 30, `status ${status}`)
+    assert.equal(ttlOf(`test/movie/${status}`), 60 * 60, `status ${status}`)
   }
 })
 
