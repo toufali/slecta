@@ -60,8 +60,7 @@ test('a filter the panel only sends once is rejected when repeated', () => {
 })
 
 test('a prototype the querystring put there is rejected', () => {
-  // Built as Koa's parser does: a plain object, then `obj[key] = values`, which for a repeated
-  // `__proto__` goes through the setter and replaces the prototype instead of adding a key
+  // Assigned the way the query parser does it, which replaces the prototype rather than adding a key
   const query = {}
   query.__proto__ = ['0', '0']
 
@@ -70,7 +69,7 @@ test('a prototype the querystring put there is rejected', () => {
 })
 
 test('a query Koa returned from its own cache is left alone', () => {
-  // `?toString` makes Koa's cache lookup find a function up the prototype chain and return it
+  // Some querystrings make Koa's own query cache hand back a function
   assert.deepEqual(invalidFilters(Object.prototype.toString, MOVIE), [])
 })
 

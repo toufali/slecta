@@ -32,9 +32,8 @@ const CHECKS = {
  * @return {string[]}
  */
 export function invalidFilters(query, rules) {
-  // A repeated `?__proto__` lands on the prototype instead of becoming a key, leaving inherited
-  // members readable as filters — `query.sort` returns `Array.prototype.sort`. Only a querystring
-  // array can get there, so an array prototype is the tell.
+  // A repeated key can land on the query's prototype rather than becoming a key of its own, which
+  // leaves inherited members readable as filters. Only an array gets there, so that is the tell.
   if (Array.isArray(Object.getPrototypeOf(query))) return ['__proto__']
 
   return Object.keys(query).filter(name => {
