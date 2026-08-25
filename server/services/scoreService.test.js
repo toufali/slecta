@@ -26,7 +26,7 @@ function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {
     calls.count++
-    const host = Object.keys(routes).find(name => String(url).includes(name))
+    const host = Object.keys(routes).find(name => new URL(url).host.endsWith(name))
     return routes[host]?.() ?? new Response('', { status: 404 })
   }
   return calls
@@ -195,7 +195,7 @@ test('a block on any status shortens the record, a 404 does not', async () => {
 
 // A Wikidata timeout leaves no slugs, so the score is missing sources rather than lacking them
 test('a slug lookup that never answered shortens the record too', async () => {
-  globalThis.fetch = async url => String(url).includes('wikidata.org')
+  globalThis.fetch = async url => new URL(url).host.endsWith('wikidata.org')
     ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
     : new Response('', { status: 404 })
 
