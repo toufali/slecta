@@ -33,3 +33,24 @@ for (const [label, method] of [['getMovieDetail', 'getMovieDetail'], ['getTvShow
     await assert.rejects(() => tmdb[method](550), /fetch failed/)
   })
 }
+
+// A list or search failure used to return undefined, which reads downstream as an empty catalogue
+// rather than an outage: the controllers then threw a TypeError on `data.movies`, and search
+// rendered "No results".
+for (const [label, method] of [['getMovies', 'getMovies'], ['getTvShows', 'getTvShows'], ['getTitlesByString', 'getTitlesByString']]) {
+  test(`${label} throws on an upstream 5xx`, async () => {
+    respond(503)
+    await assert.rejects(() => tmdb[method]('dune'), /TMDB 503/)
+  })
+
+  test(`${label} throws on a rate limit`, async () => {
+    respond(429)
+    await assert.rejects(() => tmdb[method]('dune'), /TMDB 429/)
+  })
+
+  test(`${label} propagates a network error`, async () => {
+    globalThis.fetch = async () => { throw new TypeError('fetch failed') }
+    await assert.rejects(() => tmdb[method]('dune'), /fetch failed/)
+  })
+}
+

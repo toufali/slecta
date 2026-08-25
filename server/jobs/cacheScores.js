@@ -20,8 +20,8 @@ export async function cacheScores() {
   }
 
   const [movies, shows] = await Promise.all([
-    tmdb.getMovies().then(data => data?.movies ?? []),
-    tmdb.getTvShows().then(data => data?.shows ?? [])
+    titles(() => tmdb.getMovies(), 'movies'),
+    titles(() => tmdb.getTvShows(), 'shows')
   ])
 
   const stats = [
@@ -84,4 +84,15 @@ async function cacheScoresFor(mediaType, pathSegment, titles) {
   }
 
   return stats
+}
+
+// Absorb a failed list here rather than abandoning the run: an empty batch reports as
+// "nothing processed", which the coverage check already treats as a failure
+async function titles(lookup, key) {
+  try {
+    return (await lookup())[key] ?? []
+  } catch (e) {
+    log.error('TMDB list lookup failed', { key, error: e })
+    return []
+  }
 }
