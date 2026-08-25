@@ -20,7 +20,15 @@ server.use(serve(staticUrl.pathname));
 server.use(routes)
 
 // Koa's default handler writes a bare stack to stderr, which Cloud Logging stores without fields
-server.on('error', (error, ctx) => log.error('Request failed', { method: ctx?.method, url: ctx?.url, status: ctx?.status, error }))
+server.on('error', (error, ctx) => {
+  // Koa assigns the response status after this event, so derive it from the error as Koa does
+  const status = error.status ?? 500
+
+  // A rejected request is already in Cloud Run's request log; this is for faults we caused
+  if (status < 500) return
+
+  log.error('Request failed', { method: ctx?.method, url: ctx?.url, status, error })
+})
 
 server.listen(PORT, function () {
   console.info('Static files dir:', staticUrl.pathname)

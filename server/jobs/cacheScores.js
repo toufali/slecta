@@ -19,7 +19,6 @@ export async function cacheScores() {
     log.error('IMDb ratings refresh failed, continuing with the previous dataset', { error: e })
   }
 
-  // Let either list fail without abandoning the run
   // An empty batch reports as "nothing processed", which the coverage check already fails
   const [movieList, showList] = await Promise.allSettled([tmdb.getMovies(), tmdb.getTvShows()])
 
