@@ -15,6 +15,7 @@ const DETAIL_CACHE_VERSION = 2
 class TmdbService {
   countMin = 50 // minimum vote count
   pageMax = 500 // TMDB 400s on a higher page
+  countMax = 2 ** 31 - 2 // at INT32_MAX TMDB drops the vote floor and returns everything
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc
@@ -141,13 +142,14 @@ class TmdbService {
     return ratings
   }
 
-  // Vocabularies the filter validator checks against. TMDB 400s on the other type's sort key and
-  // a genre id is looked up in this type's map; an omitted rule leaves that param unjudged.
+  // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media
+  // type; an omitted rule leaves that param unjudged.
   filterRules(mediaType) {
     const tv = mediaType === 'tv'
 
     return {
       pageMax: this.pageMax,
+      countMax: this.countMax,
       sorts: tv ? this.sortingOptions.shows : this.sortingOptions.movies,
       genres: tv ? this.genres.show : this.genres.movie,
       ratings: tv ? undefined : this.ratings

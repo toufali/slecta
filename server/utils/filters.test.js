@@ -1,23 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { invalidFilters } from './filters.js'
+import { invalidFilters, plainQuery } from './filters.js'
 
 const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
 
 const MOVIE = {
   pageMax: 500,
+  countMax: 2 ** 31 - 2,
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
 }
 const SHOW = {
   pageMax: 500,
+  countMax: 2 ** 31 - 2,
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
 
 test('a request from the filter panel passes', () => {
-  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on' }
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', count: '50' }
 
   assert.deepEqual(invalidFilters(query, MOVIE), [])
 })
@@ -59,15 +61,43 @@ test('a filter the panel only sends once is rejected when repeated', () => {
   assert.deepEqual(invalidFilters({ page: ['1', '2'] }, MOVIE), ['page'])
 })
 
-test('a repeated __proto__ is rejected, prototype and all', () => {
-  // Built the way Koa's parser does: a plain object, then `obj[key] = values`, which for
-  // `__proto__` with two values goes through the setter and replaces the prototype
-  const query = {}
+test('plainQuery strips a prototype the querystring put there, keeping real params', () => {
+  // Built as Koa's parser does: a plain object, then `obj[key] = values`, which for a repeated
+  // `__proto__` goes through the setter and replaces the prototype instead of adding a key
+  const query = { page: '2' }
   query.__proto__ = ['0', '0']
+  const ctx = { request: { query } }
 
-  assert.deepEqual(Object.keys(query), [], 'the key does not appear as a property')
-  assert.equal(typeof query.sort, 'function', 'this is the value that used to reach TMDB')
-  assert.deepEqual(invalidFilters(query, MOVIE), ['__proto__'])
+  assert.equal(typeof query.sort, 'function', 'inherited from the array, readable as a filter')
+
+  plainQuery(ctx, () => {})
+
+  assert.equal(Object.getPrototypeOf(ctx.request.query), Object.prototype)
+  assert.equal(ctx.request.query.sort, undefined)
+  assert.equal(ctx.request.query.page, '2', 'a real param is not lost with the prototype')
+})
+
+test('plainQuery replaces a query that is not a plain object', () => {
+  // `?toString` makes Koa's cache lookup find a function up the prototype chain
+  const ctx = { request: { query: Object.prototype.toString } }
+
+  plainQuery(ctx, () => {})
+
+  assert.deepEqual(ctx.request.query, {})
+})
+
+test('a vote count high enough for TMDB to drop the floor is rejected', () => {
+  // At INT32_MAX TMDB ignores vote_count.gte and returns the entire catalog
+  assert.deepEqual(invalidFilters({ count: '2147483647' }, MOVIE), ['count'])
+  assert.deepEqual(invalidFilters({ count: '99999999999999999999' }, MOVIE), ['count'])
+  assert.deepEqual(invalidFilters({ count: '2147483646' }, MOVIE), [])
+})
+
+test('streaming takes only the value the checkbox sends', () => {
+  assert.deepEqual(invalidFilters({ streaming: 'on' }, MOVIE), [])
+  // Otherwise the filter applies while the page renders the box unchecked
+  assert.deepEqual(invalidFilters({ streaming: 'off' }, MOVIE), ['streaming'])
+  assert.deepEqual(invalidFilters({ streaming: 'false' }, MOVIE), ['streaming'])
 })
 
 test('a blank among several values is rejected, though a lone blank means absent', () => {

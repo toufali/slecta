@@ -3,6 +3,7 @@ import serve from "koa-static"
 
 import env from "./env.js"
 import routes from './routes.js'
+import { plainQuery } from './utils/filters.js'
 import redis from './services/redisService.js'
 import tmdb from './services/tmdbService.js'
 
@@ -15,6 +16,7 @@ await tmdb.init()
 // STATIC_DIR set to 'src' if `npm run dev` called. Files are served direct from source without build/bundle
 // Otherwise, STATIC_DIR defaults to 'dist' – client build required to serve files from bundle
 const staticUrl = new URL(`../client/${STATIC_DIR}`, import.meta.url);
+server.use(plainQuery)
 server.use(serve(staticUrl.pathname));
 server.use(routes)
 
