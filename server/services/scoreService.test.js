@@ -205,3 +205,35 @@ test('a slug lookup that never answered shortens the record too', async () => {
   assert.equal(ttlOf('test/movie/slugfail'), 60 * 60)
 })
 
+// Half of the Metacritic pages that answer have no Metascore yet, which is the title's own answer
+test('a Metacritic page with no Metascore keeps the full life', async () => {
+  const unrated = () => ok('<script type="application/ld+json">{"@type":"Movie","name":"x"}</script>')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': unrated
+  })
+
+  await scoreService.getScore('test/movie/unrated', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/unrated'), 60 * 60 * 48)
+})
+
+// A challenge page answers 200 and parses; the absence of a whole-title block is the tell
+test('a page with no whole-title block shortens the record', async () => {
+  const challenge = () => ok('<script type="application/ld+json">{"@type":"WebPage"}</script>')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': challenge
+  })
+
+  await scoreService.getScore('test/movie/challenge', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
+})
+

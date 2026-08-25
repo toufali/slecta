@@ -138,12 +138,16 @@ class ScoreService {
       const html = await this.#fetchText(`${MC_BASE_URL}${path}/`, attempt)
       if (!html) return
 
-      const blocks = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)
+      const blocks = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
+      const titles = blocks.map(([, block]) => JSON.parse(block)).filter(item => MC_TYPES.includes(item['@type']))
 
-      for (const [, block] of blocks) {
-        const { '@type': type, aggregateRating } = JSON.parse(block)
-        if (MC_TYPES.includes(type) && aggregateRating?.ratingValue != null) return toScore(aggregateRating.ratingValue)
-      }
+      // No whole-title block means this is not the page we think it is, however it answered.
+      // A block with no rating is the title's own answer: Metacritic has no Metascore yet.
+      if (!titles.length) attempt.incomplete = true
+
+      const rated = titles.find(item => item.aggregateRating?.ratingValue != null)
+
+      return toScore(rated?.aggregateRating.ratingValue)
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error getting Metacritic score', { path, error: e })
