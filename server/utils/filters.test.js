@@ -41,17 +41,22 @@ test('a genre id absent from this media type is rejected', () => {
   assert.deepEqual(invalidFilters({ wog: 'notanumber' }, MOVIE), ['wog'])
 })
 
-test('repeated and comma-joined values are each checked', () => {
+test('every value of a repeated filter is checked', () => {
   assert.deepEqual(invalidFilters({ wg: ['27', '878'] }, MOVIE), [])
-  assert.deepEqual(invalidFilters({ wg: '27,878' }, MOVIE), [])
   assert.deepEqual(invalidFilters({ wg: ['27', '99999'] }, MOVIE), ['wg'])
+})
+
+test('a comma-joined filter is rejected, since TMDB reads it as AND', () => {
+  // The panel repeats the param instead, which TMDB reads as OR and the view can label
+  assert.deepEqual(invalidFilters({ wg: '27,878' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wr: 'R,PG-13' }, MOVIE), ['wr'])
+  assert.deepEqual(invalidFilters({ page: '1,2' }, MOVIE), ['page'])
 })
 
 test('a filter the panel only sends once is rejected when repeated', () => {
   // Two of them reach the view as an array, which no sort option can match
   assert.deepEqual(invalidFilters({ sort: ['popularity.desc', 'popularity.desc'] }, MOVIE), ['sort'])
   assert.deepEqual(invalidFilters({ page: ['1', '2'] }, MOVIE), ['page'])
-  assert.deepEqual(invalidFilters({ page: '1,2' }, MOVIE), ['page'])
 })
 
 test('a repeated __proto__ is rejected, prototype and all', () => {
@@ -67,7 +72,7 @@ test('a repeated __proto__ is rejected, prototype and all', () => {
 
 test('a blank among several values is rejected, though a lone blank means absent', () => {
   assert.deepEqual(invalidFilters({ wg: ['', ''] }, MOVIE), ['wg'])
-  assert.deepEqual(invalidFilters({ wg: '27,' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wg: ['27', ''] }, MOVIE), ['wg'])
   assert.deepEqual(invalidFilters({ wg: '' }, MOVIE), [])
 })
 

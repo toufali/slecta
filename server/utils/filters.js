@@ -1,11 +1,9 @@
 // Reject filter values the list routes cannot honour: left alone, an unknown genre id or the
 // other media type's sort key becomes a 500, at TMDB or in the view's label lookup.
 
-// A repeated single-value filter arrives as an array and reaches the view as one — its own 500.
+// Only the panel's own form is accepted: one param repeated per value, which TMDB reads as OR.
+// Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
 const MULTI = new Set(['wg', 'wog', 'wr'])
-
-// A filter may arrive repeated (`wg=27&wg=878`) or comma-joined (`wg=27,878`).
-const parts = value => [value].flat().flatMap(item => String(item).split(','))
 
 // Digits only: `Number()` also takes `0x1b` and `1e2`, which pass a genre lookup but match nothing at TMDB.
 const isCount = value => /^\d+$/.test(value)
@@ -35,10 +33,10 @@ export function invalidFilters(query, rules) {
     // hasOwn, so a param named after an Object.prototype member is not read as a check
     if (!Object.hasOwn(CHECKS, name)) return false
 
-    const values = parts(query[name])
+    const values = [query[name]].flat()
 
     if (values.length === 1 && !values[0]) return false // a lone empty value means absent
-    if (values.length > 1 && !MULTI.has(name)) return true
+    if (values.length > 1 && !MULTI.has(name)) return true // an array reaches the view as an array
 
     return !values.every(value => value && CHECKS[name](value, rules))
   })
