@@ -32,6 +32,11 @@ const CHECKS = {
  * @return {string[]}
  */
 export function invalidFilters(query, rules) {
+  // A repeated `?__proto__` lands on the prototype instead of becoming a key, leaving inherited
+  // members readable as filters — `query.sort` returns `Array.prototype.sort`. Only a querystring
+  // array can get there, so an array prototype is the tell.
+  if (Array.isArray(Object.getPrototypeOf(query))) return ['__proto__']
+
   return Object.keys(query).filter(name => {
     // hasOwn, so a param named after an Object.prototype member is not read as a check
     if (!Object.hasOwn(CHECKS, name)) return false
@@ -43,19 +48,4 @@ export function invalidFilters(query, rules) {
 
     return !values.every(value => value && CHECKS[name](value, rules))
   })
-}
-
-// Koa caches parsed queries in a `{}` keyed by the querystring, so `?toString` gets a function
-// from the prototype chain and a repeated `?__proto__` lands on the prototype — either way a
-// route can read `query.sort` and find `Array.prototype.sort`. Spread, since assign would trip
-// the same setter.
-export function plainQuery(ctx, next) {
-  const query = ctx.request.query
-  const proto = query && typeof query === 'object' ? Object.getPrototypeOf(query) : undefined
-
-  if (proto !== Object.prototype && proto !== null) {
-    Object.defineProperty(ctx.request, 'query', { value: { ...query }, configurable: true })
-  }
-
-  return next()
 }

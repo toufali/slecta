@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { invalidFilters, plainQuery } from './filters.js'
+import { invalidFilters } from './filters.js'
 
 const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
 
@@ -59,29 +59,19 @@ test('a filter the panel only sends once is rejected when repeated', () => {
   assert.deepEqual(invalidFilters({ page: ['1', '2'] }, MOVIE), ['page'])
 })
 
-test('plainQuery strips a prototype the querystring put there, keeping real params', () => {
+test('a prototype the querystring put there is rejected', () => {
   // Built as Koa's parser does: a plain object, then `obj[key] = values`, which for a repeated
   // `__proto__` goes through the setter and replaces the prototype instead of adding a key
-  const query = { page: '2' }
+  const query = {}
   query.__proto__ = ['0', '0']
-  const ctx = { request: { query } }
 
   assert.equal(typeof query.sort, 'function', 'inherited from the array, readable as a filter')
-
-  plainQuery(ctx, () => {})
-
-  assert.equal(Object.getPrototypeOf(ctx.request.query), Object.prototype)
-  assert.equal(ctx.request.query.sort, undefined)
-  assert.equal(ctx.request.query.page, '2', 'a real param is not lost with the prototype')
+  assert.deepEqual(invalidFilters(query, MOVIE), ['__proto__'])
 })
 
-test('plainQuery replaces a query that is not a plain object', () => {
-  // `?toString` makes Koa's cache lookup find a function up the prototype chain
-  const ctx = { request: { query: Object.prototype.toString } }
-
-  plainQuery(ctx, () => {})
-
-  assert.deepEqual(ctx.request.query, {})
+test('a query Koa returned from its own cache is left alone', () => {
+  // `?toString` makes Koa's cache lookup find a function up the prototype chain and return it
+  assert.deepEqual(invalidFilters(Object.prototype.toString, MOVIE), [])
 })
 
 test('streaming takes only the value the checkbox sends', () => {
