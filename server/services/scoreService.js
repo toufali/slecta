@@ -268,7 +268,12 @@ class ScoreService {
       return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
     }
 
-    return await parse(res)
+    const body = await parse(res)
+
+    // An empty body is not a page we can read, whatever the status claimed
+    if (!body) return this.#unreadable(attempt, url, { status: res.status, reason: 'empty response' })
+
+    return body
   }
 }
 

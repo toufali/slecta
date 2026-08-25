@@ -255,3 +255,18 @@ test('an unanswered slug lookup is not cached, so the retry re-asks', async () =
   assert.equal(ttlOf('slugs/movie/Q777/Nothing Answers/2026-01-01'), undefined)
 })
 
+// A 200 with nothing in it is not a page either, and some proxies answer that way on error
+test('an empty body shortens the record despite the status', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => ok(''),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  await scoreService.getScore('test/movie/empty', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/empty'), 60 * 60)
+})
+
