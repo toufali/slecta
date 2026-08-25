@@ -186,40 +186,36 @@ class TmdbService {
     let data = await redis.getCache(cacheKey)
     if (data) return data
 
-    try {
-      const res = await fetch(url, { headers })
+    const res = await fetch(url, { headers })
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
 
-      const json = await res.json()
+    const json = await res.json()
 
-      data = {
-        movies: json.results.map(item => new Object({
-          id: item.id,
-          title: item.title,
-          genres: item.genre_ids.map(id => this.genres.movie.get(id)),
-          releaseDate: item.release_date,
-          posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-          tmdbScore: item.vote_average,
-          tmdbScoreCount: item.vote_count,
-          popularity: item.popularity,
-          detailPath: `/movies/${item.id}`
-        }))
-      }
-
-      data.allGenres = this.genres.movie
-      data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-      data.allRatings = this.ratings
-      data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
-      data.allSorting = this.sortingOptions.movies
-      data.sortBy = params.sort_by
-      data.streamingNow = query?.streaming
-
-      redis.setCache(cacheKey, data)
-      return data
-    } catch (e) {
-      console.error("Error fetching data:", e);
+    data = {
+      movies: json.results.map(item => new Object({
+        id: item.id,
+        title: item.title,
+        genres: item.genre_ids.map(id => this.genres.movie.get(id)),
+        releaseDate: item.release_date,
+        posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+        tmdbScore: item.vote_average,
+        tmdbScoreCount: item.vote_count,
+        popularity: item.popularity,
+        detailPath: `/movies/${item.id}`
+      }))
     }
+
+    data.allGenres = this.genres.movie
+    data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
+    data.allRatings = this.ratings
+    data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
+    data.allSorting = this.sortingOptions.movies
+    data.sortBy = params.sort_by
+    data.streamingNow = query?.streaming
+
+    redis.setCache(cacheKey, data)
+    return data
   }
 
   async getMovieDetail(id) {
@@ -303,27 +299,24 @@ class TmdbService {
     })
     const url = `${TMDB_API_URL}/search/multi?${urlParams}`
 
-    try {
-      const res = await fetch(url, { headers })
+    const res = await fetch(url, { headers })
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
 
-      const json = await res.json()
+    const json = await res.json()
 
-      return json.results.filter(item => (item.media_type === 'tv' && item.first_air_date) || item.media_type === 'movie' && item.release_date)
-        .slice(0, limit)
-        .map(item => ({
-          id: item.id,
-          title: item.title || item.name,
-          mediaType: item.media_type,
-          mediaTypeText: item.media_type === 'tv' ? 'TV Show' : 'Movie',
-          releaseDate: item.release_date || item.first_air_date,
-          genres: item.genre_ids.map(id => this.genres.all.get(id)),
-        }))
-    } catch (e) {
-      console.error("Error fetching data:", e);
-    }
+    return json.results.filter(item => (item.media_type === 'tv' && item.first_air_date) || item.media_type === 'movie' && item.release_date)
+      .slice(0, limit)
+      .map(item => ({
+        id: item.id,
+        title: item.title || item.name,
+        mediaType: item.media_type,
+        mediaTypeText: item.media_type === 'tv' ? 'TV Show' : 'Movie',
+        releaseDate: item.release_date || item.first_air_date,
+        genres: item.genre_ids.map(id => this.genres.all.get(id)),
+      }))
   }
+
   async getTvShows(query) {
     const params = {
       // `with_watch_monetization_types` needs `watch_region` to have any effect
@@ -352,38 +345,34 @@ class TmdbService {
     let data = await redis.getCache(cacheKey)
     if (data) return data
 
-    try {
-      const res = await fetch(url, { headers })
+    const res = await fetch(url, { headers })
 
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
 
-      const json = await res.json()
+    const json = await res.json()
 
-      data = {
-        shows: json.results.map(item => new Object({
-          id: item.id,
-          title: item.name,
-          genres: item.genre_ids.map(id => this.genres.show.get(id)),
-          releaseDate: item.first_air_date,
-          posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-          tmdbScore: item.vote_average,
-          tmdbScoreCount: item.vote_count,
-          popularity: item.popularity,
-          detailPath: `/shows/${item.id}`
-        }))
-      }
-
-      data.allGenres = this.genres.show
-      data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-      data.allSorting = this.sortingOptions.shows
-      data.sortBy = params.sort_by
-      data.streamingNow = query?.streaming
-
-      redis.setCache(cacheKey, data)
-      return data
-    } catch (e) {
-      console.error("Error fetching data:", e);
+    data = {
+      shows: json.results.map(item => new Object({
+        id: item.id,
+        title: item.name,
+        genres: item.genre_ids.map(id => this.genres.show.get(id)),
+        releaseDate: item.first_air_date,
+        posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+        tmdbScore: item.vote_average,
+        tmdbScoreCount: item.vote_count,
+        popularity: item.popularity,
+        detailPath: `/shows/${item.id}`
+      }))
     }
+
+    data.allGenres = this.genres.show
+    data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
+    data.allSorting = this.sortingOptions.shows
+    data.sortBy = params.sort_by
+    data.streamingNow = query?.streaming
+
+    redis.setCache(cacheKey, data)
+    return data
   }
 
   async getTvShowDetail(id) {

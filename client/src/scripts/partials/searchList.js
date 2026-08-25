@@ -16,7 +16,8 @@ async function handleInput(e) {
     var res = await fetch(`/api/v1/search/?${params}`)
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   } catch (e) {
-    console.error(e)
+    // Return, or the next line parses the error body and rejects unhandled
+    return console.error(e)
   }
 
   const results = await res.json()
