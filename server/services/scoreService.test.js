@@ -14,9 +14,8 @@ const LD = value => `<script type="application/ld+json">${JSON.stringify({
 
 const ok = body => new Response(body, { status: 200 })
 
-// Routes by host, since the RT and Metacritic reads run concurrently and their order is not fixed.
-// Each route is a factory: a Response body reads once, and a slug probe to the same host would
-// consume it before the score fetch got there.
+// Route by host, since the RT and Metacritic reads run concurrently and their order is not fixed
+// Build a fresh Response per call: a body reads once, and a probe to the same host would consume it
 function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {

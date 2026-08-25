@@ -75,8 +75,8 @@ class ScoreService {
 
       const sources = Object.keys(scores)
       const mean = average(Object.values(scores))
-      // Rounded so the number shown and the number sorted on agree. Absent rather than NaN,
-      // which caches as a null that both sorts and renders wrong.
+      // Round, so the number shown and the number sorted on agree
+      // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
       const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
