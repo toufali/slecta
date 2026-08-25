@@ -14,10 +14,7 @@ export async function showTvShows(ctx) {
   }))
 
   scores.forEach((score, i) => {
-    if (score.value) {
-      data.shows[i].score = score.value.avgScore
-      data.shows[i].scores = score.value.scores
-    }
+    if (score.value) data.shows[i].score = score.value.avgScore
   })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -37,7 +34,6 @@ export async function showTvShowDetail(ctx) {
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id, 'tv')
 
   data.score = score?.avgScore
-  data.scores = score?.scores
   data.quotes = quotes
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -62,10 +58,7 @@ export async function getTvShows(ctx) {
   }))
 
   scores.forEach((score, i) => {
-    if (score.value) {
-      data.shows[i].score = score.value.avgScore
-      data.shows[i].scores = score.value.scores
-    }
+    if (score.value) data.shows[i].score = score.value.avgScore
   })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')

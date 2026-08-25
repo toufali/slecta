@@ -14,16 +14,21 @@ const LD = value => `<script type="application/ld+json">${JSON.stringify({
 
 const ok = body => new Response(body, { status: 200 })
 
-// Routes by host, since the RT and Metacritic reads run concurrently and their order is not fixed
+// Routes by host, since the RT and Metacritic reads run concurrently and their order is not fixed.
+// Each route is a factory: a Response body reads once, and a slug probe to the same host would
+// consume it before the score fetch got there.
 function stubHosts(routes) {
+  const calls = { count: 0 }
   globalThis.fetch = async url => {
+    calls.count++
     const host = Object.keys(routes).find(name => String(url).includes(name))
-    return routes[host] ?? new Response('', { status: 404 })
+    return routes[host]?.() ?? new Response('', { status: 404 })
   }
+  return calls
 }
 
-const wikidata = (rt, mc) => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
-const rtScorecard = (critic, audience) => ok(`<script id="media-scorecard-json">${JSON.stringify({
+const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
+const rtScorecard = (critic, audience) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
   criticsScore: { score: critic }, audienceScore: { score: audience }
 })}</script>`)
 
@@ -104,15 +109,18 @@ test('a healthy response is not retried', async () => {
 // The badge renders this number and lists order by it, so it has to be an integer or absent.
 // Redis is never connected here, so reads miss and the write is a no-op.
 test('the aggregate is a rounded integer, not the raw mean', async () => {
-  stubHosts({
+  const calls = stubHosts({
     'wikidata.org': wikidata('m/inception', 'movie/inception'),
     'rottentomatoes.com': rtScorecard(50, 85),
-    'metacritic.com': ok(LD(52))
+    'metacritic.com': () => ok(LD(52))
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
+
+  // Wikidata carried both slugs, so no probe was needed and no source was retried
+  assert.equal(calls.count, 3)
 
   // (52 + 50 + 85 + 67) / 4 is 63.5
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85, tmdb: 67 })

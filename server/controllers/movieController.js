@@ -14,10 +14,7 @@ export async function showMovies(ctx) {
   }))
 
   scores.forEach((score, i) => {
-    if (score.value) {
-      data.movies[i].score = score.value.avgScore
-      data.movies[i].scores = score.value.scores
-    }
+    if (score.value) data.movies[i].score = score.value.avgScore
   })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -37,7 +34,6 @@ export async function showMovieDetail(ctx) {
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id)
 
   data.score = score?.avgScore
-  data.scores = score?.scores
   data.quotes = quotes
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -62,10 +58,7 @@ export async function getMovies(ctx) {
   }))
 
   scores.forEach((score, i) => {
-    if (score.value) {
-      data.movies[i].score = score.value.avgScore
-      data.movies[i].scores = score.value.scores
-    }
+    if (score.value) data.movies[i].score = score.value.avgScore
   })
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
