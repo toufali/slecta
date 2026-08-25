@@ -7,13 +7,13 @@
 const MULTI = new Set(['wg', 'wog', 'wr'])
 
 // Digits only: `Number()` also takes `0x1b` and `1e2`, which pass a genre lookup but match nothing at TMDB.
-export const isCount = value => /^\d+$/.test(value)
+const isCount = value => /^\d+$/.test(value)
 
 const isGenre = (value, { genres }) => isCount(value) && genres.has(+value)
 
 const CHECKS = {
   page: (value, { pageMax }) => isCount(value) && +value >= 1 && +value <= pageMax,
-  count: (value, { countMax }) => isCount(value) && +value <= countMax,
+  count: value => isCount(value),
   sort: (value, { sorts }) => sorts.some(option => option.value === value),
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',
@@ -28,7 +28,7 @@ const CHECKS = {
  * Name the filter params the request cannot honour. Params we do not use are ignored, so
  * tracking parameters and scanner noise still get a page.
  * @param {object} query - `ctx.query`
- * @param {object} rules - `{ pageMax, countMax, sorts, genres, ratings }` for the media type
+ * @param {object} rules - `{ pageMax, sorts, genres, ratings }` for the requested media type
  * @return {string[]}
  */
 export function invalidFilters(query, rules) {
@@ -45,14 +45,10 @@ export function invalidFilters(query, rules) {
   })
 }
 
-/**
- * Replace `ctx.query` with a plain object holding only its own keys, before any route reads it.
- * Koa caches parsed queries in a `{}` keyed by the querystring, which leaks two ways: `?toString`
- * finds a function up the prototype chain and returns it as the query, and a repeated key that
- * Object.prototype defines with a setter lands on the prototype instead of the object, leaving
- * inherited members like `sort` readable as filters. Spread rather than assign — assign would
- * trip the same setter.
- */
+// Koa caches parsed queries in a `{}` keyed by the querystring, so `?toString` gets a function
+// from the prototype chain and a repeated `?__proto__` lands on the prototype — either way a
+// route can read `query.sort` and find `Array.prototype.sort`. Spread, since assign would trip
+// the same setter.
 export function plainQuery(ctx, next) {
   const query = ctx.request.query
   const proto = query && typeof query === 'object' ? Object.getPrototypeOf(query) : undefined

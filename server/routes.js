@@ -1,6 +1,6 @@
 import Router from '@koa/router';
 import tmdb from './services/tmdbService.js'
-import { invalidFilters, isCount } from './utils/filters.js'
+import { invalidFilters } from './utils/filters.js'
 import { showSearch, getTitles } from './controllers/searchController.js'
 import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
 import { getTvShows, getTvShowDetail, showTvShows, showTvShowDetail, getTvShowScore, getTvShowQuotes } from './controllers/tvShowController.js'
@@ -9,10 +9,10 @@ import { showAbout } from './controllers/mainController.js'
 const router = new Router();
 
 // Coerce to one canonical id, so `0550` and `550` share a cache key and one TMDB call, and
-// `..%2F` can't rewrite the upstream path.
+// `..%2F` can't rewrite the upstream path. Digits only: `Number()` also takes `1e2` and `0x10`.
 router.param('id', (value, ctx, next) => {
   const id = Number(value)
-  if (!isCount(value) || !Number.isSafeInteger(id) || id < 1) ctx.throw(400)
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id < 1) ctx.throw(400)
   ctx.params.id = id
   return next()
 })
@@ -23,9 +23,6 @@ function validateFilters(mediaType) {
     const invalid = invalidFilters(ctx.query, tmdb.filterRules(mediaType))
 
     if (invalid.length) ctx.throw(400, `Unsupported filter value: ${invalid.join(', ')}`)
-
-    // Canonical for the same reason as `id`: `?page=01` would otherwise mint its own cache key
-    for (const name of ['page', 'count']) if (ctx.query[name]) ctx.query[name] = String(+ctx.query[name])
 
     return next()
   }

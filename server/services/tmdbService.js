@@ -15,7 +15,6 @@ const DETAIL_CACHE_VERSION = 2
 class TmdbService {
   countMin = 50 // minimum vote count
   pageMax = 500 // TMDB 400s on a higher page
-  countMax = 2 ** 31 - 2 // at INT32_MAX TMDB drops the vote floor and returns everything
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc
@@ -149,7 +148,6 @@ class TmdbService {
 
     return {
       pageMax: this.pageMax,
-      countMax: this.countMax,
       sorts: tv ? this.sortingOptions.shows : this.sortingOptions.movies,
       genres: tv ? this.genres.show : this.genres.movie,
       ratings: tv ? undefined : this.ratings

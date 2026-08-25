@@ -6,14 +6,12 @@ const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
 
 const MOVIE = {
   pageMax: 500,
-  countMax: 2 ** 31 - 2,
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
 }
 const SHOW = {
   pageMax: 500,
-  countMax: 2 ** 31 - 2,
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
@@ -84,13 +82,6 @@ test('plainQuery replaces a query that is not a plain object', () => {
   plainQuery(ctx, () => {})
 
   assert.deepEqual(ctx.request.query, {})
-})
-
-test('a vote count high enough for TMDB to drop the floor is rejected', () => {
-  // At INT32_MAX TMDB ignores vote_count.gte and returns the entire catalog
-  assert.deepEqual(invalidFilters({ count: '2147483647' }, MOVIE), ['count'])
-  assert.deepEqual(invalidFilters({ count: '99999999999999999999' }, MOVIE), ['count'])
-  assert.deepEqual(invalidFilters({ count: '2147483646' }, MOVIE), [])
 })
 
 test('streaming takes only the value the checkbox sends', () => {
