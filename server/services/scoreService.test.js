@@ -26,8 +26,7 @@ function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {
     calls.count++
-    const host = Object.keys(routes).find(name => new URL(url).host.endsWith(name))
-    return routes[host]?.() ?? new Response('', { status: 404 })
+    return routes[new URL(url).host]?.() ?? new Response('', { status: 404 })
   }
   return calls
 }
@@ -115,9 +114,9 @@ test('a healthy response is not retried', async () => {
 // Redis is never connected here, so reads miss and the write is a no-op.
 test('the aggregate is a rounded integer, not the raw mean', async () => {
   const calls = stubHosts({
-    'wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'rottentomatoes.com': rtScorecard(50, 85),
-    'metacritic.com': () => ok(LD(52))
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
@@ -147,9 +146,9 @@ test('a title with no resolvable source has no aggregate at all', async () => {
 // "No page for this title" and "would not answer" must not be recorded alike: one is worth re-asking
 test('a score missing a source that refused expires early', async () => {
   stubHosts({
-    'wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'rottentomatoes.com': () => new Response('', { status: 429 }),
-    'metacritic.com': () => ok(LD(52))
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => ok(LD(52))
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
@@ -163,9 +162,9 @@ test('a score missing a source that refused expires early', async () => {
 // A 404 is the title's own answer, so the thinner score is settled and keeps the full life
 test('a score missing a source that has no page keeps the full life', async () => {
   stubHosts({
-    'wikidata.org': wikidata('m/nope', 'movie/inception'),
-    'rottentomatoes.com': () => new Response('', { status: 404 }),
-    'metacritic.com': () => ok(LD(52))
+    'www.wikidata.org': wikidata('m/nope', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
@@ -180,9 +179,9 @@ test('a score missing a source that has no page keeps the full life', async () =
 test('a block on any status shortens the record, a 404 does not', async () => {
   for (const status of [403, 406, 429, 451, 503]) {
     stubHosts({
-      'wikidata.org': wikidata('m/inception', 'movie/inception'),
-      'rottentomatoes.com': () => new Response('', { status }),
-      'metacritic.com': () => ok(LD(52))
+      'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+      'www.rottentomatoes.com': () => new Response('', { status }),
+      'www.metacritic.com': () => ok(LD(52))
     })
 
     await scoreService.getScore(`test/movie/${status}`, {
@@ -195,7 +194,7 @@ test('a block on any status shortens the record, a 404 does not', async () => {
 
 // A Wikidata timeout leaves no slugs, so the score is missing sources rather than lacking them
 test('a slug lookup that never answered shortens the record too', async () => {
-  globalThis.fetch = async url => new URL(url).host.endsWith('wikidata.org')
+  globalThis.fetch = async url => new URL(url).host === 'www.wikidata.org'
     ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
     : new Response('', { status: 404 })
 
