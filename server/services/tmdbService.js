@@ -14,6 +14,7 @@ const DETAIL_CACHE_VERSION = 2
 
 class TmdbService {
   countMin = 50 // minimum vote count
+  pageMax = 500 // TMDB 400s on a higher page
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
   includeVideo = false // "video" content is not theatrically released and may include: compilations, sport events, concerts, plays, fitness video, how-to, etc
@@ -140,16 +141,30 @@ class TmdbService {
     return ratings
   }
 
+  // Vocabularies the filter validator checks against. TMDB 400s on the other type's sort key and
+  // a genre id is looked up in this type's map; an omitted rule leaves that param unjudged.
+  filterRules(mediaType) {
+    const tv = mediaType === 'tv'
+
+    return {
+      pageMax: this.pageMax,
+      sorts: tv ? this.sortingOptions.shows : this.sortingOptions.movies,
+      genres: tv ? this.genres.show : this.genres.movie,
+      ratings: tv ? undefined : this.ratings
+    }
+  }
+
   async getMovies(query) {
     const params = {
-      // TODO: these params were based on deprecated filter and should be revisited
-      page: query?.page ?? 1,
+      // TMDB silently ignores `certification` without `certification_country`, and
+      // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.
+      page: query?.page || 1,
       include_adult: this.includeAdult,
       include_video: this.includeVideo,
-      sort_by: query?.sort ?? this.sortingOptions.movies[0].value,
+      sort_by: query?.sort || this.sortingOptions.movies[0].value,
       'primary_release_date.lte': new Date().toISOString().substring(0, 10),
       'primary_release_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
-      'vote_count.gte': query?.count ?? this.countMin,
+      'vote_count.gte': query?.count || this.countMin,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: query?.wog,
       certification: Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr,
@@ -311,13 +326,13 @@ class TmdbService {
   }
   async getTvShows(query) {
     const params = {
-      // TODO: these params were based on deprecated filter and should be revisited
-      page: query?.page ?? 1,
+      // `with_watch_monetization_types` needs `watch_region` to have any effect
+      page: query?.page || 1,
       include_adult: this.includeAdult,
-      sort_by: query?.sort ?? this.sortingOptions.shows[0].value,
+      sort_by: query?.sort || this.sortingOptions.shows[0].value,
       'first_air_date.lte': new Date().toISOString().substring(0, 10),
       'first_air_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
-      'vote_count.gte': query?.count ?? this.countMin,
+      'vote_count.gte': query?.count || this.countMin,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: query?.wog,
       watch_region: this.region,

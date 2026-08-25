@@ -1,0 +1,105 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { invalidFilters } from './filters.js'
+
+const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
+
+const MOVIE = {
+  pageMax: 500,
+  sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
+  genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
+  ratings: MOVIE_RATINGS
+}
+const SHOW = {
+  pageMax: 500,
+  sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
+  genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
+}
+
+test('a request from the filter panel passes', () => {
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on' }
+
+  assert.deepEqual(invalidFilters(query, MOVIE), [])
+})
+
+test('page must be within the range TMDB serves', () => {
+  for (const page of ['0', '-1', '501', 'abc', '1.5', 'gravitysmtp-settings']) {
+    assert.deepEqual(invalidFilters({ page }, MOVIE), ['page'], page)
+  }
+  assert.deepEqual(invalidFilters({ page: '500' }, MOVIE), [])
+})
+
+test('a sort key belonging to the other media type is rejected', () => {
+  assert.deepEqual(invalidFilters({ sort: 'first_air_date.desc' }, MOVIE), ['sort'])
+  assert.deepEqual(invalidFilters({ sort: 'primary_release_date.desc' }, SHOW), ['sort'])
+})
+
+test('a genre id absent from this media type is rejected', () => {
+  // 27 is Horror for film; TMDB has no such genre for television
+  assert.deepEqual(invalidFilters({ wg: '27' }, SHOW), ['wg'])
+  assert.deepEqual(invalidFilters({ wg: '99999' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wog: 'notanumber' }, MOVIE), ['wog'])
+})
+
+test('repeated and comma-joined values are each checked', () => {
+  assert.deepEqual(invalidFilters({ wg: ['27', '878'] }, MOVIE), [])
+  assert.deepEqual(invalidFilters({ wg: '27,878' }, MOVIE), [])
+  assert.deepEqual(invalidFilters({ wg: ['27', '99999'] }, MOVIE), ['wg'])
+})
+
+test('a filter the panel only sends once is rejected when repeated', () => {
+  // Two of them reach the view as an array, which no sort option can match
+  assert.deepEqual(invalidFilters({ sort: ['popularity.desc', 'popularity.desc'] }, MOVIE), ['sort'])
+  assert.deepEqual(invalidFilters({ page: ['1', '2'] }, MOVIE), ['page'])
+  assert.deepEqual(invalidFilters({ page: '1,2' }, MOVIE), ['page'])
+})
+
+test('a repeated __proto__ is rejected, prototype and all', () => {
+  // Built the way Koa's parser does: a plain object, then `obj[key] = values`, which for
+  // `__proto__` with two values goes through the setter and replaces the prototype
+  const query = {}
+  query.__proto__ = ['0', '0']
+
+  assert.deepEqual(Object.keys(query), [], 'the key does not appear as a property')
+  assert.equal(typeof query.sort, 'function', 'this is the value that used to reach TMDB')
+  assert.deepEqual(invalidFilters(query, MOVIE), ['__proto__'])
+})
+
+test('a blank among several values is rejected, though a lone blank means absent', () => {
+  assert.deepEqual(invalidFilters({ wg: ['', ''] }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wg: '27,' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wg: '' }, MOVIE), [])
+})
+
+test('a param named after an Object.prototype member is not treated as a check', () => {
+  for (const name of ['hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable', '__defineGetter__', 'constructor', 'toString']) {
+    assert.deepEqual(invalidFilters({ [name]: '1' }, MOVIE), [], name)
+  }
+})
+
+test('a genre id must be plain digits, like the id route param', () => {
+  // `+'0x1b'` is 27, which passes the lookup and then renders a genre TMDB was never sent
+  assert.deepEqual(invalidFilters({ wg: '0x1b' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wg: '2.7e1' }, MOVIE), ['wg'])
+  assert.deepEqual(invalidFilters({ wog: '+27' }, MOVIE), ['wog'])
+})
+
+test('an empty value counts as absent, matching what the services send', () => {
+  assert.deepEqual(invalidFilters({ sort: '', wg: '', page: '', wr: '' }, MOVIE), [])
+})
+
+test('params we do not use are left alone', () => {
+  const query = { rest_route: '/gravitysmtp/v1/tests/mock-data', utm_source: 'x', wog: '27' }
+
+  assert.deepEqual(invalidFilters(query, MOVIE), [])
+})
+
+test('certifications are checked only where the route sends them', () => {
+  assert.deepEqual(invalidFilters({ wr: 'BOGUS' }, MOVIE), ['wr'])
+  // The TV route neither fetches nor sends TV certifications, so it cannot judge one
+  assert.deepEqual(invalidFilters({ wr: 'TV-MA' }, SHOW), [])
+})
+
+test('every offending param is named, not just the first', () => {
+  assert.deepEqual(invalidFilters({ page: '0', sort: 'nonsense', wg: '5' }, MOVIE), ['page', 'sort', 'wg'])
+})
