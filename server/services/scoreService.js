@@ -74,7 +74,10 @@ class ScoreService {
       }
 
       const sources = Object.keys(scores)
-      const score = { avgScore: average(Object.values(scores)), scores }
+      const mean = average(Object.values(scores))
+      // Round, so the number shown and the number sorted on agree
+      // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
+      const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
         log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
