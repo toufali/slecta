@@ -166,7 +166,7 @@ class TmdbService {
       'primary_release_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
       'vote_count.gte': query?.count || this.countMin,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
-      without_genres: query?.wog,
+      without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
       certification: Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr,
       certification_country: this.region,
       watch_region: this.region,
@@ -334,7 +334,7 @@ class TmdbService {
       'first_air_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
       'vote_count.gte': query?.count || this.countMin,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
-      without_genres: query?.wog,
+      without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
       watch_region: this.region,
       with_watch_monetization_types: query?.streaming ? 'buy|free|flatrate|rent|ads' : ''
     }
