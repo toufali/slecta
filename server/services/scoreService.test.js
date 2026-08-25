@@ -237,3 +237,21 @@ test('a page with no whole-title block shortens the record', async () => {
   assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
 })
 
+// Caching an unanswered guess would outlive the score's retry window, so the rebuild an hour
+// later would find the same thin data and give it a full life
+test('an unanswered slug lookup is not cached, so the retry re-asks', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => new Response('', { status: 429 })
+  })
+
+  // A key of its own: the recorded writes are shared across tests in this file
+  await scoreService.getScore('test/movie/noslug', {
+    tmdbScore: 67, wikiId: 'Q777', title: 'Nothing Answers', releaseDate: '2026-01-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
+  assert.equal(ttlOf('slugs/movie/Q777/Nothing Answers/2026-01-01'), undefined)
+})
+

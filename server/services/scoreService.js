@@ -174,10 +174,9 @@ class ScoreService {
       if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), attempt)
       if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], attempt, '/')
 
-      // A slug nobody answered about is not a known miss, so it expires with the misses
-      const settled = (slugs.rt || slugs.mc) && !attempt.incomplete
-
-      redis.setCache(key, slugs, settled ? SLUG_TTL : SLUG_MISS_TTL)
+      // Only cache what a source answered. Storing an unanswered guess would outlive the score's
+      // retry window and hand the same thin score a full life on the next rebuild.
+      if (!attempt.incomplete) redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error resolving slugs', { title, mediaType, error: e })
