@@ -5,13 +5,13 @@ import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
 const SCORE_TTL = 60 * 60 * 48 // 48 hours
-const PARTIAL_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
+const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
-const ANSWERED = new Set([404, 410]) // the title has no page here; any other failure is ours to retry
+const NO_SUCH_PAGE = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -53,8 +53,8 @@ class ScoreService {
 
     const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
-    // Carried down so the write can tell "the title has no RT page" from "RT would not say"
-    const attempt = { partial: false }
+    // Carried down so the write can tell "the title has no RT page" from "RT would not answer"
+    const attempt = { incomplete: false }
 
     try {
       const slugs = await this.#getSlugs(wikiId, title, releaseDate, mediaType, attempt)
@@ -88,13 +88,13 @@ class ScoreService {
         log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
       }
 
-      // Expire it soon: the source is missing for our reasons, not the title's
-      // Still cached, so a host already refusing us is not asked again by every visitor
-      if (attempt.partial) log.warn('Score is partial, expiring it early', { key, title })
+      // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
+      // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
+      if (attempt.incomplete) log.warn('Score is missing a source it could not read', { key, title })
 
       // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
       // `cached` mirrors getCache's `cacheHit` flag.
-      const cached = await redis.setCache(key, score, attempt.partial ? PARTIAL_TTL : SCORE_TTL)
+      const cached = await redis.setCache(key, score, attempt.incomplete ? SCORE_RETRY_TTL : SCORE_TTL)
 
       Object.defineProperty(score, 'cached', { value: Boolean(cached) })
 
@@ -125,7 +125,7 @@ class ScoreService {
 
       return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score) }
     } catch (e) {
-      attempt.partial = true
+      attempt.incomplete = true
       log.warn('Error getting RT scores', { path, error: e })
     }
   }
@@ -145,7 +145,7 @@ class ScoreService {
         if (MC_TYPES.includes(type) && aggregateRating?.ratingValue != null) return toScore(aggregateRating.ratingValue)
       }
     } catch (e) {
-      attempt.partial = true
+      attempt.incomplete = true
       log.warn('Error getting Metacritic score', { path, error: e })
     }
   }
@@ -171,10 +171,11 @@ class ScoreService {
       if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], attempt, '/')
 
       // A slug nobody answered about is not a known miss, so it expires with the misses
-      const settled = (slugs.rt || slugs.mc) && !attempt.partial
+      const settled = (slugs.rt || slugs.mc) && !attempt.incomplete
 
       redis.setCache(key, slugs, settled ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
+      attempt.incomplete = true
       log.warn('Error resolving slugs', { title, mediaType, error: e })
     }
 
@@ -195,8 +196,8 @@ class ScoreService {
 
     const match = candidates.find((path, i) => settled[i].value?.ok)
 
-    // Only a clean 404 tells us a guessed slug is wrong; anything else went unanswered
-    if (!match && settled.some(result => !ANSWERED.has(result.value?.status))) {
+    // Only a "no such page" answer tells us a guessed slug is wrong; anything else went unanswered
+    if (!match && settled.some(result => !NO_SUCH_PAGE.has(result.value?.status))) {
       this.#unreadable(attempt, baseUrl, { reason: 'probe went unanswered' })
     }
 
@@ -226,7 +227,7 @@ class ScoreService {
 
   // Returns undefined like any other miss; the flag is what shortens the record's life
   #unreadable(attempt, url, fields) {
-    attempt.partial = true
+    attempt.incomplete = true
     log.warn('Source could not be read', { host: new URL(url).host, ...fields })
   }
 
@@ -256,7 +257,7 @@ class ScoreService {
 
       // Blocks arrive as whatever status a CDN picked — 403, 429, a challenge, even a 2xx — so
       // trust only the two that say the page is gone, and read anything else as prevented
-      if (ANSWERED.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
+      if (NO_SUCH_PAGE.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
 
       return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
     }

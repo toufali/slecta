@@ -193,3 +193,16 @@ test('a block on any status shortens the record, a 404 does not', async () => {
   }
 })
 
+// A Wikidata timeout leaves no slugs, so the score is missing sources rather than lacking them
+test('a slug lookup that never answered shortens the record too', async () => {
+  globalThis.fetch = async url => String(url).includes('wikidata.org')
+    ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
+    : new Response('', { status: 404 })
+
+  await scoreService.getScore('test/movie/slugfail', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/slugfail'), 60 * 60)
+})
+
