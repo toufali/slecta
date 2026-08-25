@@ -53,7 +53,8 @@ class ScoreService {
 
     const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
-    // Carried down so the write can tell "the title has no RT page" from "RT would not answer"
+    // Carried down so the write can tell "the title has no RT page" from "RT would not answer".
+    // Anything that drops a source for our reasons sets it, and both cache writes below read it.
     const attempt = { incomplete: false }
 
     try {
@@ -104,6 +105,8 @@ class ScoreService {
     }
   }
 
+  // No `attempt` here: a missing dataset reads the same however soon we ask again, and only the
+  // nightly refresh can fix it — which alerts on its own
   async getIMDBScore(imdbId) {
     const rating = await imdb.getRating(imdbId)
     return rating && Math.round(rating.rating * 10) // adjusted to 100 scale
