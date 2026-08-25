@@ -18,6 +18,8 @@ const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the tit
 // sustained outage would otherwise starve the pool. Cleanup must never mask a real error.
 const discard = res => res?.body?.cancel().catch(() => {})
 
+const parseJson = value => { try { return JSON.parse(value) } catch { return null } }
+
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
 
@@ -142,7 +144,9 @@ class ScoreService {
       if (!html) return
 
       const blocks = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
-      const titles = blocks.map(([, block]) => JSON.parse(block)).filter(item => MC_TYPES.includes(item['@type']))
+
+      // Parsed leniently: an unrelated malformed block should not discard a rating we did find
+      const titles = blocks.map(([, block]) => parseJson(block)).filter(item => MC_TYPES.includes(item?.['@type']))
 
       // No whole-title block means this is not the page we think it is, however it answered.
       // A block with no rating is the title's own answer: Metacritic has no Metascore yet.
@@ -167,19 +171,23 @@ class ScoreService {
     const prefixes = PATHS[mediaType] ?? PATHS.movie
     const slugs = {}
 
+    // Local, because Wikidata going quiet costs nothing if a probe resolves the slug anyway
+    const lookup = { incomplete: false }
+
     try {
       if (wikiId) {
-        const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, attempt)
+        const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, lookup)
         slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
         slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content
       }
 
-      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), attempt)
-      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], attempt, '/')
+      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), lookup)
+      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], lookup, '/')
 
-      // Only cache what a source answered. Storing an unanswered guess would outlive the score's
-      // retry window and hand the same thin score a full life on the next rebuild.
-      if (!attempt.incomplete) redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
+      // A slug still missing after something went unanswered is unknown, not absent, so the
+      // score it feeds is short a source and neither result is worth storing
+      if (lookup.incomplete && (!slugs.rt || !slugs.mc)) attempt.incomplete = true
+      else redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error resolving slugs', { title, mediaType, error: e })

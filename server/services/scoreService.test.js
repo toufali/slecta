@@ -270,3 +270,38 @@ test('an empty body shortens the record despite the status', async () => {
   assert.equal(ttlOf('test/movie/empty'), 60 * 60)
 })
 
+// Wikidata rate-limits readily, and it is only a shortcut: if the probes resolve both slugs and
+// both sources answer, nothing is missing and the record deserves its full life
+test('a Wikidata blip does not shorten a score the probes resolved', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/wikiblip', {
+    tmdbScore: 67, wikiId: 'Q42', title: 'Probed Fine', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+  assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
+  assert.ok(ttlOf('slugs/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
+})
+
+// A malformed sibling block used to throw and discard a rating that had already been found
+test('a malformed JSON-LD block does not lose a rating', async () => {
+  const mixed = () => ok(`<script type="application/ld+json">{"@type":"Movie","aggregateRating":{"ratingValue":52}}</script><script type="application/ld+json">{ not json </script>`)
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': mixed
+  })
+
+  const score = await scoreService.getScore('test/movie/mixedld', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.metacritic, 52)
+  assert.equal(ttlOf('test/movie/mixedld'), 60 * 60 * 48)
+})
+
