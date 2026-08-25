@@ -11,7 +11,7 @@ const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
-const REFUSED = new Set([403, 429]) // declining to answer, rather than answering about the title
+const ANSWERED = new Set([404, 410]) // the title has no page here; any other failure is ours to retry
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -195,8 +195,8 @@ class ScoreService {
 
     const match = candidates.find((path, i) => settled[i].value?.ok)
 
-    // A probe that was refused, faulted or timed out says nothing about whether the slug exists
-    if (!match && settled.some(result => !result.value || REFUSED.has(result.value.status) || result.value.status >= 500)) {
+    // Only a clean 404 tells us a guessed slug is wrong; anything else went unanswered
+    if (!match && settled.some(result => !ANSWERED.has(result.value?.status))) {
       this.#unreadable(attempt, baseUrl, { reason: 'probe went unanswered' })
     }
 
@@ -251,14 +251,14 @@ class ScoreService {
       res = await this.#fetch(url)
     }
 
-    if (REFUSED.has(res.status) || res.status >= 500) {
-      await discard(res)
-      return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
-    }
-
     if (!res.ok) {
       await discard(res)
-      return log.warn('Source has no page for this title', { url, status: res.status })
+
+      // Blocks arrive as whatever status a CDN picked — 403, 429, a challenge, even a 2xx — so
+      // trust only the two that say the page is gone, and read anything else as prevented
+      if (ANSWERED.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
+
+      return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
     }
 
     return await parse(res)

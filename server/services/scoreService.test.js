@@ -176,3 +176,20 @@ test('a score missing a source that has no page keeps the full life', async () =
   assert.equal(ttlOf('test/movie/27205'), 60 * 60 * 48)
 })
 
+// A block arrives as whatever status the CDN in front of the source happens to use
+test('a block on any status shortens the record, a 404 does not', async () => {
+  for (const status of [403, 406, 429, 451, 503]) {
+    stubHosts({
+      'wikidata.org': wikidata('m/inception', 'movie/inception'),
+      'rottentomatoes.com': () => new Response('', { status }),
+      'metacritic.com': () => ok(LD(52))
+    })
+
+    await scoreService.getScore(`test/movie/${status}`, {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(ttlOf(`test/movie/${status}`), 60 * 30, `status ${status}`)
+  }
+})
+
