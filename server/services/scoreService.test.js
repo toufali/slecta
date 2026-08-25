@@ -7,6 +7,12 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: scoreService } = await import('./scoreService.js')
+const { default: redis } = await import('./redisService.js')
+
+// Redis is never connected here, so the write is recorded rather than made
+const writes = new Map()
+redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, ttl))
+const ttlOf = key => writes.get(key)
 
 const LD = value => `<script type="application/ld+json">${JSON.stringify({
   '@type': 'Movie', aggregateRating: { ratingValue: value }
@@ -20,8 +26,7 @@ function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {
     calls.count++
-    const host = Object.keys(routes).find(name => String(url).includes(name))
-    return routes[host]?.() ?? new Response('', { status: 404 })
+    return routes[new URL(url).host]?.() ?? new Response('', { status: 404 })
   }
   return calls
 }
@@ -109,9 +114,9 @@ test('a healthy response is not retried', async () => {
 // Redis is never connected here, so reads miss and the write is a no-op.
 test('the aggregate is a rounded integer, not the raw mean', async () => {
   const calls = stubHosts({
-    'wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'rottentomatoes.com': rtScorecard(50, 85),
-    'metacritic.com': () => ok(LD(52))
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
@@ -137,3 +142,166 @@ test('a title with no resolvable source has no aggregate at all', async () => {
   assert.deepEqual(score.scores, {})
   assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
 })
+
+// "No page for this title" and "would not answer" must not be recorded alike: one is worth re-asking
+test('a score missing a source that refused expires early', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/27205', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.equal(ttlOf('test/movie/27205'), 60 * 60)
+})
+
+// A 404 is the title's own answer, so the thinner score is settled and keeps the full life
+test('a score missing a source that has no page keeps the full life', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/nope', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/27205', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.equal(ttlOf('test/movie/27205'), 60 * 60 * 48)
+})
+
+// A block arrives as whatever status the CDN in front of the source happens to use
+test('a block on any status shortens the record, a 404 does not', async () => {
+  for (const status of [403, 406, 429, 451, 503]) {
+    stubHosts({
+      'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+      'www.rottentomatoes.com': () => new Response('', { status }),
+      'www.metacritic.com': () => ok(LD(52))
+    })
+
+    await scoreService.getScore(`test/movie/${status}`, {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(ttlOf(`test/movie/${status}`), 60 * 60, `status ${status}`)
+  }
+})
+
+// A Wikidata timeout leaves no slugs, so the score is missing sources rather than lacking them
+test('a slug lookup that never answered shortens the record too', async () => {
+  globalThis.fetch = async url => new URL(url).host === 'www.wikidata.org'
+    ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
+    : new Response('', { status: 404 })
+
+  await scoreService.getScore('test/movie/slugfail', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/slugfail'), 60 * 60)
+})
+
+// Half of the Metacritic pages that answer have no Metascore yet, which is the title's own answer
+test('a Metacritic page with no Metascore keeps the full life', async () => {
+  const unrated = () => ok('<script type="application/ld+json">{"@type":"Movie","name":"x"}</script>')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': unrated
+  })
+
+  await scoreService.getScore('test/movie/unrated', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/unrated'), 60 * 60 * 48)
+})
+
+// A challenge page answers 200 and parses; the absence of a whole-title block is the tell
+test('a page with no whole-title block shortens the record', async () => {
+  const challenge = () => ok('<script type="application/ld+json">{"@type":"WebPage"}</script>')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': challenge
+  })
+
+  await scoreService.getScore('test/movie/challenge', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
+})
+
+// Caching an unanswered guess would outlive the score's retry window, so the rebuild an hour
+// later would find the same thin data and give it a full life
+test('an unanswered slug lookup is not cached, so the retry re-asks', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => new Response('', { status: 429 })
+  })
+
+  // A key of its own: the recorded writes are shared across tests in this file
+  await scoreService.getScore('test/movie/noslug', {
+    tmdbScore: 67, wikiId: 'Q777', title: 'Nothing Answers', releaseDate: '2026-01-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
+  assert.equal(ttlOf('slugs/movie/Q777/Nothing Answers/2026-01-01'), undefined)
+})
+
+// A 200 with nothing in it is not a page either, and some proxies answer that way on error
+test('an empty body shortens the record despite the status', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => ok(''),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  await scoreService.getScore('test/movie/empty', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(ttlOf('test/movie/empty'), 60 * 60)
+})
+
+// Wikidata rate-limits readily, and it is only a shortcut: if the probes resolve both slugs and
+// both sources answer, nothing is missing and the record deserves its full life
+test('a Wikidata blip does not shorten a score the probes resolved', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/wikiblip', {
+    tmdbScore: 67, wikiId: 'Q42', title: 'Probed Fine', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+  assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
+  assert.ok(ttlOf('slugs/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
+})
+
+// A malformed sibling block used to throw and discard a rating that had already been found
+test('a malformed JSON-LD block does not lose a rating', async () => {
+  const mixed = () => ok(`<script type="application/ld+json">{"@type":"Movie","aggregateRating":{"ratingValue":52}}</script><script type="application/ld+json">{ not json </script>`)
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': mixed
+  })
+
+  const score = await scoreService.getScore('test/movie/mixedld', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.metacritic, 52)
+  assert.equal(ttlOf('test/movie/mixedld'), 60 * 60 * 48)
+})
+

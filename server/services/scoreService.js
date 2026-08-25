@@ -5,16 +5,20 @@ import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
 const SCORE_TTL = 60 * 60 * 48 // 48 hours
+const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
+const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
 // sustained outage would otherwise starve the pool. Cleanup must never mask a real error.
 const discard = res => res?.body?.cancel().catch(() => {})
+
+const parseJson = value => { try { return JSON.parse(value) } catch { return null } }
 
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
@@ -51,12 +55,16 @@ class ScoreService {
 
     const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
+    // Carried down so the write can tell "the title has no RT page" from "RT would not answer".
+    // Anything that drops a source for our reasons sets it, and both cache writes below read it.
+    const attempt = { incomplete: false }
+
     try {
-      const slugs = await this.#getSlugs(wikiId, title, releaseDate, mediaType)
+      const slugs = await this.#getSlugs(wikiId, title, releaseDate, mediaType, attempt)
       const [imdbScore, rtScores, mcScore] = await Promise.all([
         this.getIMDBScore(imdbId),
-        this.getRTScores(slugs?.rt),
-        this.getMetacriticScore(slugs?.mc)
+        this.getRTScores(slugs?.rt, attempt),
+        this.getMetacriticScore(slugs?.mc, attempt)
       ])
 
       // Omitted rather than nulled, so key count is source count
@@ -83,9 +91,13 @@ class ScoreService {
         log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
       }
 
+      // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
+      // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
+      if (attempt.incomplete) log.warn('Score is missing a source it could not read', { key, title })
+
       // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
       // `cached` mirrors getCache's `cacheHit` flag.
-      const cached = await redis.setCache(key, score, SCORE_TTL)
+      const cached = await redis.setCache(key, score, attempt.incomplete ? SCORE_RETRY_TTL : SCORE_TTL)
 
       Object.defineProperty(score, 'cached', { value: Boolean(cached) })
 
@@ -95,6 +107,8 @@ class ScoreService {
     }
   }
 
+  // No `attempt` here: a missing dataset reads the same however soon we ask again, and only the
+  // nightly refresh can fix it — which alerts on its own
   async getIMDBScore(imdbId) {
     const rating = await imdb.getRating(imdbId)
     return rating && Math.round(rating.rating * 10) // adjusted to 100 scale
@@ -102,11 +116,11 @@ class ScoreService {
 
   // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
   // A `tv/<slug>` path with no season suffix returns RT's cross-season average, not one season's.
-  async getRTScores(path) {
+  async getRTScores(path, attempt = {}) {
     if (!path) return
 
     try {
-      const html = await this.#fetchText(RT_BASE_URL + path)
+      const html = await this.#fetchText(RT_BASE_URL + path, attempt)
       if (!html) return
 
       const json = html.match(/<script[^>]+id="media-scorecard-json"[^>]*>([\s\S]*?)<\/script>/)
@@ -116,31 +130,39 @@ class ScoreService {
 
       return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score) }
     } catch (e) {
+      attempt.incomplete = true
       log.warn('Error getting RT scores', { path, error: e })
     }
   }
 
   // Metascore ships as standard schema.org JSON-LD
-  async getMetacriticScore(path) {
+  async getMetacriticScore(path, attempt = {}) {
     if (!path) return
 
     try {
-      const html = await this.#fetchText(`${MC_BASE_URL}${path}/`)
+      const html = await this.#fetchText(`${MC_BASE_URL}${path}/`, attempt)
       if (!html) return
 
-      const blocks = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)
+      const blocks = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
 
-      for (const [, block] of blocks) {
-        const { '@type': type, aggregateRating } = JSON.parse(block)
-        if (MC_TYPES.includes(type) && aggregateRating?.ratingValue != null) return toScore(aggregateRating.ratingValue)
-      }
+      // Parsed leniently: an unrelated malformed block should not discard a rating we did find
+      const titles = blocks.map(([, block]) => parseJson(block)).filter(item => MC_TYPES.includes(item?.['@type']))
+
+      // No whole-title block means this is not the page we think it is, however it answered.
+      // A block with no rating is the title's own answer: Metacritic has no Metascore yet.
+      if (!titles.length) attempt.incomplete = true
+
+      const rated = titles.find(item => item.aggregateRating?.ratingValue != null)
+
+      return toScore(rated?.aggregateRating.ratingValue)
     } catch (e) {
+      attempt.incomplete = true
       log.warn('Error getting Metacritic score', { path, error: e })
     }
   }
 
   // One Wikidata call yields both slugs; guessing is only a fallback for items it lacks.
-  async #getSlugs(wikiId, title, releaseDate, mediaType) {
+  async #getSlugs(wikiId, title, releaseDate, mediaType, attempt) {
     const key = `slugs/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
 
@@ -149,19 +171,25 @@ class ScoreService {
     const prefixes = PATHS[mediaType] ?? PATHS.movie
     const slugs = {}
 
+    // Local, because Wikidata going quiet costs nothing if a probe resolves the slug anyway
+    const lookup = { incomplete: false }
+
     try {
       if (wikiId) {
-        const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`)
+        const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, lookup)
         slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
         slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content
       }
 
-      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate))
-      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], '/')
+      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), lookup)
+      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], lookup, '/')
 
-      // An empty result may just be a transient failure, so it expires quickly rather than hiding a source for a month
-      redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
+      // A slug still missing after something went unanswered is unknown, not absent, so the
+      // score it feeds is short a source and neither result is worth storing
+      if (lookup.incomplete && (!slugs.rt || !slugs.mc)) attempt.incomplete = true
+      else redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
     } catch (e) {
+      attempt.incomplete = true
       log.warn('Error resolving slugs', { title, mediaType, error: e })
     }
 
@@ -175,12 +203,18 @@ class ScoreService {
     return Number.isFinite(year) ? [slug, `${slug}_${year}`] : [slug]
   }
 
-  async #probe(baseUrl, candidates, suffix = '') {
+  async #probe(baseUrl, candidates, attempt, suffix = '') {
     const settled = await Promise.allSettled(candidates.map(path =>
       this.#fetch(`${baseUrl}${path}${suffix}`, { method: 'HEAD' })
     ))
 
     const match = candidates.find((path, i) => settled[i].value?.ok)
+
+    // Only a not-found answer tells us a guessed slug is wrong; anything else went unanswered
+    if (!match && settled.some(result => !PAGE_NOT_FOUND.has(result.value?.status))) {
+      this.#unreadable(attempt, baseUrl, { reason: 'probe went unanswered' })
+    }
+
     await Promise.all(settled.map(result => discard(result.value)))
 
     return match
@@ -205,21 +239,25 @@ class ScoreService {
     return await send()
   }
 
-  async #fetchText(url) {
-    const res = await this.#fetch(url)
-
-    if (!res.ok) {
-      await discard(res)
-      return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
-    }
-
-    return await res.text()
+  // Returns undefined like any other miss; the flag is what shortens the record's life
+  #unreadable(attempt, url, fields) {
+    attempt.incomplete = true
+    log.warn('Source could not be read', { host: new URL(url).host, ...fields })
   }
 
-  // Retries once on 429; the nightly job walks titles back to back and Wikidata throttles it
-  async #fetchJson(url) {
+  #fetchText(url, attempt) {
+    return this.#read(url, attempt, res => res.text())
+  }
+
+  #fetchJson(url, attempt) {
+    return this.#read(url, attempt, res => res.json())
+  }
+
+  // An unreadable source reads as a miss to the caller, but is flagged so the record expires sooner
+  async #read(url, attempt, parse) {
     let res = await this.#fetch(url)
 
+    // Only a rate limit is worth waiting out; a 403 says the same thing however long we wait
     if (res.status === 429) {
       const retryAfter = Math.min(parseInt(res.headers.get('retry-after')) || 2, RETRY_AFTER_MAX)
 
@@ -230,10 +268,20 @@ class ScoreService {
 
     if (!res.ok) {
       await discard(res)
-      return log.warn('Fetch failed', { url, status: res.status, statusText: res.statusText })
+
+      // Blocks arrive as whatever status a CDN picked — 403, 429, a challenge, even a 2xx — so
+      // trust only the two that say the page is gone, and read anything else as prevented
+      if (PAGE_NOT_FOUND.has(res.status)) return log.warn('Source has no page for this title', { url, status: res.status })
+
+      return this.#unreadable(attempt, url, { status: res.status, statusText: res.statusText })
     }
 
-    return await res.json()
+    const body = await parse(res)
+
+    // An empty body is not a page we can read, whatever the status claimed
+    if (!body) return this.#unreadable(attempt, url, { status: res.status, reason: 'empty response' })
+
+    return body
   }
 }
 
