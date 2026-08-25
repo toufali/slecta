@@ -14,6 +14,19 @@ const LD = value => `<script type="application/ld+json">${JSON.stringify({
 
 const ok = body => new Response(body, { status: 200 })
 
+// Routes by host, since the RT and Metacritic reads run concurrently and their order is not fixed
+function stubHosts(routes) {
+  globalThis.fetch = async url => {
+    const host = Object.keys(routes).find(name => String(url).includes(name))
+    return routes[host] ?? new Response('', { status: 404 })
+  }
+}
+
+const wikidata = (rt, mc) => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
+const rtScorecard = (critic, audience) => ok(`<script id="media-scorecard-json">${JSON.stringify({
+  criticsScore: { score: critic }, audienceScore: { score: audience }
+})}</script>`)
+
 // Replaces global fetch with a queue of canned outcomes, and records the call count.
 function stubFetch(...outcomes) {
   const calls = { count: 0 }
@@ -85,4 +98,35 @@ test('a healthy response is not retried', async () => {
   const calls = stubFetch(ok(LD(74)))
   assert.equal(await scoreService.getMetacriticScore('movie/inception'), 74)
   assert.equal(calls.count, 1)
+})
+
+
+// The badge renders this number and lists order by it, so it has to be an integer or absent.
+// Redis is never connected here, so reads miss and the write is a no-op.
+test('the aggregate is a rounded integer, not the raw mean', async () => {
+  stubHosts({
+    'wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'rottentomatoes.com': rtScorecard(50, 85),
+    'metacritic.com': ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/27205', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  // (52 + 50 + 85 + 67) / 4 is 63.5
+  assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85, tmdb: 67 })
+  assert.equal(score.avgScore, 64)
+})
+
+// NaN serialises to null, which would order ahead of real scores and lose the badge placeholder
+test('a title with no resolvable source has no aggregate at all', async () => {
+  stubHosts({})
+
+  const score = await scoreService.getScore('test/movie/999', {
+    title: 'Nothing Resolves', releaseDate: '2026-01-01', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.scores, {})
+  assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
 })
