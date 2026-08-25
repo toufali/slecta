@@ -7,6 +7,12 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: scoreService } = await import('./scoreService.js')
+const { default: redis } = await import('./redisService.js')
+
+// Redis is never connected here, so the write is recorded rather than made
+const writes = new Map()
+redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, ttl))
+const ttlOf = key => writes.get(key)
 
 const LD = value => `<script type="application/ld+json">${JSON.stringify({
   '@type': 'Movie', aggregateRating: { ratingValue: value }
@@ -137,3 +143,36 @@ test('a title with no resolvable source has no aggregate at all', async () => {
   assert.deepEqual(score.scores, {})
   assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
 })
+
+// "No page for this title" and "would not answer" must not be recorded alike: one is worth re-asking
+test('a score missing a source that refused expires early', async () => {
+  stubHosts({
+    'wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'rottentomatoes.com': () => new Response('', { status: 429 }),
+    'metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/27205', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.equal(ttlOf('test/movie/27205'), 60 * 30)
+})
+
+// A 404 is the title's own answer, so the thinner score is settled and keeps the full life
+test('a score missing a source that has no page keeps the full life', async () => {
+  stubHosts({
+    'wikidata.org': wikidata('m/nope', 'movie/inception'),
+    'rottentomatoes.com': () => new Response('', { status: 404 }),
+    'metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/27205', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.equal(ttlOf('test/movie/27205'), 60 * 60 * 48)
+})
+
