@@ -19,14 +19,15 @@ export async function cacheScores() {
     log.error('IMDb ratings refresh failed, continuing with the previous dataset', { error: e })
   }
 
-  const [movies, shows] = await Promise.all([
-    tmdb.getMovies().then(data => data?.movies ?? []),
-    tmdb.getTvShows().then(data => data?.shows ?? [])
-  ])
+  // An empty batch reports as "nothing processed", which the coverage check already fails
+  const [movieList, showList] = await Promise.allSettled([tmdb.getMovies(), tmdb.getTvShows()])
+
+  if (movieList.reason) log.error('TMDB movie list lookup failed', { error: movieList.reason })
+  if (showList.reason) log.error('TMDB show list lookup failed', { error: showList.reason })
 
   const stats = [
-    await cacheScoresFor('movie', 'movies', movies),
-    await cacheScoresFor('tv', 'shows', shows)
+    await cacheScoresFor('movie', 'movies', movieList.value?.movies ?? []),
+    await cacheScoresFor('tv', 'shows', showList.value?.shows ?? [])
   ]
 
   const coverage = checkRunCoverage(stats, imdbRefreshed)
