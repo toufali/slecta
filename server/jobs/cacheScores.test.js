@@ -191,3 +191,25 @@ test('a title that throws is counted, and the run still finishes', async () => {
     restore()
   }
 })
+
+// The nastier half: with a page count coerced to 1, `expected` collapsed to one page's worth and
+// twenty titles read as the whole window
+test('a page count absent while the result count is present still reports short', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 500 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const errors = []
+  const realError = log.error
+
+  tmdb.getMovies = async () => ({ movies, totalResults: 538 }) // no totalPages
+  log.error = (message, fields) => errors.push({ message, fields })
+
+  try {
+    await cacheScores()
+
+    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies'),
+      `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
+  } finally {
+    log.error = realError
+    restore()
+  }
+})

@@ -52,3 +52,16 @@ for (const [label, method] of [['getMovies', 'getMovies'], ['getTvShows', 'getTv
   })
 }
 
+
+// Coercing an absent page count to 1 made twenty titles look like the whole window to the nightly
+// walk, so the absence has to stay visible for the job's completeness check to fire
+for (const method of ['getMovies', 'getTvShows']) {
+  test(`${method} leaves the page count unusable when TMDB omits total_pages`, async () => {
+    respond(200, JSON.stringify({ results: [], total_results: 538 }))
+
+    const data = await tmdb[method]()
+
+    assert.ok(!Number.isFinite(data.totalPages), `expected an unusable page count, got ${data.totalPages}`)
+    assert.equal(data.totalResults, 538)
+  })
+}

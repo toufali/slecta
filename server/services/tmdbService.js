@@ -217,8 +217,9 @@ class TmdbService {
     data.allSorting = this.sortingOptions.movies
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
-    // Clamped because TMDB rejects a page past this; `|| 1` because Math.min of undefined is NaN
-    data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
+    // Clamped because TMDB rejects a page past this. Left NaN when absent, so the job's
+    // completeness check fails loudly rather than accepting page one as the whole window.
+    data.totalPages = Math.min(json.total_pages, this.pageMax)
     data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
@@ -377,8 +378,9 @@ class TmdbService {
     data.allSorting = this.sortingOptions.shows
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
-    // Clamped because TMDB rejects a page past this; `|| 1` because Math.min of undefined is NaN
-    data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
+    // Clamped because TMDB rejects a page past this. Left NaN when absent, so the job's
+    // completeness check fails loudly rather than accepting page one as the whole window.
+    data.totalPages = Math.min(json.total_pages, this.pageMax)
     data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
