@@ -99,8 +99,8 @@ test('a page that fails does not cost the pages after it', async () => {
   }
 })
 
-// Scoring a fraction of the catalogue leaves every coverage rate looking healthy, so it has to
-// be loud. Counted before dedupe, so a lost page cannot hide behind a cross-page duplicate.
+// Scoring a fraction of the catalogue leaves every coverage rate looking healthy, so it has to be
+// loud. Judged on distinct titles, since a duplicate row is not a scored title.
 test('a catalogue that comes back short is reported at ERROR', async () => {
   const movies = [{ page: 1, id: 31, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
@@ -115,7 +115,7 @@ test('a catalogue that comes back short is reported at ERROR', async () => {
     const short = errors.find(e => e.message === 'TMDB list came back short')
 
     assert.ok(short, `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
-    assert.deepEqual(short.fields, { key: 'movies', got: 1, expected: 60 })
+    assert.deepEqual(short.fields, { key: 'movies', got: 1, totalPages: 3, totalResults: 60 })
   } finally {
     log.error = realError
     restore()
@@ -208,6 +208,51 @@ test('a page count absent while the result count is present still reports short'
 
     assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies'),
       `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
+  } finally {
+    log.error = realError
+    restore()
+  }
+})
+
+// Redis stores NaN as null, so a cached malformed response used to multiply out to an expectation
+// of zero and accept page one as the whole window
+test('cached metadata that came back as null is not treated as verifiable', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 700 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const errors = []
+  const realError = log.error
+
+  tmdb.getMovies = async () => ({ movies, totalPages: null, totalResults: 538 })
+  log.error = (message, fields) => errors.push({ message, fields })
+
+  try {
+    await cacheScores()
+
+    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies'),
+      `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
+  } finally {
+    log.error = realError
+    restore()
+  }
+})
+
+// Heavy duplication is how a truncated walk hides: the row count matches while distinct titles
+// fall far short, so counting rows would have passed this
+test('pages that repeat their titles report short despite a full row count', async () => {
+  const movies = [1, 2, 3].flatMap(page => Array.from({ length: 20 }, (_, i) => ({ page, id: 800 + (i % 10), releaseDate: '2026-01-01' })))
+  const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
+  const errors = []
+  const realError = log.error
+
+  log.error = (message, fields) => errors.push({ message, fields })
+
+  try {
+    await cacheScores()
+
+    const short = errors.find(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies')
+
+    assert.ok(short, '60 rows collapsing to 10 distinct titles is a truncated catalogue')
+    assert.equal(short.fields.got, 10)
   } finally {
     log.error = realError
     restore()

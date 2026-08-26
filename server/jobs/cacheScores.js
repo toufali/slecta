@@ -13,6 +13,9 @@ const SEGMENT = { movie: 'movies', tv: 'shows' }
 
 const TMDB_PAGE_SIZE = 20
 
+// Distinct titles a mid-walk insertion can duplicate away, shifting one row onto the next page
+const INSERTION_SLACK = 5
+
 export async function cacheScores() {
   log.info('cacheScores job started')
 
@@ -68,17 +71,21 @@ async function listAll(fetchPage, key) {
     }
   }
 
-  // Clamped to what the walk can reach: totalPages stops at pageMax, totalResults does not
-  const expected = Math.min(first.totalResults, first.totalPages * TMDB_PAGE_SIZE)
+  // The window is sorted by release date, so a title added mid-run can land on two pages
+  const unique = [...new Map(titles.map(title => [title.id, title])).values()]
+  const { totalPages, totalResults } = first
 
-  // A fraction of the catalogue leaves every coverage rate looking healthy. Counted before dedupe,
-  // so a duplicate is not read as a lost page; negated, so being unable to verify is not a pass.
-  if (!(titles.length >= expected)) {
-    log.error('TMDB list came back short', { key, got: titles.length, expected })
+  // A fraction of the catalogue leaves every coverage rate looking healthy. Judged on distinct
+  // titles, since a duplicate row is not a scored title, and on the reach of the walk, since
+  // totalPages stops at pageMax while totalResults does not. Metadata that is not a number fails
+  // too: absent caches as null, and multiplying that out would produce an expectation of zero.
+  const verifiable = Number.isFinite(totalPages) && Number.isFinite(totalResults)
+
+  if (!verifiable || unique.length < Math.min(totalResults, totalPages * TMDB_PAGE_SIZE) - INSERTION_SLACK) {
+    log.error('TMDB list came back short', { key, got: unique.length, totalPages, totalResults })
   }
 
-  // The window is sorted by release date, so a title added mid-run can land on two pages
-  return [...new Map(titles.map(title => [title.id, title])).values()]
+  return unique
 }
 
 async function cacheScoresFor(mediaType, titles) {
