@@ -70,8 +70,9 @@ async function listAll(fetchPage, key) {
   const unique = [...new Map(titles.map(title => [title.id, title])).values()]
 
   // Scoring a fraction of the catalogue leaves every coverage rate looking healthy, so say it
-  // loudly. Compared against titles rather than pages: the last page is a partial one.
-  if (unique.length < first.totalResults * 0.9) {
+  // loudly. Counted in titles, not pages, because the last page is a partial one. Negated rather
+  // than `<`, so a missing total_results fails too — being unable to verify is not a pass.
+  if (!(unique.length >= first.totalResults * 0.9)) {
     log.error('TMDB list came back short', { key, got: unique.length, expected: first.totalResults })
   }
 

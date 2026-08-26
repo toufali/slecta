@@ -31,6 +31,7 @@ steps:
 # third-party source is down, and gating on that would block the very deploy that fixes it.
 # `checks` rather than the full run: scoring 733 titles is ~1,460 throttled requests and six
 # minutes of build time, and it warms a cache the nightly run rewrites anyway.
+# --args replaces the job's own args rather than appending, so it has to repeat them.
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run', 'jobs', 'execute', 'cache-scores', '--wait', '--region', 'us-central1',

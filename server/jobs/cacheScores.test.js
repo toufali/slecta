@@ -121,3 +121,26 @@ test('a catalogue that comes back short is reported at ERROR', async () => {
     restore()
   }
 })
+
+// The reachable cause is a list object cached before the pagination fields existed, which would
+// defeat both the page walk and the check above it. The versioned list cache key is the fix; this
+// covers the fallback, because being unable to verify completeness must not read as complete.
+test('a list with no pagination metadata is reported, not treated as complete', async () => {
+  const movies = [{ page: 1, id: 41, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const errors = []
+  const realError = log.error
+
+  tmdb.getMovies = async () => ({ movies }) // no totalPages, no totalResults
+  log.error = (message, fields) => errors.push({ message, fields })
+
+  try {
+    await cacheScores()
+
+    assert.ok(errors.some(e => e.message === 'TMDB list came back short'),
+      `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
+  } finally {
+    log.error = realError
+    restore()
+  }
+})

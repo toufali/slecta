@@ -12,6 +12,10 @@ const headers = {
 // IMDb dataset and every score record, which are expensive to rebuild.
 const DETAIL_CACHE_VERSION = 2
 
+// Same idea for the list shape. The nightly job reads `totalPages`/`totalResults` off these
+// objects, and an entry written before they existed would silently limit the run to page one.
+const LIST_CACHE_VERSION = 1
+
 class TmdbService {
   countMin = 50 // minimum vote count
   pageMax = 500 // TMDB 400s on a higher page
@@ -181,7 +185,7 @@ class TmdbService {
 
     const urlParams = new URLSearchParams(params)
     const url = `${TMDB_API_URL}/discover/movie?${urlParams}`
-    const cacheKey = `movies?${urlParams}`
+    const cacheKey = `movies/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
     if (data) return data
@@ -344,7 +348,7 @@ class TmdbService {
 
     const urlParams = new URLSearchParams(params)
     const url = `${TMDB_API_URL}/discover/tv?${urlParams}`
-    const cacheKey = `shows?${urlParams}`
+    const cacheKey = `shows/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
     if (data) return data
