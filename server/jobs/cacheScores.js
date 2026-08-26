@@ -4,7 +4,7 @@ import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import log from '../utils/logger.js'
-import { checkReferenceTitles, checkRunCoverage } from './verify.js'
+import { checkReferenceTitles, checkRunCoverage } from './checks.js'
 
 export async function cacheScores() {
   log.info('cacheScores job started')

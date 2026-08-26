@@ -73,7 +73,7 @@ async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
     if (!detail[field]) failures.push({ title: name, source: field, reason: 'detail field empty' })
   }
 
-  const result = await scoreService.getScore(`verify/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
+  const result = await scoreService.getScore(`checks/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
 
   for (const [source, want] of Object.entries(expected)) {
     const got = result?.scores?.[source]

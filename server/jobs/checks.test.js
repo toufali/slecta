@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-// verify.js reaches env.js through tmdbService. Nothing here touches the network or Redis;
+// checks.js reaches env.js through tmdbService. Nothing here touches the network or Redis;
 // the values only need to exist.
 for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', 'GCP_SEARCH_ENGINE']) {
   process.env[key] ??= 'test'
 }
 
 // Imported after the env is set — static imports are hoisted and would run env.js first
-const { checkRunCoverage, checkReferenceTitles } = await import('./verify.js')
+const { checkRunCoverage, checkReferenceTitles } = await import('./checks.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 
 // A run where every source resolved for every title

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-// Same shape as verify.test.js: env.js only needs the keys to exist.
+// Same shape as checks.test.js: env.js only needs the keys to exist.
 for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', 'GCP_SEARCH_ENGINE']) {
   process.env[key] ??= 'test'
 }
