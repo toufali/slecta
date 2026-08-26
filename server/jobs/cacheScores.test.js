@@ -100,10 +100,10 @@ test('a page that fails does not cost the pages after it', async () => {
 })
 
 // Scoring a fraction of the catalogue leaves every coverage rate looking healthy, so it has to
-// be loud. The reachable cause is a list object cached before `totalPages` was returned.
+// be loud. Counted before dedupe, so a lost page cannot hide behind a cross-page duplicate.
 test('a catalogue that comes back short is reported at ERROR', async () => {
   const movies = [{ page: 1, id: 31, releaseDate: '2026-01-01' }]
-  const { restore } = stub({ movies, totalPages: 1, totalResults: 538 })
+  const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
   const errors = []
   const realError = log.error
 
@@ -115,7 +115,30 @@ test('a catalogue that comes back short is reported at ERROR', async () => {
     const short = errors.find(e => e.message === 'TMDB list came back short')
 
     assert.ok(short, `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
-    assert.deepEqual(short.fields, { key: 'movies', got: 1, expected: 538 })
+    assert.deepEqual(short.fields, { key: 'movies', got: 1, expected: 60 })
+  } finally {
+    log.error = realError
+    restore()
+  }
+})
+
+// totalPages is clamped to pageMax and totalResults is not, so a window wider than 500 pages would
+// report short every run once `vote_count.gte` drops
+test('a window wider than the page cap does not report short', async () => {
+  // A full page each, since the clamp is expressed in TMDB's page size
+  const movies = [1, 2].flatMap(page => Array.from({ length: 20 }, (_, i) => ({ page, id: page * 100 + i, releaseDate: '2026-01-01' })))
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 100000 })
+  const errors = []
+  const realError = log.error
+
+  log.error = (message, fields) => errors.push({ message, fields })
+
+  try {
+    await cacheScores()
+
+    const short = errors.filter(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies')
+
+    assert.deepEqual(short, [], 'the reachable page count, not the raw total, is what the walk can deliver')
   } finally {
     log.error = realError
     restore()
@@ -141,6 +164,30 @@ test('a list with no pagination metadata is reported, not treated as complete', 
       `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
   } finally {
     log.error = realError
+    restore()
+  }
+})
+
+// One unexpected throw used to reject the pool, which lost the run and both checks with it
+test('a title that throws is counted, and the run still finishes', async () => {
+  const movies = [1, 2, 3].map(id => ({ page: 1, id, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const realGetScore = scoreService.getScore
+
+  scoreService.getScore = async key => {
+    if (key === 'movies/2/score') throw new TypeError('unexpected')
+    return Object.defineProperty({ avgScore: 70, scores: { tmdb: 70 } }, 'cached', { value: true })
+  }
+
+  try {
+    const { stats: [stats], coverage, reference } = await cacheScores()
+
+    assert.equal(stats.processed, 2)
+    assert.equal(stats.failed, 1, 'the throwing title should count as one failure')
+    assert.ok(coverage, 'the coverage check should still have run')
+    assert.ok(reference, 'the reference check should still have run')
+  } finally {
+    scoreService.getScore = realGetScore
     restore()
   }
 })

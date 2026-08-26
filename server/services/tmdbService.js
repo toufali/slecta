@@ -12,8 +12,8 @@ const headers = {
 // IMDb dataset and every score record, which are expensive to rebuild.
 const DETAIL_CACHE_VERSION = 2
 
-// Same idea for the list shape. The nightly job reads `totalPages`/`totalResults` off these
-// objects, and an entry written before they existed would silently limit the run to page one.
+// Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
+// silently limit the nightly run to page one.
 const LIST_CACHE_VERSION = 1
 
 class TmdbService {
@@ -217,8 +217,7 @@ class TmdbService {
     data.allSorting = this.sortingOptions.movies
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
-    // Clamped: TMDB reports the real total but rejects a page past this one. `|| 1` because
-    // Math.min of a missing total_pages is NaN, which reads as "no pages" in a `<=` loop.
+    // Clamped because TMDB rejects a page past this; `|| 1` because Math.min of undefined is NaN
     data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
     data.totalResults = json.total_results
 
@@ -378,8 +377,7 @@ class TmdbService {
     data.allSorting = this.sortingOptions.shows
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
-    // Clamped: TMDB reports the real total but rejects a page past this one. `|| 1` because
-    // Math.min of a missing total_pages is NaN, which reads as "no pages" in a `<=` loop.
+    // Clamped because TMDB rejects a page past this; `|| 1` because Math.min of undefined is NaN
     data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
     data.totalResults = json.total_results
 

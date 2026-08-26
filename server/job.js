@@ -9,12 +9,10 @@ import log from './utils/logger.js'
 import { cacheScores } from './jobs/cacheScores.js'
 import { checkReferenceTitles } from './jobs/checks.js'
 
-// ms between requests to one host, ≈2 a second. A run is ~730 requests each to RT and Metacritic
-// with slugs cached, ~2,200 to RT without, and being blocked would break the feature it feeds.
+// ms between requests to one host, ≈2 a second. A run is ~730 each to RT and Metacritic, ~2,200 cold
 const HOST_INTERVAL = 500
 
-// The deploy passes this to verify scoring end to end in seconds. Warming the whole catalogue is
-// cache maintenance: it belongs on the nightly schedule, not in the middle of a build.
+// Passed by the deploy: verifying scoring belongs in a build, warming the catalogue does not
 const checksOnly = process.argv[2] === 'checks'
 
 try {

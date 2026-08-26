@@ -41,8 +41,8 @@ const PATHS = {
 }
 
 class ScoreService {
-  // Milliseconds between requests to one host, set by the nightly job. Left at 0 here: a visitor's
-  // single title has nothing to be spaced against.
+  // ms between requests to one host, set by the nightly job. A visitor's single title has nothing
+  // to be spaced against.
   throttleMs = 0
 
   async getScoreFromCache(key) {
@@ -183,8 +183,7 @@ class ScoreService {
       if (wikiId) {
         const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, lookup)
         slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
-        // Trailing slash trimmed: some Wikidata values carry one, and the reader appends its own,
-        // which Metacritic 404s — `movie/inception//` is a miss where `movie/inception/` is a hit
+        // Trim it: the reader appends its own, and `movie/inception//` 404s where `movie/inception/` is a hit
         slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
       }
 
