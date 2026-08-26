@@ -1,5 +1,6 @@
 import { average, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
+import { space } from '../utils/throttle.js'
 import redis from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
@@ -40,6 +41,10 @@ const PATHS = {
 }
 
 class ScoreService {
+  // Milliseconds between requests to one host, set by the nightly job. Left at 0 here: a visitor's
+  // single title has nothing to be spaced against.
+  throttleMs = 0
+
   async getScoreFromCache(key) {
     return await redis.getCache(key)
   }
@@ -178,7 +183,9 @@ class ScoreService {
       if (wikiId) {
         const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, lookup)
         slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
-        slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content
+        // Trailing slash trimmed: some Wikidata values carry one, and the reader appends its own,
+        // which Metacritic 404s — `movie/inception//` is a miss where `movie/inception/` is a hit
+        slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
       }
 
       if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), lookup)
@@ -224,7 +231,12 @@ class ScoreService {
   // trip the nightly smoke test, so one retry before giving up. Only transient failures
   // qualify: a 4xx is a real answer, and the slug probes 404 by design.
   async #fetch(url, options) {
-    const send = () => fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT), ...options })
+    const host = new URL(url).host
+    // Spaced per attempt, so a retry queues like any other request
+    const send = async () => {
+      await space(host, this.throttleMs)
+      return fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT), ...options })
+    }
 
     try {
       const res = await send()

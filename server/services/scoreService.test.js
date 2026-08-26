@@ -305,3 +305,52 @@ test('a malformed JSON-LD block does not lose a rating', async () => {
   assert.equal(ttlOf('test/movie/mixedld'), 60 * 60 * 48)
 })
 
+
+// throttleMs is set by the job and read nowhere else, so the wiring needs its own cover
+test('a set throttle spaces repeat requests to one host', async () => {
+  // No slug from Wikidata, so both RT candidates get probed: two requests to the same host
+  const calls = stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+  const started = Date.now()
+
+  scoreService.throttleMs = 120
+
+  try {
+    await scoreService.getScore('test/movie/spaced', {
+      tmdbScore: 67, wikiId: 'Q4', title: 'Spaced', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+  } finally {
+    scoreService.throttleMs = 0
+  }
+
+  assert.ok(calls.count >= 3, `expected a Wikidata call and two RT probes, got ${calls.count}`)
+  assert.ok(Date.now() - started >= 120, 'the second request to a host should have waited out the interval')
+})
+
+// Measured: metacritic.com/movie/inception// 404s where movie/inception/ is a 200, so a slug
+// carrying its own trailing slash silently dropped the Metascore
+test('a Wikidata slug with a trailing slash still reaches Metacritic', async () => {
+  let requested
+  stubHosts({
+    'www.wikidata.org': wikidata('m/trailing', 'movie/trailing/'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    // 404 on the doubled slash, as Metacritic really does, so the score proves the trim happened
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+  const routed = globalThis.fetch
+  globalThis.fetch = async (url, options) => {
+    if (new URL(url).host !== 'www.metacritic.com') return routed(url, options)
+    requested = url
+    return url.includes('//', 8) ? new Response('', { status: 404 }) : ok(LD(52))
+  }
+
+  const score = await scoreService.getScore('test/movie/trailing', {
+    tmdbScore: 67, wikiId: 'Q5', title: 'Trailing', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.equal(requested, 'https://www.metacritic.com/movie/trailing/')
+  assert.equal(score.scores.metacritic, 52)
+})

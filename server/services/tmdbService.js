@@ -213,6 +213,10 @@ class TmdbService {
     data.allSorting = this.sortingOptions.movies
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
+    // Clamped: TMDB reports the real total but rejects a page past this one. `|| 1` because
+    // Math.min of a missing total_pages is NaN, which reads as "no pages" in a `<=` loop.
+    data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
+    data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
     return data
@@ -370,6 +374,10 @@ class TmdbService {
     data.allSorting = this.sortingOptions.shows
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
+    // Clamped: TMDB reports the real total but rejects a page past this one. `|| 1` because
+    // Math.min of a missing total_pages is NaN, which reads as "no pages" in a `<=` loop.
+    data.totalPages = Math.min(json.total_pages || 1, this.pageMax)
+    data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
     return data

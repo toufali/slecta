@@ -33,16 +33,16 @@ Cloud Scheduler triggers the job at 00:00 UTC. `server/job.js` starts Redis and 
 ```
 jobs/cacheScores.js
   1. imdbService.refresh()      download IMDb's dataset, load ~428k ratings into Redis
-  2. score 20 movies            TMDB discover, page 1 of the default sort
-  3. score 20 TV shows
-  4. jobs/verify.js             did that actually work?
+  2. score every movie in scope TMDB discover, all pages of the window (~538 over 27 pages)
+  3. score every TV show        ~195 over 10 pages
+  4. jobs/checks.js             did that actually work?
 ```
 
 Step 4 is two independent checks, and the reason for both is that either alone can be fooled:
 
 - `checkReferenceTitles()` scores three long-settled titles and compares **every source** against
   a known value. Catches a source returning wrong or missing numbers.
-- `checkRunCoverage()` looks at **all 40 titles** and asks how often each source resolved, how
+- `checkRunCoverage()` looks at **every title scored** and asks how often each source resolved, how
   many were built from TMDB alone, how many failed, how many never persisted. Catches a source
   failing broadly while the three reference titles happen to still work.
 
@@ -50,7 +50,13 @@ Either failing logs at `ERROR` and makes the job exit non-zero. The alert policy
 `ERROR` from the job**, not specific message text — an earlier version matched exact strings and
 renaming a function silently disarmed it. Rename freely; just keep failures at `ERROR`.
 
-The non-zero exit is what fails the post-deploy step in `cloudbuild.yaml`. That step runs after
+Requests to Rotten Tomatoes and Metacritic are spaced per host by `utils/throttle.js` — roughly
+two a second, so the rate holds however many are in flight. A full run makes about 1,460 of them
+and takes ~6 minutes warm.
+
+The non-zero exit is what fails the post-deploy step in `cloudbuild.yaml`. That step runs a
+**reference-titles-only** pass, not the full catalogue: three titles against live sources is what
+catches a deploy that broke scoring, and it takes seconds rather than minutes. It also runs after
 the service is deployed, not before — verification also fails when a third-party source is down,
 and gating the deploy on it would block the very change that fixes such an outage. It reports, it
 does not prevent. Note that Cloud
@@ -63,7 +69,8 @@ numbers.
 
 ## Where a score comes from
 
-`scoreService.getScore()` resolves five components and averages whatever it got:
+`scoreService.getScore()` resolves five components from four sources — Rotten Tomatoes yields
+both a critic and an audience score — and averages whatever it got:
 
 | Source | How |
 |---|---|
@@ -76,7 +83,7 @@ Rotten Tomatoes and Metacritic need a URL slug. Wikidata supplies both in one ca
 `P1712`); when it has none, `slugify()` guesses and a HEAD request checks the guess.
 
 Absent sources are **omitted** from the stored record rather than set to null, so the number of
-keys is the number of sources that actually answered. Phase 3's user-weighting depends on that.
+keys is the number of sources that actually answered.
 
 ## Module map
 
@@ -95,8 +102,8 @@ server/
   job.js               Cloud Run Job entrypoint, the batch counterpart to server.js
   jobs/
     cacheScores.js     the warm-up loop
-    verify.js          the two checks described above
-  utils/               logger (structured JSON for Cloud Logging), math, slug
+    checks.js          the two checks described above
+  utils/               logger (structured JSON for Cloud Logging), math, slug, throttle
   views/               tagged template literals, no template engine
 ```
 
@@ -118,7 +125,7 @@ in the background and caching resumes. Only the transitions in and out of that s
 since the underlying client retries about once a second.
 
 The nightly job is the opposite: it exists to fill the cache, so it refuses to run without one
-rather than spending the IMDb download and ~160 third-party requests on results it cannot store.
+rather than spending the IMDb download and ~1,460 third-party requests on results it cannot store.
 That check is at startup only. Losing Redis part-way through is left to run its course: a write
 skipped during a brief stall looks identical to a dead cache from inside the loop, so any
 mid-run abort risks throwing away a good night over a two-second blip. Coverage fails the run
