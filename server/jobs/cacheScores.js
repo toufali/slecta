@@ -132,10 +132,12 @@ async function cacheScoresFor(mediaType, { titles, expected }) {
   // replacing 538 rows with 20 would serve a near-empty page for a day — worse than yesterday's.
   // Gated on completeness, not coverage: a Metacritic outage thins scores but they are still the
   // scores, and withholding a ranking over it would freeze the sort for a day.
-  if (!rows.length || rows.length < expected - MAX_MISSING_TITLES) {
-    log.warn('Score index left in place, the run was incomplete', { mediaType, rows: rows.length, expected })
-  } else {
+  // Asked positively on purpose: `expected` is NaN when TMDB's metadata was unusable, and every
+  // comparison with NaN is false, so a negated test would publish exactly the unverifiable run.
+  if (rows.length && rows.length >= expected - MAX_MISSING_TITLES) {
     await publishIndex(mediaType, rows)
+  } else {
+    log.warn('Score index left in place, the run was incomplete', { mediaType, rows: rows.length, expected })
   }
 
   return stats

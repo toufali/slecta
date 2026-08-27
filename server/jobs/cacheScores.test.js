@@ -338,3 +338,23 @@ test('an incomplete run leaves the previous index alone', async () => {
     restore()
   }
 })
+
+// NaN comparisons are all false, so a negated gate published precisely the run it meant to refuse
+test('a run whose catalogue size could not be verified leaves the index alone', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 900 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  tmdb.getMovies = async () => ({ movies }) // no totalPages, no totalResults
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.has('index/movies/v1'), false, '20 unverifiable rows must not replace a complete index')
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
