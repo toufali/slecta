@@ -419,3 +419,24 @@ test('a skipped publication fails the run, not just a warning', async () => {
     restore()
   }
 })
+
+// A lost page hides 20 titles that yesterday's complete index still holds, so 96% is not good enough
+test('a short catalogue walk withholds the index even when most titles scored', async () => {
+  const movies = [1, 3].flatMap(page => Array.from({ length: 20 }, (_, i) => ({ page, id: page * 100 + i, releaseDate: '2026-01-01' })))
+  const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(stats.processed, 40, '40 of 60 scored, which clears the proportional threshold')
+    assert.equal(written.has('index/movies/v1'), false, 'but the walk was short, so nothing publishes')
+    assert.equal(stats.indexFailed, true)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})

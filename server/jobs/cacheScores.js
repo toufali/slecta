@@ -49,7 +49,7 @@ export async function cacheScores() {
     listAll(page => tmdb.getMovies({ page }), SEGMENT.movie),
     listAll(page => tmdb.getTvShows({ page }), SEGMENT.tv)
   ])
-  const noTitles = { titles: [], expected: NaN }
+  const noTitles = { titles: [], expected: NaN, complete: false }
 
   if (movieList.reason) log.error('TMDB movie list lookup failed', { error: movieList.reason })
   if (showList.reason) log.error('TMDB show list lookup failed', { error: showList.reason })
@@ -99,11 +99,11 @@ async function listAll(fetchPage, resultsKey) {
 
   const expected = verifiable ? Math.min(totalResults, totalPages * TMDB_PAGE_SIZE) : NaN
 
-  if (!(unique.length >= expected - MAX_MISSING_TITLES)) {
-    log.error('TMDB list came back short', { resultsKey, got: unique.length, totalPages, totalResults })
-  }
+  const complete = unique.length >= expected - MAX_MISSING_TITLES
 
-  return { titles: unique, expected }
+  if (!complete) log.error('TMDB list came back short', { resultsKey, got: unique.length, totalPages, totalResults })
+
+  return { titles: unique, expected, complete }
 }
 
 async function publishIndex(mediaType, rows) {
@@ -117,7 +117,7 @@ async function publishIndex(mediaType, rows) {
   log.error('Score index write failed', { mediaType, rows: rows.length })
 }
 
-async function cacheScoresFor(mediaType, { titles, expected }) {
+async function cacheScoresFor(mediaType, { titles, expected, complete }) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {} }
   const rows = []
 
@@ -133,10 +133,10 @@ async function cacheScoresFor(mediaType, { titles, expected }) {
     }
   })
 
-  // Publish only a ranking worth having: replacing 538 rows with the 20 a broken run produced would
-  // serve a near-empty page for days. Asked positively because NaN fails every comparison. Either
-  // branch failing to publish is a failed run — the scores are cached but nothing is sortable.
-  if (rows.length && rows.length >= expected * MIN_INDEX_COVERAGE) {
+  // Publish only a ranking worth having. Two separate conditions: the walk must have seen the whole
+  // catalogue, since a lost page hides 20 titles that yesterday's index still holds, and enough of
+  // what it saw must have scored. Either failure is a failed run — scores cached, nothing sortable.
+  if (complete && rows.length && rows.length >= expected * MIN_INDEX_COVERAGE) {
     stats.indexFailed = !await publishIndex(mediaType, rows)
   } else {
     stats.indexFailed = true
