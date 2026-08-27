@@ -378,3 +378,44 @@ test('a failed index write fails the run', async () => {
     restore()
   }
 })
+
+// A handful of scoring failures is still a good ranking; the gate is proportional so it publishes
+test('a run short a few titles still publishes', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1000 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const realGetScore = scoreService.getScore
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  // one of twenty fails, which is inside the 10% the ranking tolerates
+  scoreService.getScore = async key => key === 'movies/1000/score' ? null
+    : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(stats.failed, 1)
+    assert.equal(stats.indexFailed, false)
+    assert.equal(written.get('index/movies/v1').length, 19)
+  } finally {
+    scoreService.getScore = realGetScore
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Skipping publication leaves only an expiring index, so it cannot report success
+test('a skipped publication fails the run, not just a warning', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1100 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
+
+  try {
+    const { stats: [stats], coverage } = await cacheScores()
+
+    assert.equal(stats.indexFailed, true, '20 rows of 60 expected is not a ranking worth publishing')
+    assert.ok(coverage.problems.some(p => p.reason === 'score index not published'))
+  } finally {
+    restore()
+  }
+})
