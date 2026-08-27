@@ -358,3 +358,23 @@ test('a run whose catalogue size could not be verified leaves the index alone', 
     restore()
   }
 })
+
+// Caching every score but publishing nothing sortable used to exit 0 on the strength of the scores
+test('a failed index write fails the run', async () => {
+  const movies = [{ page: 1, id: 71, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const realSetCache = redis.setCache
+
+  redis.setCache = async key => !key.startsWith('index/')
+
+  try {
+    const { stats: [stats], coverage } = await cacheScores()
+
+    assert.equal(stats.indexFailed, true)
+    assert.ok(coverage.problems.some(p => p.reason === 'score index not published'),
+      `expected coverage to fail, got ${JSON.stringify(coverage.problems.map(p => p.reason ?? p.source))}`)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})

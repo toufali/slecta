@@ -204,7 +204,6 @@ class TmdbService {
         genreIds: item.genre_ids,
         releaseDate: item.release_date,
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-        // Kept alongside the composed URL for the score index, which stores 733 of these
         posterPath: item.poster_path,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
@@ -370,7 +369,6 @@ class TmdbService {
         genreIds: item.genre_ids,
         releaseDate: item.first_air_date,
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-        // Kept alongside the composed URL for the score index, which stores 733 of these
         posterPath: item.poster_path,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,

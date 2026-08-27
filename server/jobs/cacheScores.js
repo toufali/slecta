@@ -19,8 +19,8 @@ const TMDB_PAGE_SIZE = 20
 // incomplete. A title added while we page through shifts a row onto the next page, arriving twice.
 const MAX_MISSING_TITLES = 5
 
-// Matches the score records it is built from, so one missed run cannot leave the sort with nothing
-const INDEX_TTL = 60 * 60 * 48
+// Outlasts a missed run plus the next run's own duration, so the sort is never left empty
+const INDEX_TTL = 60 * 60 * 72 // 72 hours
 
 // The deploy runs the checks only, so a row-shape change is not rewritten until the nightly run.
 // Without this, the first serving deploy after one reads the previous generation for a day.
@@ -107,9 +107,9 @@ async function publishIndex(mediaType, rows) {
   // id, so an order does not reshuffle nightly on the pool's finish order alone.
   rows.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
 
-  if (!await redis.setCache(`index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`, rows, INDEX_TTL)) {
-    log.error('Score index write failed', { mediaType, rows: rows.length })
-  }
+  if (await redis.setCache(`index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`, rows, INDEX_TTL)) return true
+
+  log.error('Score index write failed', { mediaType, rows: rows.length })
 }
 
 async function cacheScoresFor(mediaType, { titles, expected }) {
@@ -128,14 +128,10 @@ async function cacheScoresFor(mediaType, { titles, expected }) {
     }
   })
 
-  // Rank only what is complete. A broken run reaches here with an empty or truncated list, and
-  // replacing 538 rows with 20 would serve a near-empty page for a day — worse than yesterday's.
-  // Gated on completeness, not coverage: a Metacritic outage thins scores but they are still the
-  // scores, and withholding a ranking over it would freeze the sort for a day.
-  // Asked positively on purpose: `expected` is NaN when TMDB's metadata was unusable, and every
-  // comparison with NaN is false, so a negated test would publish exactly the unverifiable run.
+  // Publish only a complete ranking: replacing 538 rows with the 20 a broken run produced would
+  // serve a near-empty page for days. Asked positively because NaN fails every comparison.
   if (rows.length && rows.length >= expected - MAX_MISSING_TITLES) {
-    await publishIndex(mediaType, rows)
+    stats.indexFailed = !await publishIndex(mediaType, rows)
   } else {
     log.warn('Score index left in place, the run was incomplete', { mediaType, rows: rows.length, expected })
   }
@@ -180,10 +176,8 @@ async function scoreTitle(mediaType, title, stats) {
   // Unscorable titles would sort as NaN
   if (!Number.isFinite(score.avgScore)) return
 
-  // What a card renders and what the filters match on, minus anything derivable: ids over names
-  // and paths over URLs, since imgConfig and the genre map rebuild those. Source names, not a
-  // count — RT contributes two keys, so a count cannot say how many outlets or whether a critic
-  // scored it, and the count derives from the names anyway.
+  // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
+  // names, not a count: RT contributes two keys, so a count hides outlets and critic presence.
   return {
     id: title.id,
     title: title.title,
