@@ -12,6 +12,10 @@ const headers = {
 // IMDb dataset and every score record, which are expensive to rebuild.
 const DETAIL_CACHE_VERSION = 2
 
+// Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
+// silently limit the nightly run to page one.
+const LIST_CACHE_VERSION = 1
+
 class TmdbService {
   countMin = 50 // minimum vote count
   pageMax = 500 // TMDB 400s on a higher page
@@ -181,7 +185,7 @@ class TmdbService {
 
     const urlParams = new URLSearchParams(params)
     const url = `${TMDB_API_URL}/discover/movie?${urlParams}`
-    const cacheKey = `movies?${urlParams}`
+    const cacheKey = `movies/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
     if (data) return data
@@ -213,6 +217,10 @@ class TmdbService {
     data.allSorting = this.sortingOptions.movies
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
+    // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
+    // caches as null, and the job would multiply that to a zero expectation and accept page one.
+    data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
+    data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
     return data
@@ -340,7 +348,7 @@ class TmdbService {
 
     const urlParams = new URLSearchParams(params)
     const url = `${TMDB_API_URL}/discover/tv?${urlParams}`
-    const cacheKey = `shows?${urlParams}`
+    const cacheKey = `shows/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
     if (data) return data
@@ -370,6 +378,10 @@ class TmdbService {
     data.allSorting = this.sortingOptions.shows
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
+    // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
+    // caches as null, and the job would multiply that to a zero expectation and accept page one.
+    data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
+    data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
     return data
