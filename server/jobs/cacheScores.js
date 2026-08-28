@@ -106,6 +106,15 @@ async function listAll(fetchPage, resultsKey) {
   return { titles: unique, expected, complete }
 }
 
+// Three unrelated ways a run fails to earn a ranking, each with its own tolerance and its own
+// reason in the log. Named rather than inlined: this condition has been rewritten five times and
+// twice lost a clause silently.
+function unpublishable({ rows, expected, complete }) {
+  if (!complete) return 'the catalogue walk was short'
+  if (!rows) return 'nothing scored'
+  if (!(rows >= expected * MIN_INDEX_COVERAGE)) return 'too few titles scored'
+}
+
 async function publishIndex(mediaType, rows) {
   // TMDB cannot sort on a score it does not hold, and sorting one fetched page would rank 20 of 733.
   // Stored ranked so a request only filters and slices. Votes break the ~7-way ties per point, then
@@ -133,14 +142,13 @@ async function cacheScoresFor(mediaType, { titles, expected, complete }) {
     }
   })
 
-  // Publish only a ranking worth having. Two separate conditions: the walk must have seen the whole
-  // catalogue, since a lost page hides 20 titles that yesterday's index still holds, and enough of
-  // what it saw must have scored. Either failure is a failed run — scores cached, nothing sortable.
-  if (complete && rows.length && rows.length >= expected * MIN_INDEX_COVERAGE) {
-    stats.indexFailed = !await publishIndex(mediaType, rows)
-  } else {
+  const blocked = unpublishable({ rows: rows.length, expected, complete })
+
+  if (blocked) {
     stats.indexFailed = true
-    log.warn('Score index left in place, the run was incomplete', { mediaType, rows: rows.length, expected })
+    log.warn('Score index left in place', { mediaType, blocked, rows: rows.length, expected })
+  } else {
+    stats.indexFailed = !await publishIndex(mediaType, rows)
   }
 
   return stats
