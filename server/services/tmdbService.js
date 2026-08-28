@@ -14,7 +14,7 @@ const DETAIL_CACHE_VERSION = 2
 
 // Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
 // silently limit the nightly run to page one.
-const LIST_CACHE_VERSION = 1
+const LIST_CACHE_VERSION = 2
 
 class TmdbService {
   countMin = 50 // minimum vote count
@@ -201,8 +201,10 @@ class TmdbService {
         id: item.id,
         title: item.title,
         genres: item.genre_ids.map(id => this.genres.movie.get(id)),
+        genreIds: item.genre_ids,
         releaseDate: item.release_date,
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+        posterPath: item.poster_path,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
         popularity: item.popularity,
@@ -364,8 +366,10 @@ class TmdbService {
         id: item.id,
         title: item.name,
         genres: item.genre_ids.map(id => this.genres.show.get(id)),
+        genreIds: item.genre_ids,
         releaseDate: item.first_air_date,
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
+        posterPath: item.poster_path,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
         popularity: item.popularity,

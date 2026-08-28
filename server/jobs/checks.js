@@ -101,6 +101,9 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
       continue
     }
 
+    // Scores cached but nothing sortable published is a failed run, not a healthy one
+    if (stats.indexFailed) problems.push({ mediaType: stats.mediaType, reason: 'score index not published' })
+
     for (const source of SOURCES) {
       const rate = (stats.sources[source] ?? 0) / stats.processed
       const min = MIN_SOURCE_RATE[source]

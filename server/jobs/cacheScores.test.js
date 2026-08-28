@@ -11,6 +11,7 @@ const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
 const { default: imdb } = await import('../services/imdbService.js')
 const { default: log } = await import('../utils/logger.js')
+const { default: redis } = await import('../services/redisService.js')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
@@ -22,8 +23,8 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   imdb.refresh = async () => {}
   tmdb.getMovies = async ({ page }) => ({ movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length })
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
-  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, tmdbScore: 70 })
-  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, tmdbScore: 70 })
+  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, tmdbScore: 70, rating: 'PG-13', providers: [{ provider_id: 8 }] })
+  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, tmdbScore: 70, rating: 'TV-14', providers: [{ provider_id: 8 }] })
   scoreService.getScore = async key => {
     scored.push(key)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
@@ -115,7 +116,7 @@ test('a catalogue that comes back short is reported at ERROR', async () => {
     const short = errors.find(e => e.message === 'TMDB list came back short')
 
     assert.ok(short, `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
-    assert.deepEqual(short.fields, { key: 'movies', got: 1, totalPages: 3, totalResults: 60 })
+    assert.deepEqual(short.fields, { resultsKey: 'movies', got: 1, totalPages: 3, totalResults: 60 })
   } finally {
     log.error = realError
     restore()
@@ -136,7 +137,7 @@ test('a window wider than the page cap does not report short', async () => {
   try {
     await cacheScores()
 
-    const short = errors.filter(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies')
+    const short = errors.filter(e => e.message === 'TMDB list came back short' && e.fields.resultsKey === 'movies')
 
     assert.deepEqual(short, [], 'the reachable page count, not the raw total, is what the walk can deliver')
   } finally {
@@ -206,7 +207,7 @@ test('a page count absent while the result count is present still reports short'
   try {
     await cacheScores()
 
-    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies'),
+    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.resultsKey === 'movies'),
       `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
   } finally {
     log.error = realError
@@ -228,7 +229,7 @@ test('cached metadata that came back as null is not treated as verifiable', asyn
   try {
     await cacheScores()
 
-    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies'),
+    assert.ok(errors.some(e => e.message === 'TMDB list came back short' && e.fields.resultsKey === 'movies'),
       `expected a short-catalogue error, got ${JSON.stringify(errors.map(e => e.message))}`)
   } finally {
     log.error = realError
@@ -249,12 +250,210 @@ test('pages that repeat their titles report short despite a full row count', asy
   try {
     await cacheScores()
 
-    const short = errors.find(e => e.message === 'TMDB list came back short' && e.fields.key === 'movies')
+    const short = errors.find(e => e.message === 'TMDB list came back short' && e.fields.resultsKey === 'movies')
 
     assert.ok(short, '60 rows collapsing to 10 distinct titles is a truncated catalogue')
     assert.equal(short.fields.got, 10)
   } finally {
     log.error = realError
+    restore()
+  }
+})
+
+// The sort reads this one key, so the entry has to carry everything a card renders and everything
+// the existing filters match on — otherwise a score-sorted page needs a TMDB call per title
+test('the run publishes a score index a card could be rendered from', async () => {
+  const movies = [{ page: 1, id: 61, title: 'Dune', posterPath: '/p.jpg', releaseDate: '2026-01-01', genreIds: [878], tmdbScoreCount: 900 }]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual(written.get('index/movies/v1'), [{
+      id: 61,
+      title: 'Dune',
+      posterPath: '/p.jpg',
+      releaseDate: '2026-01-01',
+      genreIds: [878],
+      votes: 900,
+      certification: 'PG-13',
+      providers: [8],
+      score: 70,
+      sources: ['tmdb', 'imdb']
+    }])
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Ranked at write time, so a request filters and slices rather than sorting, and the order cannot
+// shift with the pool's finish order
+test('the index is stored already ranked, ties broken by votes then id', async () => {
+  const movies = [
+    { page: 1, id: 1, tmdbScoreCount: 100 },
+    { page: 1, id: 2, tmdbScoreCount: 900 },
+    { page: 1, id: 3, tmdbScoreCount: 500 },
+    // 5 and 4 tie on both score and votes, listed high id first so only the id term can order them
+    { page: 1, id: 5, tmdbScoreCount: 500 },
+    { page: 1, id: 4, tmdbScoreCount: 500 }
+  ]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const scores = { 'movies/1/score': 80, 'movies/2/score': 90, 'movies/3/score': 90, 'movies/4/score': 90, 'movies/5/score': 90 }
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  scoreService.getScore = async key =>
+    Object.defineProperty({ avgScore: scores[key], scores: { tmdb: 1 } }, 'cached', { value: true })
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual(written.get('index/movies/v1').map(entry => [entry.score, entry.votes, entry.id]),
+      [[90, 900, 2], [90, 500, 3], [90, 500, 4], [90, 500, 5], [80, 100, 1]])
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Publishing the 20 rows a broken run produced would serve a near-empty list for a day, which is
+// worse than yesterday's ranking
+test('an incomplete run leaves the previous index alone', async () => {
+  const { restore } = stub({ movies: [], shows: [] })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.has('index/movies/v1'), false, 'no index should have been published')
+    assert.equal(written.has('index/shows/v1'), false)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// NaN comparisons are all false, so a negated gate published precisely the run it meant to refuse
+test('a run whose catalogue size could not be verified leaves the index alone', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 900 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  tmdb.getMovies = async () => ({ movies }) // no totalPages, no totalResults
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.has('index/movies/v1'), false, '20 unverifiable rows must not replace a complete index')
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Caching every score but publishing nothing sortable used to exit 0 on the strength of the scores
+test('a failed index write fails the run', async () => {
+  const movies = [{ page: 1, id: 71, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const realSetCache = redis.setCache
+
+  redis.setCache = async key => !key.startsWith('index/')
+
+  try {
+    const { stats: [stats], coverage } = await cacheScores()
+
+    assert.equal(stats.indexFailed, true)
+    assert.ok(coverage.problems.some(p => p.reason === 'score index not published'),
+      `expected coverage to fail, got ${JSON.stringify(coverage.problems.map(p => p.reason ?? p.source))}`)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// A handful of scoring failures is still a good ranking; the gate is proportional so it publishes
+test('a run short a few titles still publishes', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1000 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const realGetScore = scoreService.getScore
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  // one of twenty fails, which is inside the 10% the ranking tolerates
+  scoreService.getScore = async key => key === 'movies/1000/score' ? null
+    : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(stats.failed, 1)
+    assert.equal(stats.indexFailed, false)
+    assert.equal(written.get('index/movies/v1').length, 19)
+  } finally {
+    scoreService.getScore = realGetScore
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Skipping publication leaves only an expiring index, so it cannot report success. The walk here is
+// complete, so only the row-coverage condition can block it.
+test('too many unscorable titles fails the run, not just a warning', async () => {
+  const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1100 + i, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const realGetScore = scoreService.getScore
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  // 3 of 20 unscorable leaves 17 rows, under the 18 that 90% of the catalogue requires
+  scoreService.getScore = async key => [1100, 1101, 1102].some(id => key === `movies/${id}/score`) ? null
+    : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
+
+  try {
+    const { stats: [stats], coverage } = await cacheScores()
+
+    assert.equal(stats.processed, 17)
+    assert.equal(written.has('index/movies/v1'), false, '17 of 20 is under the 90% a ranking needs')
+    assert.equal(stats.indexFailed, true)
+    assert.ok(coverage.problems.some(p => p.reason === 'score index not published'))
+  } finally {
+    scoreService.getScore = realGetScore
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// 54 of 60 is exactly the 90% rows need but one short of the walk's own tolerance, so this isolates
+// the walk guard: a lost page hides titles yesterday's complete index still holds
+test('a short catalogue walk withholds the index even at full row coverage', async () => {
+  const movies = [1, 2, 3].flatMap(page => Array.from({ length: page === 3 ? 14 : 20 }, (_, i) => ({ page, id: page * 100 + i, releaseDate: '2026-01-01' })))
+  const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(stats.processed, 54, 'exactly 90% of 60, so row coverage is satisfied')
+    assert.equal(written.has('index/movies/v1'), false, 'the walk was short, so nothing publishes')
+    assert.equal(stats.indexFailed, true)
+  } finally {
+    redis.setCache = realSetCache
     restore()
   }
 })
