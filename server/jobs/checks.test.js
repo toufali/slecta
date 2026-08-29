@@ -109,3 +109,21 @@ test('a detail field TMDB stops populating fails the title', async () => {
     tmdb.getTvShowDetail = tv
   }
 })
+
+// Rates that sat above the old floors and below the new ones. The old values (metacritic .25,
+// rtCritic .25, rtAudience .45) let a source fail for half the catalogue without firing.
+test('a source at half its measured rate now trips', () => {
+  const stats = healthy({ sources: { imdb: 20, metacritic: 6, rtCritic: 8, rtAudience: 10, tmdb: 20 } })
+  const result = checkRunCoverage([stats], true)
+
+  assert.equal(result.ok, false)
+  assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
+})
+
+// The rates a healthy full run really produces must stay inside the floors
+test('the rates the first full production run measured are tolerated', () => {
+  const movies = healthy({ total: 537, processed: 537, sources: { imdb: 536, metacritic: 294, rtCritic: 356, rtAudience: 375, tmdb: 537 } })
+  const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, tmdbOnly: 5, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137, tmdb: 194 } })
+
+  assert.equal(checkRunCoverage([movies, shows], true).ok, true)
+})

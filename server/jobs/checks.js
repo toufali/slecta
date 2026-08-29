@@ -24,8 +24,9 @@ const REQUIRED_DETAIL = {
 
 const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
 
-// Set below observed rates: new releases genuinely lack critic reviews
-const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.25, rtAudience: 0.45, tmdb: 0.95 }
+// 10-15 points below the rates one full run measured, whichever media type binds. One run, so that
+// is headroom, not a confidence interval — watch a week before trusting the tight ones.
+const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.4, rtCritic: 0.55, rtAudience: 0.6, tmdb: 0.95 }
 
 // A score from TMDB alone is the signature of every other source failing
 const MAX_TMDB_ONLY_RATE = 0.1
