@@ -10,7 +10,7 @@ const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a b
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
 // Bump when the slug record shape changes. Provenance cannot be backfilled: a cached record skips
-// the Wikidata call, so an unknown source would stay "probed" for as long as the record is rewritten.
+// the Wikidata call, so an unknown source would stay "guessed" for as long as the record is rewritten.
 const SLUG_CACHE_VERSION = 1
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
@@ -224,10 +224,18 @@ class ScoreService {
         wiki.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
       }
 
+      // One flag per host, merged after: the two run concurrently and each decides whether its own
+      // read failed. Sharing `attempt` let RT's failure read as Metacritic's, which would preserve a
+      // slug Metacritic had just told us was gone.
+      const rtRead = { incomplete: false }
+      const mcRead = { incomplete: false }
+
       const [rt, mc] = await Promise.all([
-        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), attempt),
-        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), attempt)
+        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, rtRead), rtRead),
+        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, mcRead), mcRead)
       ])
+
+      if (rtRead.incomplete || mcRead.incomplete) attempt.incomplete = true
       // Keep per host, on that host's own verdict: a slug it could not read is unknown, not wrong,
       // and a 429 must not let a guess replace an authoritative answer only Wikidata returns. A 404
       // is a verdict, so that slug goes; so does one proven wrong by its year.
@@ -264,9 +272,9 @@ class ScoreService {
   }
 
   // Try cached first, then Wikidata, then guesses. Count a cached slug of unknown provenance as
-  // probed, so a record written before this check is verified rather than trusted.
+  // guessed, so a record written before this check is verified rather than trusted.
   #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
-    // Wikidata confirming a cached guess makes it authoritative; leaving it `probed` would keep it
+    // Wikidata confirming a cached guess makes it authoritative; leaving it `guessed` would keep it
     // paying a year check it should not, and a re-release date could then reject a correct slug
     const source = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'guessed'
     const authoritative = cachedSlug && source === 'wikidata' ? [{ slug: cachedSlug, source }] : []

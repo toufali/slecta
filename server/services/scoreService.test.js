@@ -44,7 +44,7 @@ function stubHosts(routes) {
 }
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
-// The year matches the fixtures' usual release date, since a probed slug is only accepted when it does
+// The year matches the fixtures' usual release date, since a guessed slug is only accepted when it does
 const rtScorecard = (critic, audience, year = 2010) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
   criticsScore: { score: critic }, audienceScore: { score: audience }
 })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
@@ -321,7 +321,7 @@ test('a malformed JSON-LD block does not lose a rating', async () => {
 
 // throttleMs is set by the job and read nowhere else, so the wiring needs its own cover
 test('a set throttle spaces repeat requests to one host', async () => {
-  // No slug from Wikidata, so both RT candidates get probed: two requests to the same host
+  // No slug from Wikidata, so both RT candidates get guessed: two requests to the same host
   const calls = stubHosts({
     'www.wikidata.org': () => ok('{}'),
     'www.rottentomatoes.com': () => new Response('', { status: 404 }),
@@ -407,7 +407,7 @@ test('a guessed slug for a different film is rejected, and the year variant trie
 // Wikidata is authoritative — paying the year check there would reject legitimate slugs whose
 // page year differs from TMDB's by a re-release or a festival date
 test('a Wikidata slug is accepted even when the page year differs', async () => {
-  const slugs = { probed: 0, rejected: 0 }
+  const rejections = warnings('Slug rejected as a different title')
   stubHosts({
     'www.wikidata.org': wikidata('m/authoritative', 'movie/authoritative'),
     'www.rottentomatoes.com': rtPage(55, 60, 1999),
@@ -416,10 +416,10 @@ test('a Wikidata slug is accepted even when the page year differs', async () => 
 
   const score = await scoreService.getScore('test/movie/authoritative', {
     tmdbScore: 67, wikiId: 'Q9', title: 'Authoritative', releaseDate: '2026-05-01', mediaType: 'movie'
-  }, false, slugs)
+  }, false)
 
   assert.equal(score.scores.rtCritic, 55)
-  assert.deepEqual(slugs, { probed: 0, rejected: 0 }, 'an authoritative slug is neither guessed nor rejected')
+  assert.deepEqual(rejections(), [], 'an authoritative slug does not pay the year check')
 })
 
 // One GET per candidate replaces a HEAD probe plus a separate read
@@ -457,22 +457,22 @@ test('a guessed slug whose page has no year is rejected, not trusted', async () 
 
 // Wikidata confirming a cached guess makes it authoritative, so it stops paying the year check
 test('a cached guess that Wikidata confirms stops being treated as a guess', async () => {
-  const slugs = { probed: 0, rejected: 0 }
+  const rejections = warnings('Slug rejected as a different title')
   stubHosts({
     'www.wikidata.org': wikidata('m/confirmed', 'movie/confirmed'),
     // the page year disagrees with TMDB, which would reject it if it were still a guess
     'www.rottentomatoes.com': rtPage(55, 60, 1999),
     'www.metacritic.com': () => new Response('', { status: 404 })
   })
-  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/confirmed', rtSource: 'probed' } : null
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/confirmed', rtSource: 'guessed' } : null
 
   try {
     const score = await scoreService.getScore('test/movie/confirmed', {
       tmdbScore: 67, wikiId: 'Q11', title: 'Confirmed', releaseDate: '2026-05-01', mediaType: 'movie'
-    }, false, slugs)
+    }, false)
 
     assert.equal(score.scores.rtCritic, 55, 'the confirmed slug is authoritative, so the year is not checked')
-    assert.equal(slugs.rejected, 0)
+    assert.deepEqual(rejections(), [])
   } finally {
     redis.getCache = async () => null
   }
@@ -537,7 +537,7 @@ test('Wikidata outranks a cached guess for the same title', async () => {
     'www.metacritic.com': () => ok(LD(52, 2026))
   })
   // rt cached as a guess, mc missing, so the lookup runs and returns a different rt slug
-  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/a_guess', rtSource: 'probed' } : null
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/a_guess', rtSource: 'guessed' } : null
 
   try {
     await scoreService.getScore('test/movie/outranked', {
