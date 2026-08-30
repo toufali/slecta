@@ -252,7 +252,7 @@ test('an unanswered slug lookup is not cached, so the retry re-asks', async () =
   }, false)
 
   assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
-  assert.equal(ttlOf('slugs/movie/Q777/Nothing Answers/2026-01-01'), undefined)
+  assert.equal(ttlOf('slugs/v1/movie/Q777/Nothing Answers/2026-01-01'), undefined)
 })
 
 // A 200 with nothing in it is not a page either, and some proxies answer that way on error
@@ -285,7 +285,7 @@ test('a Wikidata blip does not shorten a score the probes resolved', async () =>
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
   assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
-  assert.ok(ttlOf('slugs/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
+  assert.ok(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
 })
 
 // A malformed sibling block used to throw and discard a rating that had already been found
@@ -353,4 +353,73 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
 
   assert.equal(requested, 'https://www.metacritic.com/movie/trailing/')
   assert.equal(score.scores.metacritic, 52)
+})
+
+// 2 of 7 resolving guesses were a different film: `m/breach` answers 200 with a confident 2007
+// title for a 2026 release. The year in schema.org JSON-LD is what separates them.
+const rtPage = (critic, audience, year) => () => ok(
+  `<script id="media-scorecard-json">${JSON.stringify({ criticsScore: { score: critic }, audienceScore: { score: audience } })}</script>` +
+  (year ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-02-16` })}</script>` : '')
+)
+
+// Per-host request counting, since the point of one GET is that it replaces a probe plus a read
+function countingHosts(routes) {
+  const seen = []
+  globalThis.fetch = async url => {
+    seen.push(String(url))
+    return routes[new URL(url).host]?.(String(url)) ?? new Response('', { status: 404 })
+  }
+  return seen
+}
+
+test('a guessed slug for a different film is rejected, and the year variant tried', async () => {
+  const slugs = { probed: 0, rejected: 0 }
+  const seen = countingHosts({
+    'www.wikidata.org': () => ok('{}'),
+    // the bare guess is a 2007 film; the year variant is the real one
+    'www.rottentomatoes.com': url => url.endsWith('_2026') ? rtPage(70, 80, 2026)() : rtPage(83, 91, 2007)(),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/breach', {
+    tmdbScore: 67, title: 'Breach', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false, slugs)
+
+  assert.equal(score.scores.rtCritic, 70, 'the 2026 page, not the 2007 one')
+  assert.deepEqual(slugs, { probed: 1, rejected: 1 })
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
+    ['https://www.rottentomatoes.com/m/breach', 'https://www.rottentomatoes.com/m/breach_2026'])
+})
+
+// Wikidata is authoritative — paying the year check there would reject legitimate slugs whose
+// page year differs from TMDB's by a re-release or a festival date
+test('a Wikidata slug is accepted even when the page year differs', async () => {
+  const slugs = { probed: 0, rejected: 0 }
+  stubHosts({
+    'www.wikidata.org': wikidata('m/authoritative', 'movie/authoritative'),
+    'www.rottentomatoes.com': rtPage(55, 60, 1999),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/authoritative', {
+    tmdbScore: 67, wikiId: 'Q9', title: 'Authoritative', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false, slugs)
+
+  assert.equal(score.scores.rtCritic, 55)
+  assert.deepEqual(slugs, { probed: 0, rejected: 0 }, 'an authoritative slug is neither guessed nor rejected')
+})
+
+// One GET per candidate replaces a HEAD probe plus a separate read
+test('resolving a guess costs one request, not a probe and a read', async () => {
+  const seen = countingHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': rtPage(70, 80, 2026),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  await scoreService.getScore('test/movie/onerequest', {
+    tmdbScore: 67, title: 'One Request', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')), ['https://www.rottentomatoes.com/m/one_request'])
 })

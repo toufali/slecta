@@ -127,7 +127,9 @@ async function publishIndex(mediaType, rows) {
 }
 
 async function cacheScoresFor(mediaType, { titles, expected, complete }) {
-  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {} }
+  // rejected / (probed + rejected) is the share of guessed slugs that were a different film,
+  // 10.6% when the year check landed. A jump means a host changed its slug scheme.
+  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {}, slugs: { probed: 0, rejected: 0 } }
   const rows = []
 
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
@@ -173,7 +175,7 @@ async function scoreTitle(mediaType, title, stats) {
   }
 
   const { tmdbScore, imdbId, wikiId, title: name, releaseDate } = detail
-  const score = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title: name, releaseDate, mediaType }, false)
+  const score = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title: name, releaseDate, mediaType }, false, stats.slugs)
 
   if (!score) {
     stats.failed++
