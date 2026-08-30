@@ -8,6 +8,10 @@ import log from '../utils/logger.js'
 const SCORE_TTL = 60 * 60 * 48 // 48 hours
 const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
+
+// Bump when the slug record shape changes. Provenance cannot be backfilled: a cached record skips
+// the Wikidata call, so an unknown source would stay "guessed" for as long as the record is rewritten.
+const SLUG_CACHE_VERSION = 1
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; the nightly job has a 180s deadline to respect
@@ -23,6 +27,22 @@ const parseJson = value => { try { return JSON.parse(value) } catch { return nul
 
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
+
+const LD_JSON = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g
+
+// Both hosts carry the release year in schema.org JSON-LD, which is what tells a guessed slug from
+// a different film of the same name. Not in RT's scorecard blob — that holds only the score fields.
+// Off the string, not through Date: `new Date('2026-01-01').getFullYear()` is 2025 under a negative
+// offset, which would reject a correct slug anywhere TZ is set
+const yearOf = date => Number(String(date).slice(0, 4)) || undefined
+
+function pageYear(html) {
+  for (const [, block] of html.matchAll(LD_JSON)) {
+    const item = parseJson(block)
+
+    if (MC_TYPES.includes(item?.['@type'])) return yearOf(item.dateCreated)
+  }
+}
 
 // Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
 const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
@@ -65,19 +85,17 @@ class ScoreService {
     const attempt = { incomplete: false }
 
     try {
-      const slugs = await this.#getSlugs(wikiId, title, releaseDate, mediaType, attempt)
-      const [imdbScore, rtScores, mcScore] = await Promise.all([
+      const [imdbScore, resolved] = await Promise.all([
         this.getIMDBScore(imdbId),
-        this.getRTScores(slugs?.rt, attempt),
-        this.getMetacriticScore(slugs?.mc, attempt)
+        this.#resolveSources({ wikiId, title, releaseDate, mediaType }, attempt)
       ])
 
       // Omitted rather than nulled, so key count is source count
       const scores = {
         imdb: imdbScore,
-        metacritic: mcScore,
-        rtCritic: rtScores?.critic,
-        rtAudience: rtScores?.audience,
+        metacritic: resolved.mc?.page?.value,
+        rtCritic: resolved.rt?.page?.critic,
+        rtAudience: resolved.rt?.page?.audience,
         // TMDB reports 0 when a title has no votes — absence, not a score
         tmdb: tmdbScore ? toScore(tmdbScore) : undefined
       }
@@ -93,7 +111,7 @@ class ScoreService {
       const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
-        log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
+        log.warn('Score resolved from TMDB alone', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
       // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
@@ -122,6 +140,13 @@ class ScoreService {
   // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
   // A `tv/<slug>` path with no season suffix returns RT's cross-season average, not one season's.
   async getRTScores(path, attempt = {}) {
+    const page = await this.#readRT(path, attempt)
+
+    return page && { critic: page.critic, audience: page.audience }
+  }
+
+  // Return the year alongside the scores, so one GET both verifies a guess and reads it
+  async #readRT(path, attempt) {
     if (!path) return
 
     try {
@@ -133,7 +158,7 @@ class ScoreService {
 
       const { criticsScore, audienceScore } = JSON.parse(json[1])
 
-      return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score) }
+      return { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score), year: pageYear(html) }
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error getting RT scores', { path, error: e })
@@ -142,88 +167,164 @@ class ScoreService {
 
   // Metascore ships as standard schema.org JSON-LD
   async getMetacriticScore(path, attempt = {}) {
+    const page = await this.#readMC(path, attempt)
+
+    return page?.value
+  }
+
+  // Undefined only when the page could not be read; a readable page with no Metascore still
+  // returns its year, so a wrong-film guess is rejected whether or not it carries a rating
+  async #readMC(path, attempt) {
     if (!path) return
 
     try {
       const html = await this.#fetchText(`${MC_BASE_URL}${path}/`, attempt)
       if (!html) return
 
-      const blocks = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)]
-
       // Parsed leniently: an unrelated malformed block should not discard a rating we did find
-      const titles = blocks.map(([, block]) => parseJson(block)).filter(item => MC_TYPES.includes(item?.['@type']))
+      const titles = [...html.matchAll(LD_JSON)].map(([, block]) => parseJson(block))
+        .filter(item => MC_TYPES.includes(item?.['@type']))
 
-      // No whole-title block means this is not the page we think it is, however it answered.
-      // A block with no rating is the title's own answer: Metacritic has no Metascore yet.
-      if (!titles.length) attempt.incomplete = true
+      // No whole-title block means this is not the page we think it is, however it answered — a
+      // challenge or an interstitial. Returning nothing makes the resolver read it as unread rather
+      // than as a successful resolution. A block with no rating is different: that is Metacritic
+      // saying it has no Metascore yet, which is an answer.
+      if (!titles.length) {
+        attempt.incomplete = true
+
+        return
+      }
 
       const rated = titles.find(item => item.aggregateRating?.ratingValue != null)
 
-      return toScore(rated?.aggregateRating.ratingValue)
+      return { value: toScore(rated?.aggregateRating.ratingValue), year: pageYear(html) }
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error getting Metacritic score', { path, error: e })
     }
   }
 
-  // One Wikidata call yields both slugs; guessing is only a fallback for items it lacks.
-  async #getSlugs(wikiId, title, releaseDate, mediaType, attempt) {
-    const key = `slugs/${mediaType}/${wikiId}/${title}/${releaseDate}`
+  // Resolution and reading are one step: the page that proves a guess is the right film is the same
+  // page that carries its scores. A cached slug is re-verified rather than trusted, which costs
+  // nothing — the run fetches both pages for their scores anyway — and writing the record back on
+  // every run keeps an in-use slug warm, so they stop expiring together.
+  async #resolveSources({ wikiId, title, releaseDate, mediaType }, attempt) {
+    const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
-
-    if (cached) return cached
-
     const prefixes = PATHS[mediaType] ?? PATHS.movie
-    const slugs = {}
+    const year = yearOf(releaseDate)
 
-    // Local, because Wikidata going quiet costs nothing if a probe resolves the slug anyway
+    // Local, because Wikidata going quiet costs nothing if a guess resolves the slug anyway
     const lookup = { incomplete: false }
+    const wiki = {}
 
     try {
-      if (wikiId) {
+      // Ask whenever a slug is missing, not only when the record is: a record holding one slug is
+      // still truthy, so gating on that alone re-guessed the other one nightly and never recovered
+      // the authoritative answer. A record with both slugs skips the call, which is most of them.
+      if (wikiId && !(cached?.rt && cached?.mc)) {
         const res = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`, lookup)
-        slugs.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
+
+        wiki.rt = res?.[WIKI_RT_PROP]?.[0]?.value?.content
         // Trim it: the reader appends its own, and `movie/inception//` 404s where `movie/inception/` is a hit
-        slugs.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
+        wiki.mc = res?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
       }
 
-      if (!slugs.rt) slugs.rt = await this.#probe(RT_BASE_URL, this.#rtCandidates(prefixes.rt, title, releaseDate), lookup)
-      if (!slugs.mc) slugs.mc = await this.#probe(MC_BASE_URL, [`${prefixes.mc}${slugify(title, '-')}`], lookup, '/')
+      // One flag per host, merged after: the two run concurrently and each decides whether its own
+      // read failed. Sharing `attempt` let RT's failure read as Metacritic's, which would preserve a
+      // slug Metacritic had just told us was gone.
+      const rtRead = { incomplete: false }
+      const mcRead = { incomplete: false }
 
-      // A slug still missing after something went unanswered is unknown, not absent, so the
-      // score it feeds is short a source and neither result is worth storing
-      if (lookup.incomplete && (!slugs.rt || !slugs.mc)) attempt.incomplete = true
-      else redis.setCache(key, slugs, slugs.rt || slugs.mc ? SLUG_TTL : SLUG_MISS_TTL)
+      const [rt, mc] = await Promise.all([
+        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, rtRead), rtRead),
+        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, mcRead), mcRead)
+      ])
+
+      if (rtRead.incomplete || mcRead.incomplete) attempt.incomplete = true
+      const record = { rt: rt.slug, mc: mc.slug, rtSource: rt.source, mcSource: mc.source }
+      const unread = lookup.incomplete || rt.unread || mc.unread
+
+      if (unread && (!record.rt || !record.mc)) attempt.incomplete = true
+
+      // Replace the record only once every host reached a verdict. Anything unread leaves the stored
+      // record alone: a blocked run then costs one re-resolution, where merging a partial answer into
+      // it costs an authoritative slug for good — which is what every attempt to be cleverer here did.
+      if (!unread) redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
+
+      return { rt, mc }
     } catch (e) {
       attempt.incomplete = true
       log.warn('Error resolving slugs', { title, mediaType, error: e })
-    }
 
-    return slugs
+      return {}
+    }
   }
 
-  #rtCandidates(prefix, title, releaseDate) {
+  // Try cached first, then Wikidata, then guesses. Count a cached slug of unknown source as
+  // guessed, so a record written before this check is verified rather than trusted.
+  #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
+    // Wikidata confirming a cached guess makes it authoritative; leaving it `guessed` would keep it
+    // paying a year check it should not, and a re-release date could then reject a correct slug
+    const source = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'guessed'
+    const authoritative = cachedSlug && source === 'wikidata' ? [{ slug: cachedSlug, source }] : []
+    const list = [...authoritative]
+
+    if (wikiSlug && wikiSlug !== cachedSlug) list.push({ slug: wikiSlug, source: 'wikidata' })
+
+    // A cached guess ranks behind Wikidata: ahead of it, a guess that happens to verify would
+    // discard the authoritative answer and then suppress the lookup that could restore it
+    if (cachedSlug && !authoritative.length) list.push({ slug: cachedSlug, source })
+
+    for (const slug of guesses) {
+      if (!list.some(candidate => candidate.slug === slug)) list.push({ slug, source: 'guessed' })
+    }
+
+    return list
+  }
+
+  // The first candidate whose page verifies wins. Any 200 used to be accepted, and `m/breach`
+  // answers 200 with a confident 2007 film for a 2026 title.
+  async #resolve(candidates, year, read, attempt) {
+    let rejected = false
+    let unread = false
+
+    for (const { slug, source } of candidates) {
+      const failed = attempt.incomplete
+      const page = await read(slug)
+
+      if (!page) {
+        // A 404 says this slug is wrong, so try the next one. Anything else says we could not tell —
+        // and an authoritative slug must not be abandoned to a guess on that basis, because the
+        // guess would then be stored, both slugs would be present, and the lookup would stop asking.
+        if (attempt.incomplete === failed) continue
+
+        unread = true
+
+        if (source === 'wikidata') return { rejected, unread }
+
+        continue
+      }
+
+      // Only Wikidata bypasses the check. A year we cannot read must not pass as a year that
+      // matched: if a host drops the field, rejecting shows up as a rate collapse and a spike in
+      // `rejected`, where trusting would quietly go back to scoring the wrong films.
+      if (source === 'wikidata' || (Number.isFinite(year) && page.year === year)) {
+        return { slug, source, page, rejected }
+      }
+
+      rejected = true
+      // An anomaly, not a per-title fact, so log it rather than counting it: the rate is a log query
+      log.warn('Slug rejected as a different title', { slug, pageYear: page.year, wantYear: year })
+    }
+
+    return { rejected, unread }
+  }
+
+  #rtGuesses(prefix, title, year) {
     const slug = prefix + slugify(title, '_')
-    const year = new Date(releaseDate).getFullYear()
 
     return Number.isFinite(year) ? [slug, `${slug}_${year}`] : [slug]
-  }
-
-  async #probe(baseUrl, candidates, attempt, suffix = '') {
-    const settled = await Promise.allSettled(candidates.map(path =>
-      this.#fetch(`${baseUrl}${path}${suffix}`, { method: 'HEAD' })
-    ))
-
-    const match = candidates.find((path, i) => settled[i].value?.ok)
-
-    // Only a not-found answer tells us a guessed slug is wrong; anything else went unanswered
-    if (!match && settled.some(result => !PAGE_NOT_FOUND.has(result.value?.status))) {
-      this.#unreadable(attempt, baseUrl, { reason: 'probe went unanswered' })
-    }
-
-    await Promise.all(settled.map(result => discard(result.value)))
-
-    return match
   }
 
   // Sources blip. A single timeout used to drop that source's score for the title and

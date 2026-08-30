@@ -8,14 +8,27 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 
 const { default: scoreService } = await import('./scoreService.js')
 const { default: redis } = await import('./redisService.js')
+const { default: log } = await import('../utils/logger.js')
 
 // Redis is never connected here, so the write is recorded rather than made
 const writes = new Map()
-redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, ttl))
-const ttlOf = key => writes.get(key)
+redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
+const ttlOf = key => writes.get(key)?.ttl
+// Through JSON, because that is what Redis stores: undefined keys do not survive the trip
+const wrote = key => writes.has(key) ? JSON.parse(JSON.stringify(writes.get(key).value)) : undefined
 
-const LD = value => `<script type="application/ld+json">${JSON.stringify({
-  '@type': 'Movie', aggregateRating: { ratingValue: value }
+// Captures the fields of one warning, since a rejection is logged rather than counted
+function warnings(message) {
+  const seen = []
+  const real = log.warn
+
+  log.warn = (msg, fields) => { if (msg === message) seen.push(fields); return real(msg, fields) }
+
+  return () => seen
+}
+
+const LD = (value, year = 2010) => `<script type="application/ld+json">${JSON.stringify({
+  '@type': 'Movie', aggregateRating: { ratingValue: value }, dateCreated: `${year}-07-16`
 })}</script>`
 
 const ok = body => new Response(body, { status: 200 })
@@ -26,15 +39,16 @@ function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {
     calls.count++
-    return routes[new URL(url).host]?.() ?? new Response('', { status: 404 })
+    return routes[new URL(url).host]?.(String(url)) ?? new Response('', { status: 404 })
   }
   return calls
 }
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
-const rtScorecard = (critic, audience) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+// The year matches the fixtures' usual release date, since a guessed slug is only accepted when it does
+const rtScorecard = (critic, audience, year = 2010) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
   criticsScore: { score: critic }, audienceScore: { score: audience }
-})}</script>`)
+})}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
 // Replaces global fetch with a queue of canned outcomes, and records the call count.
 function stubFetch(...outcomes) {
@@ -252,7 +266,7 @@ test('an unanswered slug lookup is not cached, so the retry re-asks', async () =
   }, false)
 
   assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
-  assert.equal(ttlOf('slugs/movie/Q777/Nothing Answers/2026-01-01'), undefined)
+  assert.equal(ttlOf('slugs/v1/movie/Q777/Nothing Answers/2026-01-01'), undefined)
 })
 
 // A 200 with nothing in it is not a page either, and some proxies answer that way on error
@@ -285,7 +299,8 @@ test('a Wikidata blip does not shorten a score the probes resolved', async () =>
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
   assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
-  assert.ok(ttlOf('slugs/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
+  assert.equal(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), undefined,
+    'an unread lookup leaves the record alone, so the guesses are re-resolved next run')
 })
 
 // A malformed sibling block used to throw and discard a rating that had already been found
@@ -308,7 +323,7 @@ test('a malformed JSON-LD block does not lose a rating', async () => {
 
 // throttleMs is set by the job and read nowhere else, so the wiring needs its own cover
 test('a set throttle spaces repeat requests to one host', async () => {
-  // No slug from Wikidata, so both RT candidates get probed: two requests to the same host
+  // No slug from Wikidata, so both RT candidates get guessed: two requests to the same host
   const calls = stubHosts({
     'www.wikidata.org': () => ok('{}'),
     'www.rottentomatoes.com': () => new Response('', { status: 404 }),
@@ -353,4 +368,215 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
 
   assert.equal(requested, 'https://www.metacritic.com/movie/trailing/')
   assert.equal(score.scores.metacritic, 52)
+})
+
+// `m/breach` answers 200 with a confident 2007 title for a 2026 release. The year in schema.org
+// JSON-LD is what separates them; any 200 used to be accepted.
+const rtPage = (critic, audience, year) => () => ok(
+  `<script id="media-scorecard-json">${JSON.stringify({ criticsScore: { score: critic }, audienceScore: { score: audience } })}</script>` +
+  (year ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-02-16` })}</script>` : '')
+)
+
+// Per-host request counting, since the point of one GET is that it replaces a probe plus a read
+function countingHosts(routes) {
+  const seen = []
+  globalThis.fetch = async url => {
+    seen.push(String(url))
+    return routes[new URL(url).host]?.(String(url)) ?? new Response('', { status: 404 })
+  }
+  return seen
+}
+
+test('a guessed slug for a different film is rejected, and the year variant tried', async () => {
+  const rejections = warnings('Slug rejected as a different title')
+  const seen = countingHosts({
+    'www.wikidata.org': () => ok('{}'),
+    // the bare guess is a 2007 film; the year variant is the real one
+    'www.rottentomatoes.com': url => url.endsWith('_2026') ? rtPage(70, 80, 2026)() : rtPage(83, 91, 2007)(),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/breach', {
+    tmdbScore: 67, title: 'Breach', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, 70, 'the 2026 page, not the 2007 one')
+  assert.deepEqual(rejections(), [{ slug: 'm/breach', pageYear: 2007, wantYear: 2026 }])
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
+    ['https://www.rottentomatoes.com/m/breach', 'https://www.rottentomatoes.com/m/breach_2026'])
+})
+
+// Wikidata is authoritative — paying the year check there would reject legitimate slugs whose
+// page year differs from TMDB's by a re-release or a festival date
+test('a Wikidata slug is accepted even when the page year differs', async () => {
+  const rejections = warnings('Slug rejected as a different title')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/authoritative', 'movie/authoritative'),
+    'www.rottentomatoes.com': rtPage(55, 60, 1999),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/authoritative', {
+    tmdbScore: 67, wikiId: 'Q9', title: 'Authoritative', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, 55)
+  assert.deepEqual(rejections(), [], 'an authoritative slug does not pay the year check')
+})
+
+// One GET per candidate replaces a HEAD probe plus a separate read
+test('resolving a guess costs one request, not a probe and a read', async () => {
+  const seen = countingHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': rtPage(70, 80, 2026),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  await scoreService.getScore('test/movie/onerequest', {
+    tmdbScore: 67, title: 'One Request', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')), ['https://www.rottentomatoes.com/m/one_request'])
+})
+
+// A year we cannot read must not pass as a year that matched: if a host drops the field, the
+// verification would silently stop working and go back to scoring whatever answered
+test('a guessed slug whose page has no year is rejected, not trusted', async () => {
+  const rejections = warnings('Slug rejected as a different title')
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': rtPage(83, 91, null),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/noyear', {
+    tmdbScore: 67, title: 'No Year', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, undefined, 'an unverifiable page cannot resolve a guess')
+  assert.equal(rejections().length, 2, 'both candidates rejected')
+})
+
+// Wikidata confirming a cached guess makes it authoritative, so it stops paying the year check
+test('a cached guess that Wikidata confirms stops being treated as a guess', async () => {
+  const rejections = warnings('Slug rejected as a different title')
+  stubHosts({
+    'www.wikidata.org': wikidata('m/confirmed', 'movie/confirmed'),
+    // the page year disagrees with TMDB, which would reject it if it were still a guess
+    'www.rottentomatoes.com': rtPage(55, 60, 1999),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/confirmed', rtSource: 'guessed' } : null
+
+  try {
+    const score = await scoreService.getScore('test/movie/confirmed', {
+      tmdbScore: 67, wikiId: 'Q11', title: 'Confirmed', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.scores.rtCritic, 55, 'the confirmed slug is authoritative, so the year is not checked')
+    assert.deepEqual(rejections(), [])
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// A 429 is not evidence a slug is wrong. Overwriting the record would drop an authoritative slug
+// that only Wikidata can return, so a failed read must leave the stored record alone.
+test('a source refusing to answer does not erase its cached slug', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/authoritative', mc: 'movie/authoritative', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/refused', {
+      tmdbScore: 67, wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined,
+      'nothing is written, so the stored slug survives untouched')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// A guess that verifies must not displace an authoritative slug the run merely failed to read —
+// once it did, the record held both slugs, the lookup stopped being asked, and it was permanent
+test('a refused authoritative slug is not replaced by a guess that verifies', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': url => url.endsWith('m/displaced')
+      ? new Response('', { status: 403 })
+      : rtPage(70, 80, 2026)(),
+    'www.metacritic.com': () => ok(LD(52, 2026))
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/displaced', mc: 'movie/displaced', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/displaced', {
+      tmdbScore: 67, wikiId: 'Q13', title: 'Displaced', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01'), undefined,
+      'a blocked read writes nothing, so the guess cannot displace the stored slug')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// Wikidata must outrank a cached guess, or a guess that happens to verify discards the
+// authoritative answer and then suppresses the lookup that could restore it
+test('Wikidata outranks a cached guess for the same title', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/from_wikidata', 'movie/from_wikidata'),
+    'www.rottentomatoes.com': rtPage(70, 80, 2026),
+    'www.metacritic.com': () => ok(LD(52, 2026))
+  })
+  // rt cached as a guess, mc missing, so the lookup runs and returns a different rt slug
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/a_guess', rtSource: 'guessed' } : null
+
+  try {
+    await scoreService.getScore('test/movie/outranked', {
+      tmdbScore: 67, wikiId: 'Q14', title: 'Outranked', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false)
+
+    const record = wrote('slugs/v1/movie/Q14/Outranked/2026-05-01')
+
+    assert.equal(record?.rt, 'm/from_wikidata', 'the authoritative slug wins')
+    assert.equal(record?.rtSource, 'wikidata')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// A 404 on a cached slug is a verdict — the page is gone, so the slug must not be kept warm just
+// because a different host happened to be unreadable in the same run
+test('a cached slug that 404s is dropped, and takes its source with it', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/gone', mc: 'movie/still_here', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/verdict', {
+      tmdbScore: 67, wikiId: 'Q15', title: 'Verdict', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
+
+    assert.deepEqual(record, { mc: 'movie/still_here', mcSource: 'wikidata' },
+      'a 404 is a verdict, so the dead slug and its source both go')
+  } finally {
+    redis.getCache = async () => null
+  }
 })
