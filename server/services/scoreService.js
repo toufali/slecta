@@ -225,20 +225,21 @@ class ScoreService {
       }
 
       const [rt, mc] = await Promise.all([
-        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), slugs),
-        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), slugs)
+        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), slugs, attempt),
+        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), slugs, attempt)
       ])
-      // Keep per host rather than withholding the write: a slug nothing could read is unknown, not
-      // wrong, and a 429 must not let a guess replace an authoritative answer only Wikidata returns.
-      // Rejected is different — that slug is proven wrong, so it goes.
-      const unread = lookup.incomplete || attempt.incomplete
-      const keep = (resolved, slug) => resolved.slug ?? (unread && !resolved.rejected ? slug : undefined)
+      // Keep per host, on that host's own verdict: a slug it could not read is unknown, not wrong,
+      // and a 429 must not let a guess replace an authoritative answer only Wikidata returns. A 404
+      // is a verdict, so that slug goes; so does one proven wrong by its year.
+      const keep = (resolved, slug) => resolved.slug ?? (resolved.unread && !resolved.rejected ? slug : undefined)
       const record = {
         rt: keep(rt, cached?.rt),
         mc: keep(mc, cached?.mc),
         rtSource: rt.slug ? rt.source : cached?.rtSource,
         mcSource: mc.slug ? mc.source : cached?.mcSource
       }
+
+      const unread = lookup.incomplete || rt.unread || mc.unread
 
       if (unread && (!record.rt || !record.mc)) attempt.incomplete = true
 
@@ -286,13 +287,26 @@ class ScoreService {
 
   // The first candidate whose page verifies wins. Any 200 used to be accepted, and `m/breach`
   // answers 200 with a confident 2007 film for a 2026 title.
-  async #resolve(candidates, year, read, slugs) {
+  async #resolve(candidates, year, read, slugs, attempt) {
     let rejected = false
+    let unread = false
 
     for (const { slug, source } of candidates) {
+      const failed = attempt.incomplete
       const page = await read(slug)
 
-      if (!page) continue
+      if (!page) {
+        // A 404 says this slug is wrong, so try the next one. Anything else says we could not tell —
+        // and an authoritative slug must not be abandoned to a guess on that basis, because the
+        // guess would then be stored, both slugs would be present, and the lookup would stop asking.
+        if (attempt.incomplete === failed) continue
+
+        unread = true
+
+        if (source === 'wikidata') return { rejected, unread }
+
+        continue
+      }
 
       // Only Wikidata bypasses the check. A year we cannot read must not pass as a year that
       // matched: if a host drops the field, rejecting shows up as a rate collapse and a spike in
@@ -307,7 +321,7 @@ class ScoreService {
       slugs.rejected++
     }
 
-    return { rejected }
+    return { rejected, unread }
   }
 
   #rtGuesses(prefix, title, year) {

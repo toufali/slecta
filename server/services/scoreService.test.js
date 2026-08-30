@@ -27,7 +27,7 @@ function stubHosts(routes) {
   const calls = { count: 0 }
   globalThis.fetch = async url => {
     calls.count++
-    return routes[new URL(url).host]?.() ?? new Response('', { status: 404 })
+    return routes[new URL(url).host]?.(String(url)) ?? new Response('', { status: 404 })
   }
   return calls
 }
@@ -537,6 +537,32 @@ test('Wikidata outranks a cached guess for the same title', async () => {
 
     assert.equal(record?.rt, 'm/from_wikidata', 'the authoritative slug wins')
     assert.equal(record?.rtSource, 'wikidata')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// A 404 on a cached slug is a verdict — the page is gone, so the slug must not be kept warm just
+// because a different host happened to be unreadable in the same run
+test('a cached slug that 404s is dropped even when another host was unreadable', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => new Response('', { status: 429 })
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/gone', mc: 'movie/blocked', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/verdict', {
+      tmdbScore: 67, wikiId: 'Q15', title: 'Verdict', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
+
+    assert.equal(record?.rt, undefined, 'a 404 is a verdict, so the dead slug goes')
+    assert.equal(record?.mc, 'movie/blocked', 'a 429 is not, so that slug is kept')
   } finally {
     redis.getCache = async () => null
   }
