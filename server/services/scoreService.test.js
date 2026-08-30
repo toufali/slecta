@@ -299,7 +299,8 @@ test('a Wikidata blip does not shorten a score the probes resolved', async () =>
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
   assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
-  assert.ok(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), 'the resolved slugs are still worth caching')
+  assert.equal(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), undefined,
+    'an unread lookup leaves the record alone, so the guesses are re-resolved next run')
 })
 
 // A malformed sibling block used to throw and discard a rating that had already been found
@@ -496,8 +497,8 @@ test('a source refusing to answer does not erase its cached slug', async () => {
       tmdbScore: 67, wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.deepEqual(wrote('slugs/v1/movie/Q12/Refused/2010-07-16')?.rt, 'm/authoritative',
-      'the slug it could not read is kept, not replaced by a guess')
+    assert.equal(wrote('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined,
+      'nothing is written, so the stored slug survives untouched')
   } finally {
     redis.getCache = async () => null
   }
@@ -522,8 +523,8 @@ test('a refused authoritative slug is not replaced by a guess that verifies', as
       tmdbScore: 67, wikiId: 'Q13', title: 'Displaced', releaseDate: '2026-05-01', mediaType: 'movie'
     }, false)
 
-    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01')?.rt, 'm/displaced')
-    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01')?.rtSource, 'wikidata')
+    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01'), undefined,
+      'a blocked read writes nothing, so the guess cannot displace the stored slug')
   } finally {
     redis.getCache = async () => null
   }
@@ -556,14 +557,14 @@ test('Wikidata outranks a cached guess for the same title', async () => {
 
 // A 404 on a cached slug is a verdict — the page is gone, so the slug must not be kept warm just
 // because a different host happened to be unreadable in the same run
-test('a cached slug that 404s is dropped even when another host was unreadable', async () => {
+test('a cached slug that 404s is dropped, and takes its source with it', async () => {
   stubHosts({
     'www.wikidata.org': () => ok('{}'),
     'www.rottentomatoes.com': () => new Response('', { status: 404 }),
-    'www.metacritic.com': () => new Response('', { status: 429 })
+    'www.metacritic.com': () => ok(LD(52))
   })
   redis.getCache = async key => key.startsWith('slugs/')
-    ? { rt: 'm/gone', mc: 'movie/blocked', rtSource: 'wikidata', mcSource: 'wikidata' }
+    ? { rt: 'm/gone', mc: 'movie/still_here', rtSource: 'wikidata', mcSource: 'wikidata' }
     : null
 
   try {
@@ -573,8 +574,8 @@ test('a cached slug that 404s is dropped even when another host was unreadable',
 
     const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
 
-    assert.deepEqual(record, { mc: 'movie/blocked', mcSource: 'wikidata' },
-      'the dead slug goes and takes its source with it; the blocked one is kept whole')
+    assert.deepEqual(record, { mc: 'movie/still_here', mcSource: 'wikidata' },
+      'a 404 is a verdict, so the dead slug and its source both go')
   } finally {
     redis.getCache = async () => null
   }

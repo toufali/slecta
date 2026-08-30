@@ -185,9 +185,15 @@ class ScoreService {
       const titles = [...html.matchAll(LD_JSON)].map(([, block]) => parseJson(block))
         .filter(item => MC_TYPES.includes(item?.['@type']))
 
-      // No whole-title block means this is not the page we think it is, however it answered.
-      // A block with no rating is the title's own answer: Metacritic has no Metascore yet.
-      if (!titles.length) attempt.incomplete = true
+      // No whole-title block means this is not the page we think it is, however it answered — a
+      // challenge or an interstitial. Returning nothing makes the resolver read it as unread rather
+      // than as a successful resolution. A block with no rating is different: that is Metacritic
+      // saying it has no Metascore yet, which is an answer.
+      if (!titles.length) {
+        attempt.incomplete = true
+
+        return
+      }
 
       const rated = titles.find(item => item.aggregateRating?.ratingValue != null)
 
@@ -236,31 +242,15 @@ class ScoreService {
       ])
 
       if (rtRead.incomplete || mcRead.incomplete) attempt.incomplete = true
-      // Keep per host, on that host's own verdict: a slug it could not read is unknown, not wrong,
-      // and a 429 must not let a guess replace an authoritative answer only Wikidata returns. A 404
-      // is a verdict, so that slug goes; so does one proven wrong by its year. A slug and where it
-      // came from move as one, or a dropped slug leaves its source behind describing nothing.
-      const keep = (resolved, slug, source) => resolved.slug ? resolved
-        : resolved.unread && !resolved.rejected ? { slug, source } : {}
-
-      const rtKept = keep(rt, cached?.rt, cached?.rtSource)
-      const mcKept = keep(mc, cached?.mc, cached?.mcSource)
-      const record = { rt: rtKept.slug, mc: mcKept.slug, rtSource: rtKept.source, mcSource: mcKept.source }
-
+      const record = { rt: rt.slug, mc: mc.slug, rtSource: rt.source, mcSource: mc.source }
       const unread = lookup.incomplete || rt.unread || mc.unread
 
       if (unread && (!record.rt || !record.mc)) attempt.incomplete = true
 
-      // Write only what is worth keeping. Rejected means a stored slug is proven wrong, so the
-      // record must change — but refreshing the life on a run that rejected something would keep a
-      // wrong-but-verifying slug warm forever, and expiry is the only way it gets re-derived.
-      // Nothing resolved and nothing readable is not a result, so leave it for the next run.
-      const rejected = rt.rejected || mc.rejected
-      const nothing = !record.rt && !record.mc
-
-      if (!rejected && !(nothing && unread)) {
-        redis.setCache(key, record, nothing ? SLUG_MISS_TTL : SLUG_TTL)
-      }
+      // Replace the record only once every host reached a verdict. Anything unread leaves the stored
+      // record alone: a blocked run then costs one re-resolution, where merging a partial answer into
+      // it costs an authoritative slug for good — which is what every attempt to be cleverer here did.
+      if (!unread) redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
 
       return { rt, mc }
     } catch (e) {
