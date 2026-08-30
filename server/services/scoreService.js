@@ -203,12 +203,20 @@ class ScoreService {
       // still truthy, so gating on that alone re-guessed the other one nightly and never recovered
       // the authoritative answer. A record with both slugs skips the call, which is most of them.
       if (wikiId && !(cached?.rt && cached?.mc)) {
-        const { answered, body } = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`)
+        // Its own catch, like the two score readers have. The outer one sits outside the Promise.all
+        // below, so a throw here — a second timeout, or a 200 whose body is not JSON — would cost RT
+        // and Metacritic as well as the lookup, leaving the title on IMDb and TMDB alone.
+        try {
+          const { answered, body } = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`)
 
-        wikiAnswered = answered
-        wiki.rt = body?.[WIKI_RT_PROP]?.[0]?.value?.content
-        // Trim it: the reader appends its own, and `movie/inception//` 404s where `movie/inception/` is a hit
-        wiki.mc = body?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
+          wikiAnswered = answered
+          wiki.rt = body?.[WIKI_RT_PROP]?.[0]?.value?.content
+          // Trim it: the reader appends its own, and `movie/inception//` 404s where `movie/inception/` is a hit
+          wiki.mc = body?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
+        } catch (e) {
+          wikiAnswered = false
+          log.warn('Error resolving slugs from Wikidata', { wikiId, error: e })
+        }
       }
 
       const [rt, mc] = await Promise.all([
