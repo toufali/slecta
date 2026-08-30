@@ -271,7 +271,7 @@ class ScoreService {
     }
   }
 
-  // Try cached first, then Wikidata, then guesses. Count a cached slug of unknown provenance as
+  // Try cached first, then Wikidata, then guesses. Count a cached slug of unknown source as
   // guessed, so a record written before this check is verified rather than trusted.
   #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
     // Wikidata confirming a cached guess makes it authoritative; leaving it `guessed` would keep it

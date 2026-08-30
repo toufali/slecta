@@ -574,7 +574,7 @@ test('a cached slug that 404s is dropped even when another host was unreadable',
     const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
 
     assert.deepEqual(record, { mc: 'movie/blocked', mcSource: 'wikidata' },
-      'the dead slug goes and takes its provenance with it; the blocked one is kept whole')
+      'the dead slug goes and takes its source with it; the blocked one is kept whole')
   } finally {
     redis.getCache = async () => null
   }
