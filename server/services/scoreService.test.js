@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService } = await import('./scoreService.js')
+const { default: scoreService, orderCandidates } = await import('./scoreService.js')
 const { default: redis } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -14,15 +14,18 @@ const { default: log } = await import('../utils/logger.js')
 const writes = new Map()
 redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
 const ttlOf = key => writes.get(key)?.ttl
+const realGetCache = redis.getCache
 // Through JSON, because that is what Redis stores: undefined keys do not survive the trip
 const wrote = key => writes.has(key) ? JSON.parse(JSON.stringify(writes.get(key).value)) : undefined
 
-// Captures the fields of one warning, since a rejection is logged rather than counted
+const realWarn = log.warn
+
+// Captures the fields of one warning, since a rejection is logged rather than counted. Always wraps
+// the original, so successive tests do not stack wrappers on each other.
 function warnings(message) {
   const seen = []
-  const real = log.warn
 
-  log.warn = (msg, fields) => { if (msg === message) seen.push(fields); return real(msg, fields) }
+  log.warn = (msg, fields) => { if (msg === message) seen.push(fields); return realWarn(msg, fields) }
 
   return () => seen
 }
@@ -50,50 +53,63 @@ const rtScorecard = (critic, audience, year = 2010) => () => ok(`<script id="med
   criticsScore: { score: critic }, audienceScore: { score: audience }
 })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
-// Replaces global fetch with a queue of canned outcomes, and records the call count.
-function stubFetch(...outcomes) {
+const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+
+// Retry and body-discard policy, through the path production runs. Metacritic's slug is guessed
+// from the title, so `movie/inception` is its only candidate and every call to that host is the read
+// under test — pinned to one host so the concurrent reads of the other two cannot consume the queue.
+// No wikiId, so the lookup is skipped.
+async function readMC(key, ...outcomes) {
   const calls = { count: 0 }
-  globalThis.fetch = async () => {
+
+  globalThis.fetch = async url => {
+    if (new URL(url).host !== 'www.metacritic.com') return new Response('', { status: 404 })
+
     const outcome = outcomes[calls.count++] ?? outcomes.at(-1)
     if (outcome instanceof Error) throw outcome
     return outcome
   }
-  return calls
+
+  const score = await scoreService.getScore(key, { title: 'Inception', releaseDate: '2010-07-16' }, false)
+
+  return { calls, metacritic: score.scores.metacritic }
 }
 
-const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
-
 test('a timeout is retried and the score survives', async () => {
-  const calls = stubFetch(timeout(), ok(LD(74)))
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), 74)
+  const { calls, metacritic } = await readMC('test/read/timeout', timeout(), ok(LD(74)))
+
+  assert.equal(metacritic, 74)
   assert.equal(calls.count, 2)
 })
 
 test('a 5xx is retried', async () => {
-  const calls = stubFetch(new Response('', { status: 503 }), ok(LD(74)))
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), 74)
+  const { calls, metacritic } = await readMC('test/read/5xx', new Response('', { status: 503 }), ok(LD(74)))
+
+  assert.equal(metacritic, 74)
   assert.equal(calls.count, 2)
 })
 
-// The slug probes 404 by design, so retrying a 4xx would double every miss for nothing.
+// A wrong guess 404s by design, so retrying a 4xx would double every miss for nothing.
 test('a 404 is not retried', async () => {
-  const calls = stubFetch(new Response('', { status: 404 }), ok(LD(74)))
-  assert.equal(await scoreService.getMetacriticScore('movie/nope'), undefined)
+  const { calls, metacritic } = await readMC('test/read/404', new Response('', { status: 404 }), ok(LD(74)))
+
+  assert.equal(metacritic, undefined)
   assert.equal(calls.count, 1)
 })
 
 test('two timeouts in a row give up rather than looping', async () => {
-  const calls = stubFetch(timeout(), timeout())
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), undefined)
+  const { calls, metacritic } = await readMC('test/read/twotimeouts', timeout(), timeout())
+
+  assert.equal(metacritic, undefined)
   assert.equal(calls.count, 2)
 })
 
 // Undici holds the connection for a response whose body is never read.
 test('the discarded 5xx body is released, not left holding a connection', async () => {
   const discarded = new Response('boom', { status: 503 })
-  stubFetch(discarded, ok(LD(74)))
+  const { metacritic } = await readMC('test/read/discard', discarded, ok(LD(74)))
 
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), 74)
+  assert.equal(metacritic, 74)
   assert.equal(discarded.bodyUsed, true, 'body of the abandoned 5xx was never released')
 })
 
@@ -102,27 +118,58 @@ test('the discarded 5xx body is released, not left holding a connection', async 
 test('a 5xx surviving the retry releases both bodies', async () => {
   const first = new Response('boom', { status: 503 })
   const final = new Response('boom', { status: 503 })
-  stubFetch(first, final)
 
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), undefined)
+  const { metacritic } = await readMC('test/read/bothbodies', first, final)
+
+  assert.equal(metacritic, undefined)
   assert.equal(first.bodyUsed, true, 'first 5xx body was never released')
   assert.equal(final.bodyUsed, true, 'final 5xx body was never released')
 })
 
 test('a 4xx body is released even though it is never retried', async () => {
   const missing = new Response('not found', { status: 404 })
-  stubFetch(missing)
 
-  assert.equal(await scoreService.getMetacriticScore('movie/nope'), undefined)
+  const { metacritic } = await readMC('test/read/4xxbody', missing)
+
+  assert.equal(metacritic, undefined)
   assert.equal(missing.bodyUsed, true, '404 body was never released')
 })
 
 test('a healthy response is not retried', async () => {
-  const calls = stubFetch(ok(LD(74)))
-  assert.equal(await scoreService.getMetacriticScore('movie/inception'), 74)
+  const { calls, metacritic } = await readMC('test/read/healthy', ok(LD(74)))
+
+  assert.equal(metacritic, 74)
   assert.equal(calls.count, 1)
 })
 
+
+// Ordering is pure, so the rules can be read straight off the list with no host contacted
+test('Wikidata outranks a cached guess without discarding it', () => {
+  assert.deepEqual(orderCandidates('m/guess', 'guessed', 'm/wiki', ['m/title']), [
+    { slug: 'm/wiki', source: 'wikidata' },
+    { slug: 'm/guess', source: 'guessed' },
+    { slug: 'm/title', source: 'guessed' }
+  ])
+})
+
+test('a cached guess Wikidata confirms becomes authoritative and stands alone', () => {
+  assert.deepEqual(orderCandidates('m/same', 'guessed', 'm/same', ['m/title']), [
+    { slug: 'm/same', source: 'wikidata' },
+    { slug: 'm/title', source: 'guessed' }
+  ])
+})
+
+// A record written before the source field existed must be verified, not trusted
+test('a cached slug of unknown source counts as guessed', () => {
+  assert.deepEqual(orderCandidates('m/legacy', undefined, undefined, []), [{ slug: 'm/legacy', source: 'guessed' }])
+})
+
+test('a guess matching the Wikidata slug is not asked for twice', () => {
+  assert.deepEqual(orderCandidates(undefined, undefined, 'm/title', ['m/title', 'm/title_2010']), [
+    { slug: 'm/title', source: 'wikidata' },
+    { slug: 'm/title_2010', source: 'guessed' }
+  ])
+})
 
 // The badge renders this number and lists order by it, so it has to be an integer or absent.
 // Redis is never connected here, so reads miss and the write is a no-op.
@@ -165,12 +212,12 @@ test('a score missing a source that refused expires early', async () => {
     'www.metacritic.com': () => ok(LD(52))
   })
 
-  const score = await scoreService.getScore('test/movie/27205', {
+  const score = await scoreService.getScore('test/movie/refusedsource', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
-  assert.equal(ttlOf('test/movie/27205'), 60 * 60)
+  assert.equal(ttlOf('test/movie/refusedsource'), 60 * 60)
 })
 
 // A 404 is the title's own answer, so the thinner score is settled and keeps the full life
@@ -181,12 +228,12 @@ test('a score missing a source that has no page keeps the full life', async () =
     'www.metacritic.com': () => ok(LD(52))
   })
 
-  const score = await scoreService.getScore('test/movie/27205', {
+  const score = await scoreService.getScore('test/movie/nopage', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
-  assert.equal(ttlOf('test/movie/27205'), 60 * 60 * 48)
+  assert.equal(ttlOf('test/movie/nopage'), 60 * 60 * 48)
 })
 
 // A block arrives as whatever status the CDN in front of the source happens to use
@@ -203,20 +250,31 @@ test('a block on any status shortens the record, a 404 does not', async () => {
     }, false)
 
     assert.equal(ttlOf(`test/movie/${status}`), 60 * 60, `status ${status}`)
+    assert.deepEqual(Object.keys(wrote(`test/movie/${status}`).scores), ['metacritic', 'tmdb'], `status ${status}`)
   }
 })
 
-// A Wikidata timeout leaves no slugs, so the score is missing sources rather than lacking them
-test('a slug lookup that never answered shortens the record too', async () => {
-  globalThis.fetch = async url => new URL(url).host === 'www.wikidata.org'
-    ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
-    : new Response('', { status: 404 })
+// A lookup that *throws* — a timeout, or a 200 whose body is not JSON — escapes to the outer catch
+// and abandons the title, so neither score source is read at all. A lookup that merely fails a
+// status does not; the test above covers that. Asserted as it behaves rather than as it should:
+// giving this read the try/catch the two score readers have is its own change.
+test('a slug lookup that throws abandons the title before either source is read', async () => {
+  const seen = []
+  globalThis.fetch = async url => {
+    seen.push(new URL(url).host)
 
-  await scoreService.getScore('test/movie/slugfail', {
+    return new URL(url).host === 'www.wikidata.org'
+      ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
+      : rtScorecard(50, 85)()
+  }
+
+  const score = await scoreService.getScore('test/movie/slugthrow', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.equal(ttlOf('test/movie/slugfail'), 60 * 60)
+  assert.deepEqual([...new Set(seen)], ['www.wikidata.org'], 'RT was never asked, though it would have answered')
+  assert.deepEqual(Object.keys(score.scores), ['tmdb'])
+  assert.equal(ttlOf('test/movie/slugthrow'), 60 * 60)
 })
 
 // Half of the Metacritic pages that answer have no Metascore yet, which is the title's own answer
@@ -244,10 +302,11 @@ test('a page with no whole-title block shortens the record', async () => {
     'www.metacritic.com': challenge
   })
 
-  await scoreService.getScore('test/movie/challenge', {
+  const score = await scoreService.getScore('test/movie/challenge', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
+  assert.deepEqual(Object.keys(score.scores), ['rtCritic', 'rtAudience', 'tmdb'], 'the challenge page yielded no Metascore')
   assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
 })
 
@@ -277,10 +336,11 @@ test('an empty body shortens the record despite the status', async () => {
     'www.metacritic.com': () => ok(LD(52))
   })
 
-  await scoreService.getScore('test/movie/empty', {
+  const score = await scoreService.getScore('test/movie/empty', {
     tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'], 'the empty RT body yielded no scores')
   assert.equal(ttlOf('test/movie/empty'), 60 * 60)
 })
 
@@ -348,7 +408,7 @@ test('a set throttle spaces repeat requests to one host', async () => {
 // Measured: metacritic.com/movie/inception// 404s where movie/inception/ is a 200, so a slug
 // carrying its own trailing slash silently dropped the Metascore
 test('a Wikidata slug with a trailing slash still reaches Metacritic', async () => {
-  let requested
+  const requested = []
   stubHosts({
     'www.wikidata.org': wikidata('m/trailing', 'movie/trailing/'),
     'www.rottentomatoes.com': rtScorecard(50, 85),
@@ -358,7 +418,7 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
   const routed = globalThis.fetch
   globalThis.fetch = async (url, options) => {
     if (new URL(url).host !== 'www.metacritic.com') return routed(url, options)
-    requested = url
+    requested.push(String(url))
     return url.includes('//', 8) ? new Response('', { status: 404 }) : ok(LD(52))
   }
 
@@ -366,7 +426,9 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
     tmdbScore: 67, wikiId: 'Q5', title: 'Trailing', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.equal(requested, 'https://www.metacritic.com/movie/trailing/')
+  // Every request, not the last: an untrimmed slug 404s and the guessed candidate is the same
+  // string trimmed, so keeping only the final URL passed with the trim deleted
+  assert.deepEqual(requested, ['https://www.metacritic.com/movie/trailing/'])
   assert.equal(score.scores.metacritic, 52)
 })
 
@@ -476,7 +538,7 @@ test('a cached guess that Wikidata confirms stops being treated as a guess', asy
     assert.equal(score.scores.rtCritic, 55, 'the confirmed slug is authoritative, so the year is not checked')
     assert.deepEqual(rejections(), [])
   } finally {
-    redis.getCache = async () => null
+    redis.getCache = realGetCache
   }
 })
 
@@ -500,7 +562,7 @@ test('a source refusing to answer does not erase its cached slug', async () => {
     assert.equal(wrote('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined,
       'nothing is written, so the stored slug survives untouched')
   } finally {
-    redis.getCache = async () => null
+    redis.getCache = realGetCache
   }
 })
 
@@ -526,7 +588,7 @@ test('a refused authoritative slug is not replaced by a guess that verifies', as
     assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01'), undefined,
       'a blocked read writes nothing, so the guess cannot displace the stored slug')
   } finally {
-    redis.getCache = async () => null
+    redis.getCache = realGetCache
   }
 })
 
@@ -551,7 +613,7 @@ test('Wikidata outranks a cached guess for the same title', async () => {
     assert.equal(record?.rt, 'm/from_wikidata', 'the authoritative slug wins')
     assert.equal(record?.rtSource, 'wikidata')
   } finally {
-    redis.getCache = async () => null
+    redis.getCache = realGetCache
   }
 })
 
@@ -577,6 +639,61 @@ test('a cached slug that 404s is dropped, and takes its source with it', async (
     assert.deepEqual(record, { mc: 'movie/still_here', mcSource: 'wikidata' },
       'a 404 is a verdict, so the dead slug and its source both go')
   } finally {
-    redis.getCache = async () => null
+    redis.getCache = realGetCache
   }
+})
+
+// A host that just refused will refuse the next guess too, so asking anyway multiplied the
+// rate-limit wait by the number of candidates
+test('a refusing host is asked once, not once per candidate', async () => {
+  const seen = countingHosts({
+    'www.rottentomatoes.com': () => new Response('', { status: 429, headers: { 'retry-after': '1' } })
+  })
+
+  await scoreService.getScore('test/movie/amplified', {
+    tmdbScore: 67, title: 'Amplified', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  // Two guesses exist, `m/amplified` and `m/amplified_2010`. Only the first is tried, and it
+  // costs the one 429 plus the one retry the wait is for.
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
+    ['https://www.rottentomatoes.com/m/amplified', 'https://www.rottentomatoes.com/m/amplified'])
+})
+
+// A quiet lookup counts against the score only while a slug is still missing: it may have held the
+// one the guesses could not find, so the thin score is worth rebuilding sooner
+test('a Wikidata blip shortens the score when a slug is still missing', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/wikigap', {
+    tmdbScore: 67, wikiId: 'Q43', title: 'Wiki Gap', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  // Metacritic resolved and RT did not, which is the case this exists for — a 1h TTL alone would
+  // also hold if neither had
+  assert.equal(score.scores.metacritic, 52)
+  assert.equal(score.scores.rtCritic, undefined)
+  assert.equal(ttlOf('test/movie/wikigap'), 60 * 60)
+})
+
+// Fall-through on a 404, which became a path of its own once `!page` and `!answered` split. The
+// year-mismatch route above covers the same pair of URLs but never exercises this branch.
+test('a 404 on the first guess falls through to the year variant', async () => {
+  const seen = countingHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': url => url.endsWith('_2026') ? rtPage(70, 80, 2026)() : new Response('', { status: 404 }),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/fallthrough', {
+    tmdbScore: 67, title: 'Fall Through', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, 70, 'the year variant resolved after the bare guess 404d')
+  assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
+    ['https://www.rottentomatoes.com/m/fall_through', 'https://www.rottentomatoes.com/m/fall_through_2026'])
 })
