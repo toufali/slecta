@@ -238,14 +238,14 @@ class ScoreService {
       if (rtRead.incomplete || mcRead.incomplete) attempt.incomplete = true
       // Keep per host, on that host's own verdict: a slug it could not read is unknown, not wrong,
       // and a 429 must not let a guess replace an authoritative answer only Wikidata returns. A 404
-      // is a verdict, so that slug goes; so does one proven wrong by its year.
-      const keep = (resolved, slug) => resolved.slug ?? (resolved.unread && !resolved.rejected ? slug : undefined)
-      const record = {
-        rt: keep(rt, cached?.rt),
-        mc: keep(mc, cached?.mc),
-        rtSource: rt.slug ? rt.source : cached?.rtSource,
-        mcSource: mc.slug ? mc.source : cached?.mcSource
-      }
+      // is a verdict, so that slug goes; so does one proven wrong by its year. A slug and where it
+      // came from move as one, or a dropped slug leaves its source behind describing nothing.
+      const keep = (resolved, slug, source) => resolved.slug ? resolved
+        : resolved.unread && !resolved.rejected ? { slug, source } : {}
+
+      const rtKept = keep(rt, cached?.rt, cached?.rtSource)
+      const mcKept = keep(mc, cached?.mc, cached?.mcSource)
+      const record = { rt: rtKept.slug, mc: mcKept.slug, rtSource: rtKept.source, mcSource: mcKept.source }
 
       const unread = lookup.incomplete || rt.unread || mc.unread
 

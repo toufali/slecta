@@ -14,7 +14,8 @@ const { default: log } = await import('../utils/logger.js')
 const writes = new Map()
 redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
 const ttlOf = key => writes.get(key)?.ttl
-const wrote = key => writes.get(key)?.value
+// Through JSON, because that is what Redis stores: undefined keys do not survive the trip
+const wrote = key => writes.has(key) ? JSON.parse(JSON.stringify(writes.get(key).value)) : undefined
 
 // Captures the fields of one warning, since a rejection is logged rather than counted
 function warnings(message) {
@@ -572,8 +573,8 @@ test('a cached slug that 404s is dropped even when another host was unreadable',
 
     const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
 
-    assert.equal(record?.rt, undefined, 'a 404 is a verdict, so the dead slug goes')
-    assert.equal(record?.mc, 'movie/blocked', 'a 429 is not, so that slug is kept')
+    assert.deepEqual(record, { mc: 'movie/blocked', mcSource: 'wikidata' },
+      'the dead slug goes and takes its provenance with it; the blocked one is kept whole')
   } finally {
     redis.getCache = async () => null
   }
