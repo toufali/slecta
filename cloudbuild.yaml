@@ -23,7 +23,7 @@ steps:
       for attempt in 1 2 3; do
         gcloud run jobs update cache-scores \
           --image gcr.io/$PROJECT_ID/$REPO_FULL_NAME/$SHORT_SHA \
-          --task-timeout 1800s \
+          --task-timeout 3600s \
           --region us-central1 && exit 0
         sleep 5
       done
