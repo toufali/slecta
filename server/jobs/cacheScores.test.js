@@ -457,3 +457,27 @@ test('a short catalogue walk withholds the index even at full row coverage', asy
     restore()
   }
 })
+
+// The counters are wired through a fourth argument, so a regression there leaves the completion
+// metric permanently zero while the resolver's own tests keep passing
+test('slug counters from the scorer reach the run stats', async () => {
+  const movies = [1, 2].map(id => ({ page: 1, id, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const realGetScore = scoreService.getScore
+
+  // reference titles call without the fourth argument, so it has to default here too
+  scoreService.getScore = async (key, data, tryCache, slugs = { probed: 0, rejected: 0 }) => {
+    slugs.probed++
+    if (key === 'movies/2/score') slugs.rejected++
+    return Object.defineProperty({ avgScore: 70, scores: { tmdb: 70 } }, 'cached', { value: true })
+  }
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.deepEqual(stats.slugs, { probed: 2, rejected: 1 })
+  } finally {
+    scoreService.getScore = realGetScore
+    restore()
+  }
+})

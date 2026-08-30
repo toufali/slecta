@@ -243,7 +243,10 @@ class ScoreService {
   // Try cached first, then Wikidata, then guesses. Count a cached slug of unknown provenance as
   // probed, so a record written before this check is verified rather than trusted.
   #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
-    const list = cachedSlug ? [{ slug: cachedSlug, source: cachedSource ?? 'probed' }] : []
+    // Wikidata confirming a cached guess makes it authoritative; leaving it `probed` would keep it
+    // paying a year check it should not, and a re-release date could then reject a correct slug
+    const cached = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'probed'
+    const list = cachedSlug ? [{ slug: cachedSlug, source: cached }] : []
 
     if (wikiSlug && wikiSlug !== cachedSlug) list.push({ slug: wikiSlug, source: 'wikidata' })
 
@@ -264,8 +267,10 @@ class ScoreService {
 
       if (!page) continue
 
-      // Wikidata is authoritative; an unknown year on either side cannot be checked
-      if (source === 'wikidata' || !Number.isFinite(year) || !Number.isFinite(page.year) || page.year === year) {
+      // Only Wikidata bypasses the check. A year we cannot read must not pass as a year that
+      // matched: if a host drops the field, rejecting shows up as a rate collapse and a spike in
+      // `rejected`, where trusting would quietly go back to scoring the wrong films.
+      if (source === 'wikidata' || (Number.isFinite(year) && page.year === year)) {
         if (source === 'probed') slugs.probed++
 
         return { slug, source, page, rejected }

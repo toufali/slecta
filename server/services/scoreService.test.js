@@ -14,8 +14,8 @@ const writes = new Map()
 redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, ttl))
 const ttlOf = key => writes.get(key)
 
-const LD = value => `<script type="application/ld+json">${JSON.stringify({
-  '@type': 'Movie', aggregateRating: { ratingValue: value }
+const LD = (value, year = 2010) => `<script type="application/ld+json">${JSON.stringify({
+  '@type': 'Movie', aggregateRating: { ratingValue: value }, dateCreated: `${year}-07-16`
 })}</script>`
 
 const ok = body => new Response(body, { status: 200 })
@@ -32,9 +32,10 @@ function stubHosts(routes) {
 }
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
-const rtScorecard = (critic, audience) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+// The year matches the fixtures' usual release date, since a probed slug is only accepted when it does
+const rtScorecard = (critic, audience, year = 2010) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
   criticsScore: { score: critic }, audienceScore: { score: audience }
-})}</script>`)
+})}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
 // Replaces global fetch with a queue of canned outcomes, and records the call count.
 function stubFetch(...outcomes) {
@@ -355,8 +356,8 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
   assert.equal(score.scores.metacritic, 52)
 })
 
-// 2 of 7 resolving guesses were a different film: `m/breach` answers 200 with a confident 2007
-// title for a 2026 release. The year in schema.org JSON-LD is what separates them.
+// `m/breach` answers 200 with a confident 2007 title for a 2026 release. The year in schema.org
+// JSON-LD is what separates them; any 200 used to be accepted.
 const rtPage = (critic, audience, year) => () => ok(
   `<script id="media-scorecard-json">${JSON.stringify({ criticsScore: { score: critic }, audienceScore: { score: audience } })}</script>` +
   (year ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-02-16` })}</script>` : '')
@@ -422,4 +423,45 @@ test('resolving a guess costs one request, not a probe and a read', async () => 
   }, false)
 
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')), ['https://www.rottentomatoes.com/m/one_request'])
+})
+
+// A year we cannot read must not pass as a year that matched: if a host drops the field, the
+// verification would silently stop working and go back to scoring whatever answered
+test('a guessed slug whose page has no year is rejected, not trusted', async () => {
+  const slugs = { probed: 0, rejected: 0 }
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': rtPage(83, 91, null),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/noyear', {
+    tmdbScore: 67, title: 'No Year', releaseDate: '2026-05-01', mediaType: 'movie'
+  }, false, slugs)
+
+  assert.equal(score.scores.rtCritic, undefined, 'an unverifiable page cannot resolve a guess')
+  assert.deepEqual(slugs, { probed: 0, rejected: 2 }, 'both candidates rejected')
+})
+
+// Wikidata confirming a cached guess makes it authoritative, so it stops paying the year check
+test('a cached guess that Wikidata confirms stops being treated as a guess', async () => {
+  const slugs = { probed: 0, rejected: 0 }
+  stubHosts({
+    'www.wikidata.org': wikidata('m/confirmed', 'movie/confirmed'),
+    // the page year disagrees with TMDB, which would reject it if it were still a guess
+    'www.rottentomatoes.com': rtPage(55, 60, 1999),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/confirmed', rtSource: 'probed' } : null
+
+  try {
+    const score = await scoreService.getScore('test/movie/confirmed', {
+      tmdbScore: 67, wikiId: 'Q11', title: 'Confirmed', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false, slugs)
+
+    assert.equal(score.scores.rtCritic, 55, 'the confirmed slug is authoritative, so the year is not checked')
+    assert.equal(slugs.rejected, 0)
+  } finally {
+    redis.getCache = async () => null
+  }
 })
