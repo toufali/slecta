@@ -127,8 +127,9 @@ async function publishIndex(mediaType, rows) {
 }
 
 async function cacheScoresFor(mediaType, { titles, expected, complete }) {
-  // rejected / (probed + rejected) is the share of guessed slugs that were a different film,
-  // 10.6% when the year check landed. A jump means a host changed its slug scheme.
+  // `probed` counts guesses accepted, at most one per host per title; `rejected` counts candidates
+  // refused, which can be several for one title. So the ratio tracks refusals against acceptances,
+  // not a per-title false-positive rate. A jump means a host changed its slug scheme or its markup.
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {}, slugs: { probed: 0, rejected: 0 } }
   const rows = []
 

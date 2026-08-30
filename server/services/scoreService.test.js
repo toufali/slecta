@@ -11,8 +11,9 @@ const { default: redis } = await import('./redisService.js')
 
 // Redis is never connected here, so the write is recorded rather than made
 const writes = new Map()
-redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, ttl))
-const ttlOf = key => writes.get(key)
+redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
+const ttlOf = key => writes.get(key)?.ttl
+const wrote = key => writes.get(key)?.value
 
 const LD = (value, year = 2010) => `<script type="application/ld+json">${JSON.stringify({
   '@type': 'Movie', aggregateRating: { ratingValue: value }, dateCreated: `${year}-07-16`
@@ -483,7 +484,59 @@ test('a source refusing to answer does not erase its cached slug', async () => {
       tmdbScore: 67, wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(ttlOf('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined, 'no slug write, so the stored record survives')
+    assert.deepEqual(wrote('slugs/v1/movie/Q12/Refused/2010-07-16')?.rt, 'm/authoritative',
+      'the slug it could not read is kept, not replaced by a guess')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// A guess that verifies must not displace an authoritative slug the run merely failed to read —
+// once it did, the record held both slugs, the lookup stopped being asked, and it was permanent
+test('a refused authoritative slug is not replaced by a guess that verifies', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': url => url.endsWith('m/displaced')
+      ? new Response('', { status: 403 })
+      : rtPage(70, 80, 2026)(),
+    'www.metacritic.com': () => ok(LD(52, 2026))
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/displaced', mc: 'movie/displaced', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/displaced', {
+      tmdbScore: 67, wikiId: 'Q13', title: 'Displaced', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01')?.rt, 'm/displaced')
+    assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01')?.rtSource, 'wikidata')
+  } finally {
+    redis.getCache = async () => null
+  }
+})
+
+// Wikidata must outrank a cached guess, or a guess that happens to verify discards the
+// authoritative answer and then suppresses the lookup that could restore it
+test('Wikidata outranks a cached guess for the same title', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/from_wikidata', 'movie/from_wikidata'),
+    'www.rottentomatoes.com': rtPage(70, 80, 2026),
+    'www.metacritic.com': () => ok(LD(52, 2026))
+  })
+  // rt cached as a guess, mc missing, so the lookup runs and returns a different rt slug
+  redis.getCache = async key => key.startsWith('slugs/') ? { rt: 'm/a_guess', rtSource: 'probed' } : null
+
+  try {
+    await scoreService.getScore('test/movie/outranked', {
+      tmdbScore: 67, wikiId: 'Q14', title: 'Outranked', releaseDate: '2026-05-01', mediaType: 'movie'
+    }, false)
+
+    const record = wrote('slugs/v1/movie/Q14/Outranked/2026-05-01')
+
+    assert.equal(record?.rt, 'm/from_wikidata', 'the authoritative slug wins')
+    assert.equal(record?.rtSource, 'wikidata')
   } finally {
     redis.getCache = async () => null
   }

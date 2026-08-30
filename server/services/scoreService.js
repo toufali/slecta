@@ -32,11 +32,15 @@ const LD_JSON = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/scri
 
 // Both hosts carry the release year in schema.org JSON-LD, which is what tells a guessed slug from
 // a different film of the same name. Not in RT's scorecard blob — that holds only the score fields.
+// Off the string, not through Date: `new Date('2026-01-01').getFullYear()` is 2025 under a negative
+// offset, which would reject a correct slug anywhere TZ is set
+const yearOf = date => Number(String(date).slice(0, 4)) || undefined
+
 function pageYear(html) {
   for (const [, block] of html.matchAll(LD_JSON)) {
     const item = parseJson(block)
 
-    if (MC_TYPES.includes(item?.['@type'])) return new Date(item.dateCreated).getFullYear()
+    if (MC_TYPES.includes(item?.['@type'])) return yearOf(item.dateCreated)
   }
 }
 
@@ -89,9 +93,9 @@ class ScoreService {
       // Omitted rather than nulled, so key count is source count
       const scores = {
         imdb: imdbScore,
-        metacritic: resolved.mc?.page.value,
-        rtCritic: resolved.rt?.page.critic,
-        rtAudience: resolved.rt?.page.audience,
+        metacritic: resolved.mc?.page?.value,
+        rtCritic: resolved.rt?.page?.critic,
+        rtAudience: resolved.rt?.page?.audience,
         // TMDB reports 0 when a title has no votes — absence, not a score
         tmdb: tmdbScore ? toScore(tmdbScore) : undefined
       }
@@ -107,7 +111,7 @@ class ScoreService {
       const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
 
       if (sources.length === 1 && sources[0] === 'tmdb') {
-        log.warn('Score resolved from TMDB alone', { key, title, slugs, imdbId })
+        log.warn('Score resolved from TMDB alone', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
       // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
@@ -202,7 +206,7 @@ class ScoreService {
     const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
     const prefixes = PATHS[mediaType] ?? PATHS.movie
-    const year = new Date(releaseDate).getFullYear()
+    const year = yearOf(releaseDate)
 
     // Local, because Wikidata going quiet costs nothing if a guess resolves the slug anyway
     const lookup = { incomplete: false }
@@ -224,13 +228,30 @@ class ScoreService {
         this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), slugs),
         this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), slugs)
       ])
-      const record = { rt: rt?.slug, mc: mc?.slug, rtSource: rt?.source, mcSource: mc?.source }
+      // Keep per host rather than withholding the write: a slug nothing could read is unknown, not
+      // wrong, and a 429 must not let a guess replace an authoritative answer only Wikidata returns.
+      // Rejected is different — that slug is proven wrong, so it goes.
+      const unread = lookup.incomplete || attempt.incomplete
+      const keep = (resolved, slug) => resolved.slug ?? (unread && !resolved.rejected ? slug : undefined)
+      const record = {
+        rt: keep(rt, cached?.rt),
+        mc: keep(mc, cached?.mc),
+        rtSource: rt.slug ? rt.source : cached?.rtSource,
+        mcSource: mc.slug ? mc.source : cached?.mcSource
+      }
 
-      // A slug still missing after something went unanswered is unknown, not absent, so leave the
-      // stored record alone: a 429 is not evidence a slug is wrong, and overwriting drops an
-      // authoritative answer only Wikidata can return. Reader failures count, not just the lookup's.
-      if ((lookup.incomplete || attempt.incomplete) && (!record.rt || !record.mc)) attempt.incomplete = true
-      else redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
+      if (unread && (!record.rt || !record.mc)) attempt.incomplete = true
+
+      // Write only what is worth keeping. Rejected means a stored slug is proven wrong, so the
+      // record must change — but refreshing the life on a run that rejected something would keep a
+      // wrong-but-verifying slug warm forever, and expiry is the only way it gets re-derived.
+      // Nothing resolved and nothing readable is not a result, so leave it for the next run.
+      const rejected = rt.rejected || mc.rejected
+      const nothing = !record.rt && !record.mc
+
+      if (!rejected && !(nothing && unread)) {
+        redis.setCache(key, record, nothing ? SLUG_MISS_TTL : SLUG_TTL)
+      }
 
       return { rt, mc }
     } catch (e) {
@@ -246,10 +267,15 @@ class ScoreService {
   #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
     // Wikidata confirming a cached guess makes it authoritative; leaving it `probed` would keep it
     // paying a year check it should not, and a re-release date could then reject a correct slug
-    const cached = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'probed'
-    const list = cachedSlug ? [{ slug: cachedSlug, source: cached }] : []
+    const source = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'probed'
+    const authoritative = cachedSlug && source === 'wikidata' ? [{ slug: cachedSlug, source }] : []
+    const list = [...authoritative]
 
     if (wikiSlug && wikiSlug !== cachedSlug) list.push({ slug: wikiSlug, source: 'wikidata' })
+
+    // A cached guess ranks behind Wikidata: ahead of it, a guess that happens to verify would
+    // discard the authoritative answer and then suppress the lookup that could restore it
+    if (cachedSlug && !authoritative.length) list.push({ slug: cachedSlug, source })
 
     for (const slug of guesses) {
       if (!list.some(candidate => candidate.slug === slug)) list.push({ slug, source: 'probed' })
@@ -280,6 +306,8 @@ class ScoreService {
       rejected = true
       slugs.rejected++
     }
+
+    return { rejected }
   }
 
   #rtGuesses(prefix, title, year) {
