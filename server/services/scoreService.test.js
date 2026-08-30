@@ -8,12 +8,23 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 
 const { default: scoreService } = await import('./scoreService.js')
 const { default: redis } = await import('./redisService.js')
+const { default: log } = await import('../utils/logger.js')
 
 // Redis is never connected here, so the write is recorded rather than made
 const writes = new Map()
 redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
 const ttlOf = key => writes.get(key)?.ttl
 const wrote = key => writes.get(key)?.value
+
+// Captures the fields of one warning, since a rejection is logged rather than counted
+function warnings(message) {
+  const seen = []
+  const real = log.warn
+
+  log.warn = (msg, fields) => { if (msg === message) seen.push(fields); return real(msg, fields) }
+
+  return () => seen
+}
 
 const LD = (value, year = 2010) => `<script type="application/ld+json">${JSON.stringify({
   '@type': 'Movie', aggregateRating: { ratingValue: value }, dateCreated: `${year}-07-16`
@@ -375,7 +386,7 @@ function countingHosts(routes) {
 }
 
 test('a guessed slug for a different film is rejected, and the year variant tried', async () => {
-  const slugs = { probed: 0, rejected: 0 }
+  const rejections = warnings('Slug rejected as a different title')
   const seen = countingHosts({
     'www.wikidata.org': () => ok('{}'),
     // the bare guess is a 2007 film; the year variant is the real one
@@ -385,10 +396,10 @@ test('a guessed slug for a different film is rejected, and the year variant trie
 
   const score = await scoreService.getScore('test/movie/breach', {
     tmdbScore: 67, title: 'Breach', releaseDate: '2026-05-01', mediaType: 'movie'
-  }, false, slugs)
+  }, false)
 
   assert.equal(score.scores.rtCritic, 70, 'the 2026 page, not the 2007 one')
-  assert.deepEqual(slugs, { probed: 1, rejected: 1 })
+  assert.deepEqual(rejections(), [{ slug: 'm/breach', pageYear: 2007, wantYear: 2026 }])
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
     ['https://www.rottentomatoes.com/m/breach', 'https://www.rottentomatoes.com/m/breach_2026'])
 })
@@ -429,7 +440,7 @@ test('resolving a guess costs one request, not a probe and a read', async () => 
 // A year we cannot read must not pass as a year that matched: if a host drops the field, the
 // verification would silently stop working and go back to scoring whatever answered
 test('a guessed slug whose page has no year is rejected, not trusted', async () => {
-  const slugs = { probed: 0, rejected: 0 }
+  const rejections = warnings('Slug rejected as a different title')
   stubHosts({
     'www.wikidata.org': () => ok('{}'),
     'www.rottentomatoes.com': rtPage(83, 91, null),
@@ -438,10 +449,10 @@ test('a guessed slug whose page has no year is rejected, not trusted', async () 
 
   const score = await scoreService.getScore('test/movie/noyear', {
     tmdbScore: 67, title: 'No Year', releaseDate: '2026-05-01', mediaType: 'movie'
-  }, false, slugs)
+  }, false)
 
   assert.equal(score.scores.rtCritic, undefined, 'an unverifiable page cannot resolve a guess')
-  assert.deepEqual(slugs, { probed: 0, rejected: 2 }, 'both candidates rejected')
+  assert.equal(rejections().length, 2, 'both candidates rejected')
 })
 
 // Wikidata confirming a cached guess makes it authoritative, so it stops paying the year check

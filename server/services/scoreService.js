@@ -69,7 +69,7 @@ class ScoreService {
     return await redis.getCache(key)
   }
 
-  async getScore(key, data, tryCache = true, slugs = { probed: 0, rejected: 0 }) {
+  async getScore(key, data, tryCache = true) {
     // TODO: a more sophisticated caching strategy
     if (tryCache) {
       const score = await this.getScoreFromCache(key)
@@ -87,7 +87,7 @@ class ScoreService {
     try {
       const [imdbScore, resolved] = await Promise.all([
         this.getIMDBScore(imdbId),
-        this.#resolveSources({ wikiId, title, releaseDate, mediaType }, attempt, slugs)
+        this.#resolveSources({ wikiId, title, releaseDate, mediaType }, attempt)
       ])
 
       // Omitted rather than nulled, so key count is source count
@@ -202,7 +202,7 @@ class ScoreService {
   // page that carries its scores. A cached slug is re-verified rather than trusted, which costs
   // nothing — the run fetches both pages for their scores anyway — and writing the record back on
   // every run keeps an in-use slug warm, so they stop expiring together.
-  async #resolveSources({ wikiId, title, releaseDate, mediaType }, attempt, slugs) {
+  async #resolveSources({ wikiId, title, releaseDate, mediaType }, attempt) {
     const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
     const prefixes = PATHS[mediaType] ?? PATHS.movie
@@ -225,8 +225,8 @@ class ScoreService {
       }
 
       const [rt, mc] = await Promise.all([
-        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), slugs, attempt),
-        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), slugs, attempt)
+        this.#resolve(this.#candidates(cached?.rt, cached?.rtSource, wiki.rt, this.#rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug, attempt), attempt),
+        this.#resolve(this.#candidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug, attempt), attempt)
       ])
       // Keep per host, on that host's own verdict: a slug it could not read is unknown, not wrong,
       // and a 429 must not let a guess replace an authoritative answer only Wikidata returns. A 404
@@ -268,7 +268,7 @@ class ScoreService {
   #candidates(cachedSlug, cachedSource, wikiSlug, guesses) {
     // Wikidata confirming a cached guess makes it authoritative; leaving it `probed` would keep it
     // paying a year check it should not, and a re-release date could then reject a correct slug
-    const source = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'probed'
+    const source = cachedSlug === wikiSlug ? 'wikidata' : cachedSource ?? 'guessed'
     const authoritative = cachedSlug && source === 'wikidata' ? [{ slug: cachedSlug, source }] : []
     const list = [...authoritative]
 
@@ -279,7 +279,7 @@ class ScoreService {
     if (cachedSlug && !authoritative.length) list.push({ slug: cachedSlug, source })
 
     for (const slug of guesses) {
-      if (!list.some(candidate => candidate.slug === slug)) list.push({ slug, source: 'probed' })
+      if (!list.some(candidate => candidate.slug === slug)) list.push({ slug, source: 'guessed' })
     }
 
     return list
@@ -287,7 +287,7 @@ class ScoreService {
 
   // The first candidate whose page verifies wins. Any 200 used to be accepted, and `m/breach`
   // answers 200 with a confident 2007 film for a 2026 title.
-  async #resolve(candidates, year, read, slugs, attempt) {
+  async #resolve(candidates, year, read, attempt) {
     let rejected = false
     let unread = false
 
@@ -312,13 +312,12 @@ class ScoreService {
       // matched: if a host drops the field, rejecting shows up as a rate collapse and a spike in
       // `rejected`, where trusting would quietly go back to scoring the wrong films.
       if (source === 'wikidata' || (Number.isFinite(year) && page.year === year)) {
-        if (source === 'probed') slugs.probed++
-
         return { slug, source, page, rejected }
       }
 
       rejected = true
-      slugs.rejected++
+      // An anomaly, not a per-title fact, so log it rather than counting it: the rate is a log query
+      log.warn('Slug rejected as a different title', { slug, pageYear: page.year, wantYear: year })
     }
 
     return { rejected, unread }

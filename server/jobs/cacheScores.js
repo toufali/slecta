@@ -127,10 +127,7 @@ async function publishIndex(mediaType, rows) {
 }
 
 async function cacheScoresFor(mediaType, { titles, expected, complete }) {
-  // `probed` counts guesses accepted, at most one per host per title; `rejected` counts candidates
-  // refused, which can be several for one title. So the ratio tracks refusals against acceptances,
-  // not a per-title false-positive rate. A jump means a host changed its slug scheme or its markup.
-  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {}, slugs: { probed: 0, rejected: 0 } }
+  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {} }
   const rows = []
 
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
@@ -176,7 +173,7 @@ async function scoreTitle(mediaType, title, stats) {
   }
 
   const { tmdbScore, imdbId, wikiId, title: name, releaseDate } = detail
-  const score = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title: name, releaseDate, mediaType }, false, stats.slugs)
+  const score = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title: name, releaseDate, mediaType }, false)
 
   if (!score) {
     stats.failed++
