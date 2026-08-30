@@ -465,3 +465,26 @@ test('a cached guess that Wikidata confirms stops being treated as a guess', asy
     redis.getCache = async () => null
   }
 })
+
+// A 429 is not evidence a slug is wrong. Overwriting the record would drop an authoritative slug
+// that only Wikidata can return, so a failed read must leave the stored record alone.
+test('a source refusing to answer does not erase its cached slug', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 429 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  redis.getCache = async key => key.startsWith('slugs/')
+    ? { rt: 'm/authoritative', mc: 'movie/authoritative', rtSource: 'wikidata', mcSource: 'wikidata' }
+    : null
+
+  try {
+    await scoreService.getScore('test/movie/refused', {
+      tmdbScore: 67, wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(ttlOf('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined, 'no slug write, so the stored record survives')
+  } finally {
+    redis.getCache = async () => null
+  }
+})

@@ -226,9 +226,10 @@ class ScoreService {
       ])
       const record = { rt: rt?.slug, mc: mc?.slug, rtSource: rt?.source, mcSource: mc?.source }
 
-      // A slug still missing after something went unanswered is unknown, not absent, so the
-      // score it feeds is short a source and neither result is worth storing
-      if (lookup.incomplete && (!record.rt || !record.mc)) attempt.incomplete = true
+      // A slug still missing after something went unanswered is unknown, not absent, so leave the
+      // stored record alone: a 429 is not evidence a slug is wrong, and overwriting drops an
+      // authoritative answer only Wikidata can return. Reader failures count, not just the lookup's.
+      if ((lookup.incomplete || attempt.incomplete) && (!record.rt || !record.mc)) attempt.incomplete = true
       else redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
 
       return { rt, mc }
