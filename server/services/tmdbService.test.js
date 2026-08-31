@@ -153,3 +153,87 @@ test('the ratings filter is offered for movies and withheld for TV', async () =>
   assert.equal(tmdb.filterRules('tv').ratings, undefined)
   assert.ok(tmdb.filterRules('movie').ratings !== undefined)
 })
+
+
+// The detail pair diverges further than the list pair: different appended resources, a different
+// place to read the certificate from, a different credits payload, and different extra fields.
+const DETAIL = {
+  id: 7, overview: 'x', vote_average: 7.5, backdrop_path: null,
+  external_ids: { imdb_id: 'tt1', wikidata_id: 'Q1' },
+  'watch/providers': { results: {} },
+  videos: { results: [] },
+  spoken_languages: [{ english_name: 'English' }],
+  genres: [{ name: 'Action' }],
+  // movie-side
+  title: 'A Movie', release_date: '2026-01-02', runtime: 100,
+  release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13' }] }] },
+  credits: { cast: [{ name: 'Lead' }], crew: [{ job: 'Director', name: 'A Director' }] },
+  // tv-side
+  name: 'A Show', first_air_date: '2026-03-04', number_of_seasons: 3,
+  content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-MA' }] },
+  aggregate_credits: { cast: [{ name: 'Regular' }] },
+  created_by: [{ name: 'A Creator' }]
+}
+
+function captureDetail() {
+  const seen = []
+
+  globalThis.fetch = async url => {
+    seen.push(String(url))
+    return new Response(JSON.stringify(DETAIL), { status: 200 })
+  }
+
+  return seen
+}
+
+test('each detail asks its own endpoint and appends only what it can read', async () => {
+  const seen = captureDetail()
+
+  await tmdb.getMovieDetail(7)
+  await tmdb.getTvShowDetail(7)
+
+  assert.match(decodeURIComponent(seen[0]), /\/movie\/7\?append_to_response=videos,release_dates,watch\/providers,external_ids,credits$/)
+  assert.match(decodeURIComponent(seen[1]), /\/tv\/7\?append_to_response=videos,watch\/providers,external_ids,aggregate_credits,content_ratings$/)
+})
+
+// A movie certificate lives under the release date for the region; a TV one has its own resource
+test('the certificate comes from each catalogue\'s own resource', async () => {
+  captureDetail()
+
+  assert.equal((await tmdb.getMovieDetail(7)).rating, 'PG-13')
+  assert.equal((await tmdb.getTvShowDetail(7)).rating, 'TV-MA')
+})
+
+test('a movie carries a director and a runtime, a show a creator and a season count', async () => {
+  captureDetail()
+
+  const movie = await tmdb.getMovieDetail(7)
+  const show = await tmdb.getTvShowDetail(7)
+
+  assert.deepEqual(
+    [movie.title, movie.releaseDate, movie.cast, movie.director, movie.runtime],
+    ['A Movie', '2026-01-02', 'Lead', 'A Director', 100]
+  )
+  assert.deepEqual(
+    [show.title, show.releaseDate, show.cast, show.creator, show.seasons],
+    ['A Show', '2026-03-04', 'Regular', 'A Creator', 3]
+  )
+  assert.equal('director' in show, false)
+  assert.equal('seasons' in movie, false)
+})
+
+// The cached object is stored and served as JSON, so its key order is part of the shape
+test('the stored field order is unchanged for both catalogues', async () => {
+  captureDetail()
+
+  assert.deepEqual(Object.keys(await tmdb.getMovieDetail(7)), [
+    'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate', 'tmdbScore',
+    'rating', 'cast', 'director', 'runtime',
+    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+  ])
+  assert.deepEqual(Object.keys(await tmdb.getTvShowDetail(7)), [
+    'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate', 'tmdbScore',
+    'cast', 'creator', 'rating', 'seasons',
+    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+  ])
+})
