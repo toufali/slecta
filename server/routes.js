@@ -2,8 +2,7 @@ import Router from '@koa/router';
 import tmdb from './services/tmdbService.js'
 import { invalidFilters } from './utils/filters.js'
 import { showSearch, getTitles } from './controllers/searchController.js'
-import { getMovies, getMovieDetail, getMovieScore, showMovies, showMovieDetail, getMovieQuotes } from './controllers/movieController.js'
-import { getTvShows, getTvShowDetail, showTvShows, showTvShowDetail, getTvShowScore, getTvShowQuotes } from './controllers/tvShowController.js'
+import { showList, showDetail, getList, getDetail, getScore, getQuotes } from './controllers/titleController.js'
 import { showAbout } from './controllers/mainController.js'
 
 const router = new Router();
@@ -28,23 +27,23 @@ function validateFilters(mediaType) {
   }
 }
 
-router.get('/', validateFilters('movie'), showMovies);
+router.get('/', validateFilters('movie'), showList('movie'));
 router.get('/about', showAbout);
 router.get('/search', showSearch);
-router.get('/movies', validateFilters('movie'), showMovies);
-router.get('/movies/:id', showMovieDetail);
-router.get('/shows', validateFilters('tv'), showTvShows);
-router.get('/shows/:id', showTvShowDetail);
+router.get('/movies', validateFilters('movie'), showList('movie'));
+router.get('/movies/:id', showDetail('movie'));
+router.get('/shows', validateFilters('tv'), showList('tv'));
+router.get('/shows/:id', showDetail('tv'));
 
 // API routes
 router.get('/api/v1/search', getTitles);
-router.get('/api/v1/movies', validateFilters('movie'), getMovies);
-router.get('/api/v1/movies/:id', getMovieDetail);
-router.get('/api/v1/movies/:id/score', getMovieScore);
-router.get('/api/v1/movies/:id/quotes', getMovieQuotes);
-router.get('/api/v1/shows', validateFilters('tv'), getTvShows);
-router.get('/api/v1/shows/:id', getTvShowDetail);
-router.get('/api/v1/shows/:id/score', getTvShowScore);
-router.get('/api/v1/shows/:id/quotes', getTvShowQuotes);
+router.get('/api/v1/movies', validateFilters('movie'), getList('movie'));
+router.get('/api/v1/movies/:id', getDetail('movie'));
+router.get('/api/v1/movies/:id/score', getScore('movie'));
+router.get('/api/v1/movies/:id/quotes', getQuotes('movie'));
+router.get('/api/v1/shows', validateFilters('tv'), getList('tv'));
+router.get('/api/v1/shows/:id', getDetail('tv'));
+router.get('/api/v1/shows/:id/score', getScore('tv'));
+router.get('/api/v1/shows/:id/quotes', getQuotes('tv'));
 
 export default router.routes()
