@@ -22,18 +22,25 @@ const LIST_CACHE_VERSION = 2
 const CATALOGUE = {
   movie: {
     segment: 'movies',
-    discover: 'movie',
+    path: 'movie',
     dateParam: 'primary_release_date',
     dateField: 'release_date',
     titleField: 'title',
     genreKey: 'movie',
     certifications: true,
     video: true,
-    monetization: 'buy|free|flatrate|rent'
+    monetization: 'buy|free|flatrate|rent',
+    append: 'videos,release_dates,watch/providers,external_ids,credits',
+    detail: (json, region) => ({
+      rating: json.release_dates.results.find(item => item.iso_3166_1 === region)?.release_dates.find(release => release.certification !== '')?.certification ?? '',
+      cast: json.credits.cast.slice(0, 5).map(item => item.name).join(', '),
+      director: json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', '),
+      runtime: json.runtime || null // TMDB reports 0 for an unreleased film
+    })
   },
   tv: {
     segment: 'shows',
-    discover: 'tv',
+    path: 'tv',
     dateParam: 'first_air_date',
     dateField: 'first_air_date',
     titleField: 'name',
@@ -41,7 +48,14 @@ const CATALOGUE = {
     certifications: false,
     video: false,
     // TV alone counts ad-supported as available
-    monetization: 'buy|free|flatrate|rent|ads'
+    monetization: 'buy|free|flatrate|rent|ads',
+    append: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings',
+    detail: (json, region) => ({
+      cast: json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', '),
+      creator: json.created_by.map(item => item.name).join(', '),
+      rating: json.content_ratings.results.find(item => item.iso_3166_1 === region)?.rating ?? '',
+      seasons: json.number_of_seasons
+    })
   }
 }
 
@@ -230,7 +244,7 @@ class TmdbService {
     }
 
     const urlParams = new URLSearchParams(params)
-    const url = `${TMDB_API_URL}/discover/${media.discover}?${urlParams}`
+    const url = `${TMDB_API_URL}/discover/${media.path}?${urlParams}`
     const cacheKey = `${media.segment}/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
@@ -280,14 +294,26 @@ class TmdbService {
   }
 
   async getMovieDetail(id) {
-    const params = {
-      append_to_response: 'videos,release_dates,watch/providers,external_ids,credits'
-    }
-    const url = `${TMDB_API_URL}/movie/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `movies/${id}/v${DETAIL_CACHE_VERSION}`
+    return this.#getDetail('movie', id)
+  }
 
-    let movie = await redis.getCache(cacheKey)
-    if (movie) return movie
+  async getTvShowDetail(id) {
+    return this.#getDetail('tv', id)
+  }
+
+  // The shared half of a detail lookup: the fetch, the provider reshaping, the trailer pick and the
+  // fields both catalogues carry. What each adds sits in its `detail` entry, which returns its own
+  // fields in its own order — the stored key order is part of the cached shape and of the API body.
+  async #getDetail(mediaType, id) {
+    const media = CATALOGUE[mediaType]
+    const params = {
+      append_to_response: media.append
+    }
+    const url = `${TMDB_API_URL}/${media.path}/${id}?${new URLSearchParams(params)}`
+    const cacheKey = `${media.segment}/${id}/v${DETAIL_CACHE_VERSION}`
+
+    let detail = await redis.getCache(cacheKey)
+    if (detail) return detail
 
     const res = await fetch(url, { headers })
 
@@ -321,33 +347,27 @@ class TmdbService {
           return k - j
         })
     }
-    const rating = json.release_dates.results.find(item => item.iso_3166_1 === this.region)?.release_dates.find(release => release.certification !== '')?.certification ?? ''
     const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
     const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
-    const cast = json.credits.cast.slice(0, 5).map(item => item.name).join(', ')
-    const director = json.credits.crew.filter(item => /^director$/i.test(item.job)).map(item => item.name).join(', ')
     const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
 
-    movie = {
+    detail = {
       tmdbId: json.id,
       imdbId: json.external_ids.imdb_id,
       wikiId: json.external_ids.wikidata_id,
-      title: json.title,
+      title: json[media.titleField],
       overview: json.overview,
-      releaseDate: json.release_date,
+      releaseDate: json[media.dateField],
       tmdbScore: Math.round(json.vote_average * 10),
-      rating,
-      cast,
-      director,
-      runtime: json.runtime || null, // TMDB reports 0 for an unreleased film
+      ...media.detail(json, this.region),
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
       backdropUrl,
       ytTrailerId: ytTrailer?.key
     }
-    redis.setCache(cacheKey, movie)
-    return movie
+    redis.setCache(cacheKey, detail)
+    return detail
   }
 
   async getTitlesByString(str) {
@@ -376,77 +396,6 @@ class TmdbService {
         releaseDate: item.release_date || item.first_air_date,
         genres: item.genre_ids.map(id => this.genres.all.get(id)),
       }))
-  }
-
-  async getTvShowDetail(id) {
-    const params = {
-      append_to_response: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings'
-    }
-    const url = `${TMDB_API_URL}/tv/${id}?${new URLSearchParams(params)}`
-    const cacheKey = `shows/${id}/v${DETAIL_CACHE_VERSION}`
-
-    let show = await redis.getCache(cacheKey)
-    if (show) return show
-
-    const res = await fetch(url, { headers })
-
-    // A 404 is the real answer that the title does not exist. Every other failure is
-    // transient or ours, and callers must not see it as a missing title.
-    if (res.status === 404) return null
-    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
-
-    const json = await res.json()
-    let providers = json['watch/providers'].results[this.region]
-
-    if (providers) {
-      // reshape, reduce, and mutate data
-      const providerPriority = this.providerPriority.toReversed()
-      const thisClass = this
-
-      providers = Object.values(providers)
-        .flat()
-        .filter(function (item) {
-          if (!item.provider_id) return // not a valid provider if no ID
-          if (this.has(item.provider_id)) return // already in set
-          if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
-
-          item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
-          this.add(item.provider_id)
-          return true
-        }, new Set())
-        .sort((a, b) => {
-          const j = providerPriority.indexOf(a.provider_id)
-          const k = providerPriority.indexOf(b.provider_id)
-          return k - j
-        })
-    }
-    const yt = json.videos.results.filter(item => /youtube/i.test(item.site))
-    const ytTrailer = yt.find(item => /trailer/i.test(item.type)) || yt.find(item => /teaser|clip/i.test(item.type))
-    const rating = json.content_ratings.results.find(item => item.iso_3166_1 === this.region)?.rating ?? ''
-    const cast = json.aggregate_credits.cast.slice(0, 5).map(item => item.name).join(', ')
-    const creator = json.created_by.map(item => item.name).join(', ')
-    const backdropUrl = json.backdrop_path ? this.imgConfig.secure_base_url + this.imgConfig.backdrop_sizes[2] + json.backdrop_path : null
-
-    show = {
-      tmdbId: json.id,
-      imdbId: json.external_ids.imdb_id,
-      wikiId: json.external_ids.wikidata_id,
-      title: json.name,
-      overview: json.overview,
-      releaseDate: json.first_air_date, // TV details carry first_air_date, not release_date
-      tmdbScore: Math.round(json.vote_average * 10),
-      cast,
-      creator,
-      rating,
-      seasons: json.number_of_seasons,
-      languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
-      genres: json.genres.map(genre => genre.name).join(', '),
-      providers,
-      backdropUrl,
-      ytTrailerId: ytTrailer?.key
-    }
-    redis.setCache(cacheKey, show)
-    return show
   }
 
 }
