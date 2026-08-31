@@ -16,6 +16,35 @@ const DETAIL_CACHE_VERSION = 2
 // silently limit the nightly run to page one.
 const LIST_CACHE_VERSION = 2
 
+// Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
+// list, since both are built at init. `segment` covers the cache-key prefix, the list property and
+// the detail path — they are already the same word.
+const CATALOGUE = {
+  movie: {
+    segment: 'movies',
+    discover: 'movie',
+    dateParam: 'primary_release_date',
+    dateField: 'release_date',
+    titleField: 'title',
+    genreKey: 'movie',
+    certifications: true,
+    video: true,
+    monetization: 'buy|free|flatrate|rent'
+  },
+  tv: {
+    segment: 'shows',
+    discover: 'tv',
+    dateParam: 'first_air_date',
+    dateField: 'first_air_date',
+    titleField: 'name',
+    genreKey: 'show',
+    certifications: false,
+    video: false,
+    // TV alone counts ad-supported as available
+    monetization: 'buy|free|flatrate|rent|ads'
+  }
+}
+
 class TmdbService {
   countMin = 50 // minimum vote count
   pageMax = 500 // TMDB 400s on a higher page
@@ -148,33 +177,50 @@ class TmdbService {
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media
   // type; an omitted rule leaves that param unjudged.
   filterRules(mediaType) {
-    const tv = mediaType === 'tv'
+    const media = CATALOGUE[mediaType] ?? CATALOGUE.movie
 
     return {
       pageMax: this.pageMax,
-      sorts: tv ? this.sortingOptions.shows : this.sortingOptions.movies,
-      genres: tv ? this.genres.show : this.genres.movie,
-      ratings: tv ? undefined : this.ratings
+      sorts: this.sortingOptions[media.segment],
+      genres: this.genres[media.genreKey],
+      ratings: media.certifications ? this.ratings : undefined
     }
   }
 
   async getMovies(query) {
+    return this.#getList('movie', query)
+  }
+
+  async getTvShows(query) {
+    return this.#getList('tv', query)
+  }
+
+  // One skeleton for both catalogues: build params, prune, read cache, fetch, map, decorate. The
+  // pairs this replaces had already drifted once — TV read `release_date` where TMDB sends
+  // `first_air_date` — and the drift was in the mapping, not in anything the two genuinely differ on.
+  async #getList(mediaType, query) {
+    const media = CATALOGUE[mediaType]
+    const genres = this.genres[media.genreKey]
+    const sorts = this.sortingOptions[media.segment]
+
+    // TMDB silently ignores `certification` without `certification_country`, and
+    // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.
+    // Key order is the cache key: these are serialised in insertion order, so a movie-only param
+    // dropping out must not reorder the rest.
     const params = {
-      // TMDB silently ignores `certification` without `certification_country`, and
-      // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.
       page: query?.page || 1,
       include_adult: this.includeAdult,
-      include_video: this.includeVideo,
-      sort_by: query?.sort || this.sortingOptions.movies[0].value,
-      'primary_release_date.lte': new Date().toISOString().substring(0, 10),
-      'primary_release_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
+      include_video: media.video ? this.includeVideo : undefined,
+      sort_by: query?.sort || sorts[0].value,
+      [`${media.dateParam}.lte`]: new Date().toISOString().substring(0, 10),
+      [`${media.dateParam}.gte`]: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
       'vote_count.gte': query?.count || this.countMin,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
-      certification: Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr,
-      certification_country: this.region,
+      certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
+      certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,
-      with_watch_monetization_types: query?.streaming ? 'buy|free|flatrate|rent' : ''
+      with_watch_monetization_types: query?.streaming ? media.monetization : ''
     }
 
     for (const [key, value] of Object.entries(params)) {
@@ -184,8 +230,8 @@ class TmdbService {
     }
 
     const urlParams = new URLSearchParams(params)
-    const url = `${TMDB_API_URL}/discover/movie?${urlParams}`
-    const cacheKey = `movies/v${LIST_CACHE_VERSION}?${urlParams}`
+    const url = `${TMDB_API_URL}/discover/${media.discover}?${urlParams}`
+    const cacheKey = `${media.segment}/v${LIST_CACHE_VERSION}?${urlParams}`
 
     let data = await redis.getCache(cacheKey)
     if (data) return data
@@ -197,26 +243,31 @@ class TmdbService {
     const json = await res.json()
 
     data = {
-      movies: json.results.map(item => new Object({
+      [media.segment]: json.results.map(item => new Object({
         id: item.id,
-        title: item.title,
-        genres: item.genre_ids.map(id => this.genres.movie.get(id)),
+        title: item[media.titleField],
+        genres: item.genre_ids.map(id => genres.get(id)),
         genreIds: item.genre_ids,
-        releaseDate: item.release_date,
+        releaseDate: item[media.dateField],
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
         posterPath: item.poster_path,
         tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
         popularity: item.popularity,
-        detailPath: `/movies/${item.id}`
+        detailPath: `/${media.segment}/${item.id}`
       }))
     }
 
-    data.allGenres = this.genres.movie
+    data.allGenres = genres
     data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-    data.allRatings = this.ratings
-    data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
-    data.allSorting = this.sortingOptions.movies
+
+    // TMDB offers no TV equivalent, which `filterRules` already reflects
+    if (media.certifications) {
+      data.allRatings = this.ratings
+      data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
+    }
+
+    data.allSorting = sorts
     data.sortBy = params.sort_by
     data.streamingNow = query?.streaming
     // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
@@ -325,70 +376,6 @@ class TmdbService {
         releaseDate: item.release_date || item.first_air_date,
         genres: item.genre_ids.map(id => this.genres.all.get(id)),
       }))
-  }
-
-  async getTvShows(query) {
-    const params = {
-      // `with_watch_monetization_types` needs `watch_region` to have any effect
-      page: query?.page || 1,
-      include_adult: this.includeAdult,
-      sort_by: query?.sort || this.sortingOptions.shows[0].value,
-      'first_air_date.lte': new Date().toISOString().substring(0, 10),
-      'first_air_date.gte': new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
-      'vote_count.gte': query?.count || this.countMin,
-      with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
-      without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
-      watch_region: this.region,
-      with_watch_monetization_types: query?.streaming ? 'buy|free|flatrate|rent|ads' : ''
-    }
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined || value === '') {
-        delete params[key]
-      }
-    }
-
-    const urlParams = new URLSearchParams(params)
-    const url = `${TMDB_API_URL}/discover/tv?${urlParams}`
-    const cacheKey = `shows/v${LIST_CACHE_VERSION}?${urlParams}`
-
-    let data = await redis.getCache(cacheKey)
-    if (data) return data
-
-    const res = await fetch(url, { headers })
-
-    if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
-
-    const json = await res.json()
-
-    data = {
-      shows: json.results.map(item => new Object({
-        id: item.id,
-        title: item.name,
-        genres: item.genre_ids.map(id => this.genres.show.get(id)),
-        genreIds: item.genre_ids,
-        releaseDate: item.first_air_date,
-        posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
-        posterPath: item.poster_path,
-        tmdbScore: item.vote_average,
-        tmdbScoreCount: item.vote_count,
-        popularity: item.popularity,
-        detailPath: `/shows/${item.id}`
-      }))
-    }
-
-    data.allGenres = this.genres.show
-    data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-    data.allSorting = this.sortingOptions.shows
-    data.sortBy = params.sort_by
-    data.streamingNow = query?.streaming
-    // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
-    // caches as null, and the job would multiply that to a zero expectation and accept page one.
-    data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
-    data.totalResults = json.total_results
-
-    redis.setCache(cacheKey, data)
-    return data
   }
 
   async getTvShowDetail(id) {
