@@ -254,28 +254,35 @@ test('a block on any status shortens the record, a 404 does not', async () => {
   }
 })
 
-// A lookup that *throws* — a timeout, or a 200 whose body is not JSON — escapes to the outer catch
-// and abandons the title, so neither score source is read at all. A lookup that merely fails a
-// status does not; the test above covers that. Asserted as it behaves rather than as it should:
-// giving this read the try/catch the two score readers have is its own change.
-test('a slug lookup that throws abandons the title before either source is read', async () => {
-  const seen = []
-  globalThis.fetch = async url => {
-    seen.push(new URL(url).host)
+// The lookup is the only external read here whose own failure could cost the two that carry scores:
+// the outer catch sits outside the Promise.all that contacts them. A throw is the case a bad status
+// does not cover — the test above covers that one.
+// An id and title of their own: the slug key is built from them, and the recorded writes are shared
+// across every test in this file
+for (const [label, id, wikidata] of [
+  ['a timeout', 'Q900', () => Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))],
+  ['a 200 that is not JSON', 'Q901', () => ok('<html>a challenge page</html>')]
+]) {
+  test(`a slug lookup answering with ${label} costs the lookup, not the title`, async () => {
+    stubHosts({
+      'www.wikidata.org': wikidata,
+      'www.rottentomatoes.com': rtScorecard(50, 85),
+      'www.metacritic.com': () => ok(LD(52))
+    })
 
-    return new URL(url).host === 'www.wikidata.org'
-      ? Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }))
-      : rtScorecard(50, 85)()
-  }
+    const key = `test/movie/${id}`
+    const score = await scoreService.getScore(key, {
+      tmdbScore: 67, wikiId: id, title: 'Wiki Throw', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
 
-  const score = await scoreService.getScore('test/movie/slugthrow', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
-  }, false)
-
-  assert.deepEqual([...new Set(seen)], ['www.wikidata.org'], 'RT was never asked, though it would have answered')
-  assert.deepEqual(Object.keys(score.scores), ['tmdb'])
-  assert.equal(ttlOf('test/movie/slugthrow'), 60 * 60)
-})
+    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'],
+      'both score sources were read despite the lookup failing')
+    // Both slugs resolved by guessing, so nothing is missing and the score keeps its full life
+    assert.equal(ttlOf(key), 60 * 60 * 48)
+    assert.equal(wrote(`slugs/v1/movie/${id}/Wiki Throw/2010-07-16`), undefined,
+      'an unanswered lookup still leaves the stored record alone')
+  })
+}
 
 // Half of the Metacritic pages that answer have no Metascore yet, which is the title's own answer
 test('a Metacritic page with no Metascore keeps the full life', async () => {
