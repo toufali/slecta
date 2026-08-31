@@ -1,27 +1,27 @@
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
+import { attachScores } from './attachScores.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
 import { movieDetail } from '../views/partials/movieDetail.js'
 
-export async function showMovies(ctx) {
+// Shared by the page and the API: both need the same rows, the same badges and the same cache-hit
+// header, and differ only in how they serialise the result
+async function list(ctx) {
   const data = await tmdb.getMovies(ctx.query)
 
-  const scores = await Promise.allSettled(data.movies.map(movie => {
-    const key = `movies/${movie.id}/score`
-    return scoreService.getScoreFromCache(key)
-  }))
-
-  scores.forEach((score, i) => {
-    if (score.value) data.movies[i].score = score.value.avgScore
-  })
+  await attachScores(data.movies, 'movies')
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
+  return data
+}
+
+export async function showMovies(ctx) {
   return ctx.body = mainView({
     partial: movieList,
-    content: data
+    content: await list(ctx)
   })
 }
 
@@ -48,20 +48,9 @@ export async function showMovieDetail(ctx) {
 
 // API
 export async function getMovies(ctx) {
-  const data = await tmdb.getMovies(ctx.query)
+  const data = await list(ctx)
 
   data.allGenres = Array.from(data.allGenres.entries()) // can't send type Map via JSON :(
-
-  const scores = await Promise.allSettled(data.movies.map(movie => {
-    const key = `movies/${movie.id}/score`
-    return scoreService.getScoreFromCache(key)
-  }))
-
-  scores.forEach((score, i) => {
-    if (score.value) data.movies[i].score = score.value.avgScore
-  })
-
-  if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
 
   ctx.set('Cache-Control', 'max-age=43200, stale-while-revalidate=43200')
 
