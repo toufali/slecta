@@ -110,18 +110,27 @@ test('a detail field TMDB stops populating fails the title', async () => {
   }
 })
 
-// Rates that sat above the old floors and below the new ones. The old values (metacritic .25,
-// rtCritic .25, rtAudience .45) let a source fail for half the catalogue without firing.
-test('a source at half its measured rate now trips', () => {
-  const stats = healthy({ sources: { imdb: 20, metacritic: 6, rtCritic: 8, rtAudience: 10, tmdb: 20 } })
+// Half the measured rate is the drop worth catching: a source degrading rather than disappearing
+test('a source at half its measured rate trips', () => {
+  const stats = healthy({ sources: { imdb: 20, metacritic: 3, rtCritic: 5, rtAudience: 5, tmdb: 20 } })
   const result = checkRunCoverage([stats], true)
 
   assert.equal(result.ok, false)
   assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
 })
 
-// The rates a healthy full run really produces must stay inside the floors
-test('the rates the first full production run measured are tolerated', () => {
+// The rates a healthy full run really produces must stay inside the floors. Measured over the
+// 1,178-title set the lowered vote floor admits, which is the set these floors now govern.
+test('the rates a full run measures at the current vote floor are tolerated', () => {
+  const movies = healthy({ total: 814, processed: 814, sources: { imdb: 806, metacritic: 324, rtCritic: 441, rtAudience: 443, tmdb: 814 } })
+  const shows = healthy({ mediaType: 'tv', total: 365, processed: 365, tmdbOnly: 13, sources: { imdb: 351, metacritic: 126, rtCritic: 193, rtAudience: 185, tmdb: 365 } })
+
+  assert.equal(checkRunCoverage([movies, shows], true).ok, true)
+})
+
+// The set before the vote floor dropped, which resolved far better. Kept so a regression back
+// toward those rates is not mistaken for the obscure titles the floor now admits.
+test('the richer rates of the smaller catalogue are tolerated too', () => {
   const movies = healthy({ total: 537, processed: 537, sources: { imdb: 536, metacritic: 294, rtCritic: 356, rtAudience: 375, tmdb: 537 } })
   const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, tmdbOnly: 5, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137, tmdb: 194 } })
 

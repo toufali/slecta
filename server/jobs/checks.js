@@ -24,9 +24,10 @@ const REQUIRED_DETAIL = {
 
 const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
 
-// 10-15 points below the rates one full run measured, whichever media type binds. One run, so that
-// is headroom, not a confidence interval — watch a week before trusting the tight ones.
-const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.4, rtCritic: 0.55, rtAudience: 0.6, tmdb: 0.95 }
+// ~10 points below what a full run measures, whichever media type binds. Re-measured against the
+// 1,178-title set: a lower vote floor admits more obscure titles, and RT and Metacritic carry far
+// fewer of them. Headroom from one run, not a confidence interval — see `decisions.md`.
+const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.45, rtAudience: 0.4, tmdb: 0.95 }
 
 // A score from TMDB alone is the signature of every other source failing
 const MAX_TMDB_ONLY_RATE = 0.1
