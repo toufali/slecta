@@ -22,11 +22,6 @@ const MAX_MISSING_TITLES = 5
 // Outlasts a missed run plus the next run's own duration, so the sort is never left empty
 const INDEX_TTL = 60 * 60 * 72 // 72 hours
 
-// Share of the catalogue a ranking needs to be worth publishing. Proportional, not the absolute
-// duplicate tolerance above: a ranking short six titles of 538 is still a ranking, and mirrors the
-// coverage check's own 10% failure limit from the other side.
-const MIN_INDEX_COVERAGE = 0.9
-
 // The deploy runs the checks only, so a row-shape change is not rewritten until the nightly run.
 // Without this, the first serving deploy after one reads the previous generation for a day.
 const INDEX_VERSION = 1
@@ -49,7 +44,7 @@ export async function cacheScores() {
     listAll(page => tmdb.getMovies({ page }), SEGMENT.movie),
     listAll(page => tmdb.getTvShows({ page }), SEGMENT.tv)
   ])
-  const noTitles = { titles: [], expected: NaN, complete: false }
+  const noTitles = { titles: [], complete: false }
 
   if (movieList.reason) log.error('TMDB movie list lookup failed', { error: movieList.reason })
   if (showList.reason) log.error('TMDB show list lookup failed', { error: showList.reason })
@@ -103,30 +98,32 @@ async function listAll(fetchPage, resultsKey) {
 
   if (!complete) log.error('TMDB list came back short', { resultsKey, got: unique.length, totalPages, totalResults })
 
-  return { titles: unique, expected, complete }
+  return { titles: unique, complete }
 }
 
-// Three unrelated ways a run fails to earn a ranking, each with its own tolerance and its own
-// reason in the log. Named rather than inlined: this condition has been rewritten five times and
-// twice lost a clause silently.
-function unpublishable({ rows, expected, complete }) {
-  if (!complete) return 'the catalogue walk was short'
-  if (!rows) return 'nothing scored'
-  if (!(rows >= expected * MIN_INDEX_COVERAGE)) return 'too few titles scored'
-}
+async function publishIndex(mediaType, rows, titles, complete) {
+  const key = `index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`
+  const walked = new Set(titles.map(title => title.id))
 
-async function publishIndex(mediaType, rows) {
+  // Drop a row this run did not confirm only when the walk was complete. A lost page otherwise
+  // reads as titles leaving the window, and yesterday's ranking still holds them.
+  const carried = complete ? [] : (await redis.getCache(key) ?? []).filter(row => !walked.has(row.id))
+  const all = [...rows, ...carried]
+
+  // Publishing nothing is worse than yesterday's ranking, which still has its own TTL to run
+  if (!all.length) return log.error('Score index left in place, nothing to publish', { mediaType })
+
   // TMDB cannot sort on a score it does not hold, and sorting one fetched page would rank 20 of 733.
   // Stored ranked so a request only filters and slices. Votes break the ~7-way ties per point, then
   // id, so an order does not reshuffle nightly on the pool's finish order alone.
-  rows.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
+  all.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
 
-  if (await redis.setCache(`index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`, rows, INDEX_TTL) === WRITTEN) return true
+  if (await redis.setCache(key, all, INDEX_TTL) === WRITTEN) return true
 
-  log.error('Score index write failed', { mediaType, rows: rows.length })
+  log.error('Score index write failed', { mediaType, rows: all.length })
 }
 
-async function cacheScoresFor(mediaType, { titles, expected, complete }) {
+async function cacheScoresFor(mediaType, { titles, complete }) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
 
@@ -142,14 +139,7 @@ async function cacheScoresFor(mediaType, { titles, expected, complete }) {
     }
   })
 
-  const blocked = unpublishable({ rows: rows.length, expected, complete })
-
-  if (blocked) {
-    stats.indexFailed = true
-    log.warn('Score index left in place', { mediaType, blocked, rows: rows.length, expected })
-  } else {
-    stats.indexFailed = !await publishIndex(mediaType, rows)
-  }
+  stats.indexFailed = !await publishIndex(mediaType, rows, titles, complete)
 
   return stats
 }
@@ -177,30 +167,30 @@ async function scoreTitle(mediaType, title, stats) {
 
   if (!score) {
     stats.failed++
-    return
+  } else {
+    // Tonight's attempt, not what is stored: these rates are the live outage detector
+    const sources = Object.keys(score.scores)
+
+    if (!score.cached) stats.notCached++
+
+    if (!sources.length) stats.unscored++
+
+    // Why each source produced what it did, which is what all three coverage rates divide by
+    for (const [source, outcome] of Object.entries(score.outcomes ?? {})) {
+      const tally = stats.outcomes[source] ??= {}
+
+      tally[outcome] = (tally[outcome] ?? 0) + 1
+    }
+
+    stats.processed++
   }
 
-  // Tonight's attempt, not what is stored: these rates are the live outage detector
-  const sources = Object.keys(score.scores)
-
-  if (!score.cached) stats.notCached++
-
-  if (!sources.length) stats.unscored++
-
-  // Why each source produced what it did, which is what all three coverage rates divide by
-  for (const [source, outcome] of Object.entries(score.outcomes ?? {})) {
-    const tally = stats.outcomes[source] ??= {}
-
-    tally[outcome] = (tally[outcome] ?? 0) + 1
-  }
-
-  stats.processed++
-
-  // Publish what storage holds, so a row cannot disagree with the detail page reading the same record
-  const row = score.kept ?? score
+  // The row is whatever storage holds, so it cannot disagree with the detail page reading the same
+  // record, and a title that failed tonight keeps the score it already had
+  const row = await scoreService.getScoreFromCache(key)
 
   // Unscorable titles would sort as NaN
-  if (!Number.isFinite(row.avgScore)) return
+  if (!Number.isFinite(row?.avgScore)) return
 
   // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
   // names, not a count: RT contributes two keys, so a count hides outlets and critic presence.
