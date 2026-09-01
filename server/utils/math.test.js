@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { average, toCount, toScore } from './math.js'
+import { average, toCount, toFloor, toScore } from './math.js'
 
 test('average ignores non-finite values', () => {
   assert.equal(average([80, 90]), 85)
@@ -45,4 +45,18 @@ test('toCount rejects a thousands-separated string rather than truncating it', (
   assert.equal(toCount('1,234'), undefined)
   assert.equal(toCount('526 reviews'), undefined)
   assert.equal(toCount(9.5), undefined)
+})
+
+// RT bands a cross-season audience count rather than publishing one, in these exact shapes
+test('toFloor reads the lower bound out of a band', () => {
+  assert.equal(toFloor('50+ Ratings'), 50)
+  assert.equal(toFloor('250+ Ratings'), 250)
+  assert.equal(toFloor('10,000+ Verified Ratings'), 10000)
+})
+
+// A floor of nothing is no floor: at this band the true count could be 5 or 49
+test('toFloor rejects a band with no lower bound', () => {
+  assert.equal(toFloor('Fewer than 50 Ratings'), undefined)
+  assert.equal(toFloor(undefined), undefined)
+  assert.equal(toFloor('Ratings'), undefined)
 })

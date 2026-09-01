@@ -27,7 +27,7 @@ function stubCache(records) {
 }
 
 test('each row gets its own cached badge, keyed by media segment', async () => {
-  const asked = stubCache({ [scoreKey('movies', 1)]: { avgScore: 81 }, [scoreKey('movies', 2)]: { avgScore: 64 } })
+  const asked = stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81 } }, [scoreKey('movies', 2)]: { scores: { imdb: 64 } } })
   const items = [{ id: 1 }, { id: 2 }]
 
   await attachScores(items, 'movies')
@@ -38,7 +38,7 @@ test('each row gets its own cached badge, keyed by media segment', async () => {
 
 // A movie and a show can share a TMDB id, so the segment is load-bearing rather than cosmetic
 test('the segment reaches the key', async () => {
-  const asked = stubCache({ [scoreKey('shows', 1)]: { avgScore: 55 } })
+  const asked = stubCache({ [scoreKey('shows', 1)]: { scores: { imdb: 55 } } })
   const items = [{ id: 1 }]
 
   await attachScores(items, 'shows')
@@ -61,7 +61,7 @@ test('a title with no cached score keeps no score key at all', async () => {
 
 // Settled rather than all: one unreadable record must not reject the whole list
 test('one failed read costs its own badge, not the list', async () => {
-  stubCache({ [scoreKey('movies', 1)]: new Error('redis unavailable'), [scoreKey('movies', 2)]: { avgScore: 64 } })
+  stubCache({ [scoreKey('movies', 1)]: new Error('redis unavailable'), [scoreKey('movies', 2)]: { scores: { imdb: 64 } } })
   const items = [{ id: 1 }, { id: 2 }]
 
   await attachScores(items, 'movies')
@@ -70,7 +70,7 @@ test('one failed read costs its own badge, not the list', async () => {
 })
 
 test('an empty list asks nothing', async () => {
-  const asked = stubCache({ [scoreKey('movies', 1)]: { avgScore: 81 } })
+  const asked = stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81 } } })
 
   await attachScores([], 'movies')
 

@@ -23,7 +23,7 @@ function recordCalls() {
   tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7 } }
   tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7 } }
   scoreService.getScoreFromCache = async key => { calls.push(['scoreCache', key]); return null }
-  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache]); return { avgScore: 70 } }
+  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache]); return { scores: { imdb: 70 } } }
   // Defaulted as the service defaults it, so the assertion is on the effective type rather than
   // on whether the argument was passed explicitly
   reviewService.getQuotes = async (id, name, date, mediaType = 'movie') => { calls.push(['quotes', id, mediaType]); return [] }
@@ -93,12 +93,12 @@ for (const { mediaType, segment } of MEDIA) {
 // A cache hit must not go on to fetch the title, which is what the header is reporting
 test('a cached score is served without touching TMDB', async () => {
   const calls = recordCalls()
-  scoreService.getScoreFromCache = async () => ({ avgScore: 81 })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 81 } })
   const ctx = context()
 
   await getScore('movie')(ctx)
 
   assert.deepEqual(calls, [])
-  assert.deepEqual(ctx.body, { avgScore: 81 })
+  assert.deepEqual(ctx.body, { scores: { imdb: 81 }, avgScore: 81 }, 'the aggregate is derived into the response the browser reads')
   assert.equal(ctx.headers['x-server-cache-hit'], 'true')
 })

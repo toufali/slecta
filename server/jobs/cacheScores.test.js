@@ -29,10 +29,10 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   scoreService.getScore = async key => {
     scored.push(key)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
-    return Object.defineProperty({ avgScore: 70, scores: { imdb: 80, rtCritic: 70 } }, 'cached', { value: true })
+    return Object.defineProperty({ scores: { imdb: 70, rtCritic: 70 } }, 'cached', { value: true })
   }
   // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
-  scoreService.getScoreFromCache = async () => ({ avgScore: 70, scores: { imdb: 80, rtCritic: 70 } })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, rtCritic: 70 } })
 
   return { scored, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
@@ -180,7 +180,7 @@ test('a title that throws is counted, and the run still finishes', async () => {
 
   scoreService.getScore = async key => {
     if (key === scoreKey('movies', 2)) throw new TypeError('unexpected')
-    return Object.defineProperty({ avgScore: 70, scores: { imdb: 70 } }, 'cached', { value: true })
+    return Object.defineProperty({ scores: { imdb: 70 } }, 'cached', { value: true })
   }
 
   try {
@@ -311,7 +311,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 90, [scoreKey('movies', 3)]: 90, [scoreKey('movies', 4)]: 90, [scoreKey('movies', 5)]: 90 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
-  scoreService.getScoreFromCache = async key => ({ avgScore: scores[key], scores: { imdb: 1 } })
+  scoreService.getScoreFromCache = async key => ({ scores: { imdb: scores[key] } })
 
   try {
     await cacheScores()
@@ -398,7 +398,7 @@ test('a title that failed tonight keeps the row its stored score earned', async 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   // one of twenty fails, which is inside the 10% the ranking tolerates
   scoreService.getScore = async key => key === scoreKey('movies', 1000) ? null
-    : Object.defineProperty({ avgScore: 70, scores: { imdb: 1 } }, 'cached', { value: true })
+    : Object.defineProperty({ scores: { imdb: 70 } }, 'cached', { value: true })
 
   try {
     const { stats: [stats] } = await cacheScores()
@@ -423,7 +423,7 @@ test('a title with no stored score contributes no row', async () => {
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   scoreService.getScoreFromCache = async key => [1100, 1101, 1102].some(id => key === scoreKey('movies', id))
     ? null
-    : { avgScore: 70, scores: { imdb: 1 } }
+    : { scores: { imdb: 70 } }
 
   try {
     const { stats: [stats] } = await cacheScores()
@@ -494,7 +494,7 @@ test('a carried row whose score record is gone is dropped', async () => {
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
-  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? null : { avgScore: 70, scores: { imdb: 1 } }
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? null : { scores: { imdb: 70 } }
 
   try {
     await cacheScores()
@@ -519,8 +519,8 @@ test('a carried row takes its score from the record, not from the previous index
     ? [{ id: 99, score: 88, votes: 1, sources: ['imdb', 'rtCritic'] }]
     : realGetCache(key)
   scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99)
-    ? { avgScore: 55, scores: { metacritic: 55 } }
-    : { avgScore: 70, scores: { imdb: 1 } }
+    ? { scores: { metacritic: 55 } }
+    : { scores: { imdb: 70 } }
 
   try {
     await cacheScores()
@@ -545,7 +545,7 @@ test('a title whose record could not be read keeps the row it had, even on a com
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 2, score: 88, votes: 1 }] : realGetCache(key)
-  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 2) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 2) ? undefined : { scores: { imdb: 70 } }
 
   try {
     const { stats: [stats] } = await cacheScores()
@@ -590,7 +590,7 @@ test('a carried row whose record could not be read is kept, not dropped', async 
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
-  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? undefined : { scores: { imdb: 70 } }
 
   try {
     await cacheScores()
@@ -636,14 +636,14 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
 
   redis.setCache = async (key, value) => { writes.set(key, value); return WRITTEN }
   scoreService.getScore = async () => {
-    const fresh = { avgScore: 40, scores: { imdb: 40 } }
+    const fresh = { scores: { imdb: 40 } }
 
     Object.defineProperty(fresh, 'cached', { value: true })
     Object.defineProperty(fresh, 'outcomes', { value: { imdb: 'scored', metacritic: 'unreachable', rtCritic: 'unreachable', rtAudience: 'unreachable' } })
     return fresh
   }
   // The write was refused, so the richer record is what the key still holds
-  scoreService.getScoreFromCache = async () => ({ avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } })
 
   try {
     const { stats: [stats] } = await cacheScores()

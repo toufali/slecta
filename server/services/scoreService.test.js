@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL } = await import('./scoreService.js')
+const { default: scoreService, aggregate, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -59,8 +59,9 @@ function stubHosts(routes) {
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
 // The year matches the fixtures' usual release date, since a guessed slug is only accepted when it does
-const rtScorecard = (critic, audience, year = 2010, criticCount, audienceCount) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
-  criticsScore: { score: critic, reviewCount: criticCount }, audienceScore: { score: audience, reviewCount: audienceCount }
+const rtScorecard = (critic, audience, year = 2010, criticCount, audienceCount, band) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+  criticsScore: { score: critic, reviewCount: criticCount },
+  audienceScore: { score: audience, reviewCount: audienceCount, bandedRatingCount: band }
 })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
 const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
@@ -153,6 +154,45 @@ test('a healthy response is not retried', async () => {
 })
 
 
+// A thin component is noisy in both directions, so it is shrunk toward the better-sampled ones
+// rather than penalised. Constants and their derivation are in `decisions.md`.
+test('a thin component pulls less than a well-sampled one', () => {
+  const thin = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 12 } }
+  const thick = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 50000 } }
+
+  assert.equal(aggregate(thin), 72)
+  assert.equal(aggregate(thick), 83)
+})
+
+// Nothing is known to be better, so discounting them equally leaves the plain mean
+test('components thin in equal measure return the plain mean', () => {
+  const record = { scores: { rtCritic: 60, metacritic: 80 }, counts: { rtCritic: 8, metacritic: 3 } }
+
+  assert.equal(aggregate(record), 70)
+})
+
+// Half the TV catalogue has only a band, so a floor has to count for something
+test('a floor stands in for a count that was only banded', () => {
+  const banded = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000 }, floors: { rtAudience: 500 } }
+  const none = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000 } }
+
+  assert.ok(aggregate(banded) > aggregate(none), 'a banded component still carries weight')
+  assert.equal(aggregate(none), 70, 'and without one it is shrunk out entirely')
+})
+
+// Losing the score entirely is worse than weighting it flat, and no sample says nothing about which
+test('a record no component can weight falls back to the plain mean', () => {
+  assert.equal(aggregate({ scores: { imdb: 60, metacritic: 80 } }), 70)
+})
+
+// An unmapped source must not vanish from the aggregate the moment it is added. Paired with a
+// mapped one, since alone it would reach the same answer through the plain-mean fallback.
+test('a source with no constant carries full weight', () => {
+  const record = { scores: { imdb: 60, letterboxd: 90 }, counts: { imdb: 100000, letterboxd: 5 } }
+
+  assert.equal(aggregate(record), 75)
+})
+
 // Ordering is pure, so the rules can be read straight off the list with no host contacted
 test('Wikidata outranks a cached guess without discarding it', () => {
   assert.deepEqual(orderCandidates('m/guess', 'guessed', 'm/wiki', ['m/title']), [
@@ -199,7 +239,7 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
 
   // (52 + 50 + 85) / 3 is 62.3
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
-  assert.equal(score.avgScore, 62)
+  assert.equal(aggregate(score), 62)
 })
 
 // Every source publishes how many reviews its score came from, and an unweighted mean over a
@@ -238,6 +278,22 @@ test('a source with no reviews has no count rather than a zero', async () => {
   }, false)
 
   assert.deepEqual(score.counts, { rtCritic: 526 })
+})
+
+// RT bands a cross-season audience count instead of publishing it, which is half the TV catalogue
+test('a banded audience count is stored as a floor, apart from the counts', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(87, 91, 2010, 526, undefined, '250+ Ratings'),
+    'www.metacritic.com': () => ok(LD(74))
+  })
+
+  const score = await scoreService.getScore('test/movie/banded', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.floors, { rtAudience: 250 })
+  assert.equal(score.counts.rtAudience, undefined, 'a floor is not a count')
 })
 
 // The coverage check divides by these, so a page carrying no score has to be told from a title the
@@ -280,7 +336,7 @@ test('a title with no resolvable source has no aggregate at all', async () => {
   }, false)
 
   assert.deepEqual(score.scores, {})
-  assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
+  assert.equal(aggregate(score), undefined)
 })
 
 // "No page for this title" and "would not answer" must not be recorded alike: one is worth re-asking
@@ -790,7 +846,7 @@ test('a 404 on the first guess falls through to the year variant', async () => {
 const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
 
 // Stamped, since one test below checks that a refused write leaves the stored stamp alone.
-const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() }
+const RICH = { scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() }
 
 // The guard exists for a source that is down, so it has to end when the source starts answering:
 // a record cannot be held against a 404 until it expires, least of all at this TTL.
@@ -951,7 +1007,7 @@ test('a source we no longer produce is not held', async () => {
     'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: Date.now() })
+  storedScore({ scores: { letterboxd: 72, mubi: 68 }, fetchedAt: Date.now() })
 
   try {
     await scoreService.getScore('test/movie/retired', {
@@ -980,7 +1036,7 @@ test('a run resolving fewer outlets leaves the record untouched and still return
     assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
     // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
     assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-    assert.equal(score.kept.avgScore, 80, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(aggregate(score.kept), 80, 'the record it preserved, for a caller that must not publish tonight')
     assert.equal(score.cached, true, 'a refusal is not a persistence failure')
   } finally {
     redis.getCache = realGetCache
@@ -994,7 +1050,7 @@ test('a run that loses nothing writes, refreshing the record', async () => {
     'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() })
+  storedScore({ scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() })
 
   try {
     await scoreService.getScore('test/movie/rtoutlet', {
@@ -1013,7 +1069,7 @@ test('a richer result replaces a thinner record', async () => {
     'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 67, scores: { tmdb: 67 }, fetchedAt: Date.now() })
+  storedScore({ scores: { tmdb: 67 }, fetchedAt: Date.now() })
 
   try {
     const score = await scoreService.getScore('test/movie/richer', {
@@ -1122,7 +1178,7 @@ test('a declined write reports the record that declined it', async () => {
   })
 
   let reads = 0
-  const replaced = { avgScore: 91, scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92 } }
+  const replaced = { scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92 } }
 
   redis.getCache = async key => key.startsWith('test/') ? (reads++ === 0 ? RICH : replaced) : null
 
@@ -1131,7 +1187,7 @@ test('a declined write reports the record that declined it', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(score.kept.avgScore, 91, 'the value that won, not the one the comparison saw')
+    assert.equal(aggregate(score.kept), 91, 'the value that won, not the one the comparison saw')
   } finally {
     redis.getCache = realGetCache
   }
@@ -1151,7 +1207,7 @@ test('a supplied TMDB score never reaches the aggregate', async () => {
   }, false)
 
   assert.deepEqual(score.scores, { metacritic: 52 })
-  assert.equal(score.avgScore, 52)
+  assert.equal(aggregate(score), 52)
 })
 
 test('a title only TMDB could have scored has no aggregate at all', async () => {
@@ -1162,5 +1218,5 @@ test('a title only TMDB could have scored has no aggregate at all', async () => 
   }, false)
 
   assert.deepEqual(score.scores, {})
-  assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
+  assert.equal(aggregate(score), undefined)
 })
