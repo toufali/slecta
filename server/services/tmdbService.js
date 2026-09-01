@@ -60,7 +60,8 @@ const CATALOGUE = {
 }
 
 class TmdbService {
-  countMin = 50 // minimum vote count
+  // TMDB votes a title needs to enter the catalogue, on the job and the list path alike
+  minVotes = 25
   pageMax = 500 // TMDB 400s on a higher page
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
@@ -228,7 +229,7 @@ class TmdbService {
       sort_by: query?.sort || sorts[0].value,
       [`${media.dateParam}.lte`]: new Date().toISOString().substring(0, 10),
       [`${media.dateParam}.gte`]: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
-      'vote_count.gte': query?.count || this.countMin,
+      'vote_count.gte': query?.minVotes || this.minVotes,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,

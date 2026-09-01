@@ -237,3 +237,17 @@ test('the stored field order is unchanged for both catalogues', async () => {
     'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
   ])
 })
+
+
+// One constant decides both what the job scores and what a visitor can browse to
+test('the vote floor reaches the query for both catalogues, and a caller can override it', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies()
+  await tmdb.getTvShows()
+  await tmdb.getMovies({ minVotes: 200 })
+
+  assert.match(seen[0], /vote_count\.gte=25(&|$)/)
+  assert.match(seen[1], /vote_count\.gte=25(&|$)/)
+  assert.match(seen[2], /vote_count\.gte=200(&|$)/)
+})

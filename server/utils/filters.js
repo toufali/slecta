@@ -7,13 +7,13 @@
 const MULTI = new Set(['wg', 'wog', 'wr'])
 
 // Digits only: `Number()` also takes `0x1b` and `1e2`, which pass a genre lookup but match nothing at TMDB.
-const isCount = value => /^\d+$/.test(value)
+const isDigits = value => /^\d+$/.test(value)
 
-const isGenre = (value, { genres }) => isCount(value) && genres.has(+value)
+const isGenre = (value, { genres }) => isDigits(value) && genres.has(+value)
 
 const CHECKS = {
-  page: (value, { pageMax }) => isCount(value) && +value >= 1 && +value <= pageMax,
-  count: value => isCount(value),
+  page: (value, { pageMax }) => isDigits(value) && +value >= 1 && +value <= pageMax,
+  minVotes: value => isDigits(value),
   sort: (value, { sorts }) => sorts.some(option => option.value === value),
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',

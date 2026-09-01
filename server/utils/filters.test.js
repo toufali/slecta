@@ -17,7 +17,7 @@ const SHOW = {
 }
 
 test('a request from the filter panel passes', () => {
-  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', count: '50' }
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50' }
 
   assert.deepEqual(invalidFilters(query, MOVIE), [])
 })
