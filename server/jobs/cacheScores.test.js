@@ -12,13 +12,13 @@ const { default: scoreService } = await import('../services/scoreService.js')
 const { default: imdb } = await import('../services/imdbService.js')
 const { default: log } = await import('../utils/logger.js')
 const { default: redis, WRITTEN, FAILED } = await import('../services/redisService.js')
-const { scoreKey } = await import('../services/scoreService.js')
+const { scoreKey, SCORE_TTL } = await import('../services/scoreService.js')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   const scored = []
   const originals = [[imdb, 'refresh'], [tmdb, 'getMovies'], [tmdb, 'getTvShows'], [tmdb, 'getMovieDetail'],
-    [tmdb, 'getTvShowDetail'], [scoreService, 'getScore']]
+    [tmdb, 'getTvShowDetail'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
     .map(([target, name]) => [target, name, target[name]])
 
   imdb.refresh = async () => {}
@@ -31,6 +31,8 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
     return Object.defineProperty({ avgScore: 70, scores: { imdb: 80, rtCritic: 70 } }, 'cached', { value: true })
   }
+  // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
+  scoreService.getScoreFromCache = async () => ({ avgScore: 70, scores: { imdb: 80, rtCritic: 70 } })
 
   return { scored, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
@@ -309,8 +311,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 90, [scoreKey('movies', 3)]: 90, [scoreKey('movies', 4)]: 90, [scoreKey('movies', 5)]: 90 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
-  scoreService.getScore = async key =>
-    Object.defineProperty({ avgScore: scores[key], scores: { imdb: 1 } }, 'cached', { value: true })
+  scoreService.getScoreFromCache = async key => ({ avgScore: scores[key], scores: { imdb: 1 } })
 
   try {
     await cacheScores()
@@ -323,9 +324,8 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   }
 })
 
-// Publishing the 20 rows a broken run produced would serve a near-empty list for a day, which is
-// worse than yesterday's ranking
-test('an incomplete run leaves the previous index alone', async () => {
+// Yesterday's ranking still has its own TTL to run, so publishing nothing beats publishing empty
+test('a run with nothing to publish leaves the previous index alone', async () => {
   const { restore } = stub({ movies: [], shows: [] })
   const written = new Map()
   const realSetCache = redis.setCache
@@ -343,21 +343,25 @@ test('an incomplete run leaves the previous index alone', async () => {
   }
 })
 
-// NaN comparisons are all false, so a negated gate published precisely the run it meant to refuse
-test('a run whose catalogue size could not be verified leaves the index alone', async () => {
+// A walk that cannot be verified is treated as short, so its unconfirmed rows are kept rather than
+// read as titles leaving the window
+test('a walk that cannot be verified publishes, keeping the rows it could not confirm', async () => {
   const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 900 + i, releaseDate: '2026-01-01' }))
   const { restore } = stub({ movies })
   const written = new Map()
-  const realSetCache = redis.setCache
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
 
   tmdb.getMovies = async () => ({ movies }) // no totalPages, no totalResults
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 10 }] : realGetCache(key)
 
   try {
-    await cacheScores()
+    const { stats: [stats] } = await cacheScores()
 
-    assert.equal(written.has('index/movies/v1'), false, '20 unverifiable rows must not replace a complete index')
+    assert.equal(stats.indexFailed, false)
+    assert.equal(written.get('index/movies/v1').length, 21, 'twenty walked plus the one it could not confirm')
   } finally {
+    redis.getCache = realGetCache
     redis.setCache = realSetCache
     restore()
   }
@@ -383,8 +387,8 @@ test('a failed index write fails the run', async () => {
   }
 })
 
-// A handful of scoring failures is still a good ranking; the gate is proportional so it publishes
-test('a run short a few titles still publishes', async () => {
+// The reason the index reads storage: a bad night refreshes less rather than publishing less
+test('a title that failed tonight keeps the row its stored score earned', async () => {
   const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1000 + i, releaseDate: '2026-01-01' }))
   const { restore } = stub({ movies })
   const written = new Map()
@@ -401,7 +405,7 @@ test('a run short a few titles still publishes', async () => {
 
     assert.equal(stats.failed, 1)
     assert.equal(stats.indexFailed, false)
-    assert.equal(written.get('index/movies/v1').length, 19)
+    assert.equal(written.get('index/movies/v1').length, 20, 'the failed title still has a stored score')
   } finally {
     scoreService.getScore = realGetScore
     redis.setCache = realSetCache
@@ -409,51 +413,214 @@ test('a run short a few titles still publishes', async () => {
   }
 })
 
-// Skipping publication leaves only an expiring index, so it cannot report success. The walk here is
-// complete, so only the row-coverage condition can block it.
-test('too many unscorable titles fails the run, not just a warning', async () => {
+// A row can only claim a score the record still holds, or the ranking outlives the detail page
+test('a title with no stored score contributes no row', async () => {
   const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 1100 + i, releaseDate: '2026-01-01' }))
   const { restore } = stub({ movies })
   const written = new Map()
   const realSetCache = redis.setCache
-  const realGetScore = scoreService.getScore
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
-  // 3 of 20 unscorable leaves 17 rows, under the 18 that 90% of the catalogue requires
-  scoreService.getScore = async key => [1100, 1101, 1102].some(id => key === scoreKey('movies', id)) ? null
-    : Object.defineProperty({ avgScore: 70, scores: { imdb: 1 } }, 'cached', { value: true })
+  scoreService.getScoreFromCache = async key => [1100, 1101, 1102].some(id => key === scoreKey('movies', id))
+    ? null
+    : { avgScore: 70, scores: { imdb: 1 } }
 
   try {
-    const { stats: [stats], coverage } = await cacheScores()
+    const { stats: [stats] } = await cacheScores()
 
-    assert.equal(stats.processed, 17)
-    assert.equal(written.has('index/movies/v1'), false, '17 of 20 is under the 90% a ranking needs')
-    assert.equal(stats.indexFailed, true)
-    assert.ok(coverage.problems.some(p => p.reason === 'score index not published'))
+    assert.equal(stats.processed, 20)
+    assert.equal(stats.failed, 0, 'a missing record is not a thrown one')
+    assert.equal(stats.indexFailed, false)
+    assert.equal(written.get('index/movies/v1').length, 17)
   } finally {
-    scoreService.getScore = realGetScore
     redis.setCache = realSetCache
     restore()
   }
 })
 
-// 54 of 60 is exactly the 90% rows need but one short of the walk's own tolerance, so this isolates
-// the walk guard: a lost page hides titles yesterday's complete index still holds
-test('a short catalogue walk withholds the index even at full row coverage', async () => {
+// Both directions of the carry rule: a short walk keeps what it did not confirm, and a walked title
+// is refreshed rather than carried a second time
+test('a short catalogue walk keeps the rows it could not confirm, and duplicates none', async () => {
   const movies = [1, 2, 3].flatMap(page => Array.from({ length: page === 3 ? 14 : 20 }, (_, i) => ({ page, id: page * 100 + i, releaseDate: '2026-01-01' })))
   const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
   const written = new Map()
-  const realSetCache = redis.setCache
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+  const previous = [{ id: 100, score: 99, votes: 1 }, { id: 999, score: 88, votes: 1 }]
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? previous : realGetCache(key)
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+    const rows = written.get('index/movies/v1')
+
+    assert.equal(stats.processed, 54)
+    assert.equal(stats.indexFailed, false)
+    assert.equal(rows.length, 55, '54 walked plus the one title the short walk never reached')
+    assert.equal(rows.filter(row => row.id === 100).length, 1, 'a walked title is refreshed, not carried too')
+    assert.equal(rows.find(row => row.id === 100).score, 70, 'and refreshed from storage, not carried')
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// A gap here is where a ranking keeps serving scores the detail page has already lost
+test('the index is written with the score TTL, not a longer one', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const ttls = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value, ttl) => { ttls.set(key, ttl); return WRITTEN }
+
+  try {
+    await cacheScores()
+
+    assert.equal(ttls.get('index/movies/v1'), SCORE_TTL)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// The record can have expired since the row was published, and carrying the row renews it
+test('a carried row whose score record is gone is dropped', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? null : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual(written.get('index/movies/v1').map(row => row.id), [1])
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// The row is a projection of the record, so carrying one must not preserve a number it has since lost
+test('a carried row takes its score from the record, not from the previous index', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1'
+    ? [{ id: 99, score: 88, votes: 1, sources: ['imdb', 'rtCritic'] }]
+    : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99)
+    ? { avgScore: 55, scores: { metacritic: 55 } }
+    : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+    const carried = written.get('index/movies/v1').find(row => row.id === 99)
+
+    assert.equal(carried.score, 55)
+    assert.deepEqual(carried.sources, ['metacritic'])
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// `getCache` answers undefined for an unreadable Redis and null for a miss; collapsing them drops a
+// title over a failed read. Three places make the same mistake, so each gets its own test.
+test('a title whose record could not be read keeps the row it had, even on a complete walk', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 2, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 2) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+    const rows = written.get('index/movies/v1')
+
+    assert.equal(stats.failed, 0)
+    assert.deepEqual(rows.map(row => row.id), [2, 1], 'the unreadable title keeps its place')
+    assert.equal(rows.find(row => row.id === 2).score, 88)
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+test('an unreadable previous index withholds publication rather than replacing it', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? undefined : realGetCache(key)
 
   try {
     const { stats: [stats] } = await cacheScores()
 
-    assert.equal(stats.processed, 54, 'exactly 90% of 60, so row coverage is satisfied')
-    assert.equal(written.has('index/movies/v1'), false, 'the walk was short, so nothing publishes')
+    assert.equal(written.has('index/movies/v1'), false)
     assert.equal(stats.indexFailed, true)
   } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+test('a carried row whose record could not be read is kept, not dropped', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+    const rows = written.get('index/movies/v1')
+
+    assert.deepEqual(rows.map(row => row.id), [99, 1])
+    assert.equal(rows.find(row => row.id === 99).score, 88, 'kept as it was, since nothing said otherwise')
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// The complete-walk half: a title the walk did not return has left the window, so its row goes
+test('a complete walk drops a row for a title no longer in the window', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual(written.get('index/movies/v1').map(row => row.id), [1])
+  } finally {
+    redis.getCache = realGetCache
     redis.setCache = realSetCache
     restore()
   }
@@ -461,7 +628,7 @@ test('a short catalogue walk withholds the index even at full row coverage', asy
 
 // A refused write leaves the richer record in place, so the row has to carry that record's numbers
 // or the ranked list contradicts the detail page reading the same key
-test('a refused write publishes the stored score, not tonight thinner one', async () => {
+test('a refused write publishes the stored score, not tonight\u2019s thinner one', async () => {
   const movies = [{ page: 1, id: 7, title: 'kept', releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies })
   const writes = new Map()
@@ -472,10 +639,11 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
     const fresh = { avgScore: 40, scores: { imdb: 40 } }
 
     Object.defineProperty(fresh, 'cached', { value: true })
-    Object.defineProperty(fresh, 'kept', { value: { avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } } })
     Object.defineProperty(fresh, 'outcomes', { value: { imdb: 'scored', metacritic: 'unreachable', rtCritic: 'unreachable', rtAudience: 'unreachable' } })
     return fresh
   }
+  // The write was refused, so the richer record is what the key still holds
+  scoreService.getScoreFromCache = async () => ({ avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } })
 
   try {
     const { stats: [stats] } = await cacheScores()
