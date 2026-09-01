@@ -12,7 +12,7 @@ const { default: scoreService } = await import('../services/scoreService.js')
 const { default: imdb } = await import('../services/imdbService.js')
 const { default: log } = await import('../utils/logger.js')
 const { default: redis, WRITTEN, FAILED } = await import('../services/redisService.js')
-const { scoreKey } = await import('../services/scoreService.js')
+const { scoreKey, SCORE_TTL } = await import('../services/scoreService.js')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
@@ -458,6 +458,77 @@ test('a short catalogue walk keeps the rows it could not confirm, and duplicates
     assert.equal(rows.length, 55, '54 walked plus the one title the short walk never reached')
     assert.equal(rows.filter(row => row.id === 100).length, 1, 'a walked title is refreshed, not carried too')
     assert.equal(rows.find(row => row.id === 100).score, 70, 'and refreshed from storage, not carried')
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// A row is only as good as the record it projects, so the index cannot be given a longer life than
+// the records get — the gap is where a ranking keeps serving scores the detail page has lost
+test('the index is written with the score TTL, not a longer one', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const ttls = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value, ttl) => { ttls.set(key, ttl); return WRITTEN }
+
+  try {
+    await cacheScores()
+
+    assert.equal(ttls.get('index/movies/v1'), SCORE_TTL)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// A carried row's record can have expired since the row was published, and carrying it forward
+// would renew a row nothing backs — index rows outlive score records otherwise
+test('a carried row whose score record is gone is dropped', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? null : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual(written.get('index/movies/v1').map(row => row.id), [1])
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// The row is a projection of the record, so carrying one must not preserve a number it has since lost
+test('a carried row takes its score from the record, not from the previous index', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1'
+    ? [{ id: 99, score: 88, votes: 1, sources: ['imdb', 'rtCritic'] }]
+    : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99)
+    ? { avgScore: 55, scores: { metacritic: 55 } }
+    : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+    const carried = written.get('index/movies/v1').find(row => row.id === 99)
+
+    assert.equal(carried.score, 55)
+    assert.deepEqual(carried.sources, ['metacritic'])
   } finally {
     redis.getCache = realGetCache
     redis.setCache = realSetCache

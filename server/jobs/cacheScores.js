@@ -1,7 +1,7 @@
 // Refreshes the IMDb dataset, warms score caches across both full catalogues, then verifies.
 
 import tmdb from '../services/tmdbService.js'
-import scoreService, { scoreKey } from '../services/scoreService.js'
+import scoreService, { scoreKey, SCORE_TTL } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import log from '../utils/logger.js'
@@ -19,8 +19,9 @@ const TMDB_PAGE_SIZE = 20
 // incomplete. A title added while we page through shifts a row onto the next page, arriving twice.
 const MAX_MISSING_TITLES = 5
 
-// Outlasts a missed run plus the next run's own duration, so the sort is never left empty
-const INDEX_TTL = 60 * 60 * 72 // 72 hours
+// The index is a projection of the score records, so it must not outlive them. A longer life only
+// buys a ranking of scores that are already gone.
+const INDEX_TTL = SCORE_TTL
 
 // The deploy runs the checks only, so a row-shape change is not rewritten until the nightly run.
 // Without this, the first serving deploy after one reads the previous generation for a day.
@@ -107,7 +108,7 @@ async function publishIndex(mediaType, rows, titles, complete) {
 
   // Drop a row this run did not confirm only when the walk was complete. A lost page otherwise
   // reads as titles leaving the window, and yesterday's ranking still holds them.
-  const carried = complete ? [] : (await redis.getCache(key) ?? []).filter(row => !walked.has(row.id))
+  const carried = complete ? [] : await carryRows(mediaType, await redis.getCache(key), walked)
   const all = [...rows, ...carried]
 
   // Publishing nothing is worse than yesterday's ranking, which still has its own TTL to run
@@ -121,6 +122,20 @@ async function publishIndex(mediaType, rows, titles, complete) {
   if (await redis.setCache(key, all, INDEX_TTL) === WRITTEN) return true
 
   log.error('Score index write failed', { mediaType, rows: all.length })
+}
+
+// Re-read rather than copied: a carried row's record can have expired since it was published, and
+// carrying it forward would renew a row nothing backs.
+async function carryRows(mediaType, previous, walked) {
+  const rows = await Promise.all((previous ?? [])
+    .filter(row => !walked.has(row.id))
+    .map(async row => {
+      const stored = await scoreService.getScoreFromCache(scoreKey(SEGMENT[mediaType], row.id))
+
+      return Number.isFinite(stored?.avgScore) ? { ...row, score: stored.avgScore, sources: Object.keys(stored.scores) } : null
+    }))
+
+  return rows.filter(Boolean)
 }
 
 async function cacheScoresFor(mediaType, { titles, complete }) {

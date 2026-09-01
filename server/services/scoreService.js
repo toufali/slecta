@@ -5,7 +5,7 @@ import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
-const SCORE_TTL = 60 * 60 * 48 // 48 hours
+export const SCORE_TTL = 60 * 60 * 48 // 48 hours
 const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
