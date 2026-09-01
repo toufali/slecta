@@ -127,7 +127,7 @@ async function publishIndex(mediaType, rows) {
 }
 
 async function cacheScoresFor(mediaType, { titles, expected, complete }) {
-  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, sources: {} }
+  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
 
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
@@ -185,8 +185,15 @@ async function scoreTitle(mediaType, title, stats) {
 
   if (!score.cached) stats.notCached++
 
-  for (const source of sources) stats.sources[source] = (stats.sources[source] ?? 0) + 1
   if (!sources.length) stats.unscored++
+
+  // Why each source produced what it did, which is what all three coverage rates divide by
+  for (const [source, outcome] of Object.entries(score.outcomes ?? {})) {
+    const tally = stats.outcomes[source] ??= {}
+
+    tally[outcome] = (tally[outcome] ?? 0) + 1
+  }
+
   stats.processed++
 
   // Publish what storage holds, so a row cannot disagree with the detail page reading the same record

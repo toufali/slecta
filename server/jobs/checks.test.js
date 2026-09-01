@@ -11,11 +11,18 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 const { checkRunCoverage, checkReferenceTitles } = await import('./checks.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 
-// A run where every source resolved for every title
-const healthy = (over = {}) => ({
-  mediaType: 'movie', total: 20, processed: 20, failed: 0, notCached: 0, unscored: 0,
-  sources: { imdb: 20, metacritic: 20, rtCritic: 20, rtAudience: 20 }, ...over
-})
+// A run where every source resolved for every title. `sources` is shorthand for the scored tally:
+// titles a source did not score are read as ones it does not carry, which is a healthy run's shape.
+// Pass `outcomes` instead to describe a source that failed rather than one that was never asked.
+const healthy = ({ sources, ...over } = {}) => {
+  const stats = { mediaType: 'movie', total: 20, processed: 20, failed: 0, notCached: 0, unscored: 0, ...over }
+  const resolved = sources ?? { imdb: 20, metacritic: 20, rtCritic: 20, rtAudience: 20 }
+
+  stats.outcomes ??= Object.fromEntries(Object.entries(resolved)
+    .map(([source, scored]) => [source, { scored, absent: stats.processed - scored }]))
+
+  return stats
+}
 
 const reasons = result => result.problems.map(p => p.reason ?? p.source)
 
@@ -34,7 +41,46 @@ test('a dead source trips its floor', () => {
 
   assert.equal(result.ok, false)
   // Every floor, so one cannot drop out of the loop without a test noticing
-  assert.deepEqual(reasons(result), ['imdb', 'metacritic', 'rtCritic', 'rtAudience'])
+  assert.deepEqual([...new Set(result.problems.map(p => p.source))], ['imdb', 'metacritic', 'rtCritic', 'rtAudience'])
+})
+
+// The detection the loosened floors gave up: a source blocked for part of the run trips its
+// unreachable ceiling while every score it did return still clears the resolved floor
+test('a source blocking for part of the run fails, where the resolved floor alone passes', () => {
+  const stats = healthy({
+    sources: { imdb: 20, metacritic: 20, rtCritic: 16, rtAudience: 16 },
+    outcomes: {
+      imdb: { scored: 20 },
+      metacritic: { scored: 20 },
+      rtCritic: { scored: 16, unreachable: 4 },
+      rtAudience: { scored: 16, unreachable: 4 }
+    }
+  })
+  const result = checkRunCoverage([stats], true)
+
+  assert.equal(result.ok, false)
+  assert.deepEqual(reasons(result), ['could not be read', 'could not be read'])
+})
+
+// The denominator change, stated as one comparison: the same resolved rate passes or fails on
+// whether the titles that produced nothing are ones the source carries
+test('titles a source does not carry are not counted against it', () => {
+  const notCarried = { scored: 6, absent: 14 }
+  const carried = { scored: 6, unscored: 14 }
+  const stats = over => healthy({ sources: { imdb: 20, metacritic: 6, rtCritic: 20, rtAudience: 20 }, outcomes: { imdb: { scored: 20 }, metacritic: over, rtCritic: { scored: 20 }, rtAudience: { scored: 20 } } })
+
+  assert.equal(checkRunCoverage([stats(notCarried)], true).ok, true)
+  assert.deepEqual(reasons(checkRunCoverage([stats(carried)], true)), ['no score on the pages that carry it'])
+})
+
+// `NaN < min` is false, so dividing by a denominator of zero would make a total outage pass
+test('a source no title carries fails rather than dividing by zero', () => {
+  const stats = healthy({
+    sources: { imdb: 20, metacritic: 20, rtCritic: 20, rtAudience: 0 },
+    outcomes: { imdb: { scored: 20 }, metacritic: { scored: 20 }, rtCritic: { scored: 20 }, rtAudience: { absent: 20 } }
+  })
+
+  assert.ok(reasons(checkRunCoverage([stats], true)).includes('no score on the pages that carry it'))
 })
 
 // Every source failing for one title shows as no aggregate at all, which no rate catches: the
@@ -123,10 +169,26 @@ test('a source at half its measured rate trips', () => {
   assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
 })
 
-// Measured, so the floors cannot drift above what a healthy run produces
-test('the rates a full run measures at the current vote floor are tolerated', () => {
-  const movies = healthy({ total: 814, processed: 814, sources: { imdb: 806, metacritic: 324, rtCritic: 441, rtAudience: 443 } })
-  const shows = healthy({ mediaType: 'tv', total: 365, processed: 365, sources: { imdb: 351, metacritic: 126, rtCritic: 193, rtAudience: 185 } })
+// A full run's own tallies, so no floor can drift above what a healthy run produces
+test('the outcomes a full run measures at the current vote floor are tolerated', () => {
+  const movies = healthy({
+    total: 812, processed: 812, unscored: 8,
+    outcomes: {
+      imdb: { scored: 804, absent: 8 },
+      metacritic: { scored: 323, unscored: 167, absent: 320, unreachable: 2 },
+      rtCritic: { scored: 439, unscored: 175, absent: 198 },
+      rtAudience: { scored: 441, unscored: 173, absent: 198 }
+    }
+  })
+  const shows = healthy({
+    mediaType: 'tv', total: 365, processed: 365, unscored: 13,
+    outcomes: {
+      imdb: { scored: 351, absent: 14 },
+      metacritic: { scored: 126, unscored: 25, absent: 213, unreachable: 1 },
+      rtCritic: { scored: 193, unscored: 96, absent: 76 },
+      rtAudience: { scored: 185, unscored: 104, absent: 76 }
+    }
+  })
 
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
 })
