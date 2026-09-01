@@ -3,7 +3,7 @@
 // Either failing logs at ERROR, which is what the Cloud Monitoring alert matches.
 
 import tmdb from '../services/tmdbService.js'
-import scoreService from '../services/scoreService.js'
+import scoreService, { scoreKey } from '../services/scoreService.js'
 import log from '../utils/logger.js'
 
 // Points of drift allowed. A dead source returns nothing at all, not a near-miss.
@@ -22,17 +22,15 @@ const REQUIRED_DETAIL = {
   tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'languages', 'genres']
 }
 
-const SOURCES = ['imdb', 'metacritic', 'rtCritic', 'rtAudience', 'tmdb']
-
 // ~10 points below what a full run measures, whichever media type binds. Re-measure after any
 // change to the vote floor — see `decisions.md`.
-const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.45, rtAudience: 0.4, tmdb: 0.95 }
-
-// A score from TMDB alone is the signature of every other source failing
-const MAX_TMDB_ONLY_RATE = 0.1
+const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.45, rtAudience: 0.4 }
 
 // Source rates divide by titles scored, which hides a batch where almost everything failed
 const MAX_FAILED_RATE = 0.1
+
+// A title no source could score at all, which is every source failing for it at once
+const MAX_UNSCORED_RATE = 0.1
 
 /** Score known titles and compare every source against its expected value. */
 export async function checkReferenceTitles() {
@@ -74,7 +72,7 @@ async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
     if (!detail[field]) failures.push({ title: name, source: field, reason: 'detail field empty' })
   }
 
-  const result = await scoreService.getScore(`checks/${mediaType}/${tmdbId}`, { ...detail, mediaType }, false)
+  const result = await scoreService.getScore(scoreKey(`checks/${mediaType}`, tmdbId), { ...detail, mediaType }, false)
 
   for (const [source, want] of Object.entries(expected)) {
     const got = result?.scores?.[source]
@@ -82,9 +80,6 @@ async function scoreReferenceTitle({ mediaType, tmdbId, name, expected }) {
     if (got === undefined) failures.push({ title: name, source, want, reason: 'absent' })
     else if (Math.abs(got - want) > TOLERANCE) failures.push({ title: name, source, want, got, reason: 'out of tolerance' })
   }
-
-  // TMDB drifts too much to pin a value, but a dropped component should still fail
-  if (result?.scores?.tmdb === undefined) failures.push({ title: name, source: 'tmdb', reason: 'absent' })
 
   return failures
 }
@@ -105,23 +100,24 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
     // Scores cached but nothing sortable published is a failed run, not a healthy one
     if (stats.indexFailed) problems.push({ mediaType: stats.mediaType, reason: 'score index not published' })
 
-    for (const source of SOURCES) {
+    // Driven by the floors themselves, so a source cannot be listed for checking without one and
+    // then skipped silently, which `rate < undefined` would do
+    for (const [source, min] of Object.entries(MIN_SOURCE_RATE)) {
       const rate = (stats.sources[source] ?? 0) / stats.processed
-      const min = MIN_SOURCE_RATE[source]
 
       if (rate < min) problems.push({ mediaType: stats.mediaType, source, rate: round(rate), min })
-    }
-
-    const tmdbOnlyRate = stats.tmdbOnly / stats.processed
-
-    if (tmdbOnlyRate > MAX_TMDB_ONLY_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'aggregates built from TMDB alone', rate: round(tmdbOnlyRate), max: MAX_TMDB_ONLY_RATE })
     }
 
     const failedRate = stats.failed / stats.total
 
     if (failedRate > MAX_FAILED_RATE) {
       problems.push({ mediaType: stats.mediaType, reason: 'titles failed to score', rate: round(failedRate), max: MAX_FAILED_RATE })
+    }
+
+    const unscoredRate = stats.unscored / stats.processed
+
+    if (unscoredRate > MAX_UNSCORED_RATE) {
+      problems.push({ mediaType: stats.mediaType, reason: 'titles no source could score', rate: round(unscoredRate), max: MAX_UNSCORED_RATE })
     }
 
     // Scoring can succeed while the Redis write fails, leaving the cache cold but every rate green

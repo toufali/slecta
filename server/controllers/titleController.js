@@ -1,5 +1,5 @@
 import tmdb from '../services/tmdbService.js'
-import scoreService from '../services/scoreService.js'
+import scoreService, { scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { mainView } from '../views/mainView.js'
@@ -59,7 +59,7 @@ export const showDetail = mediaType => async ctx => {
 
   if (!data) return ctx.throw(404)
 
-  const score = await scoreService.getScoreFromCache(`${media.segment}/${ctx.params.id}/score`)
+  const score = await scoreService.getScoreFromCache(scoreKey(media.segment, ctx.params.id))
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id, mediaType)
 
   data.score = score?.avgScore
@@ -100,7 +100,7 @@ export const getDetail = mediaType => async ctx => {
 // window ever gets scored
 export const getScore = mediaType => async ctx => {
   const { segment, detail } = MEDIA[mediaType]
-  const key = `${segment}/${ctx.params.id}/score`
+  const key = scoreKey(segment, ctx.params.id)
 
   let data = await scoreService.getScoreFromCache(key)
 
@@ -113,9 +113,10 @@ export const getScore = mediaType => async ctx => {
 
   if (!found) return ctx.throw(404)
 
-  const { tmdbScore, imdbId, wikiId, title, releaseDate } = found
+  const { imdbId, wikiId, title, releaseDate } = found
 
-  data = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType })
+  // Checks the cache again, since the detail fetch above gives another request time to fill it
+  data = await scoreService.getScore(key, { imdbId, wikiId, title, releaseDate, mediaType })
 
   return ctx.body = data
 }

@@ -9,6 +9,13 @@ const SCORE_TTL = 60 * 60 * 48 // 48 hours
 const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
+// Bump when the set of scored sources changes. Never-degrade compares outlet counts, so records
+// holding a source the code no longer produces would refuse every write until they expired.
+const SCORE_CACHE_VERSION = 1
+
+/** `prefix` is the media segment, or a caller's own namespace. */
+export const scoreKey = (prefix, id) => `${prefix}/${id}/score/v${SCORE_CACHE_VERSION}`
+
 // Bump when the slug record shape changes. Slug source cannot be backfilled: a cached
 // record skips the Wikidata call and every run refreshes its TTL, so an unknown source would stay
 // "guessed" forever.
@@ -20,7 +27,7 @@ const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
 // One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
-const OUTLET = { imdb: 'imdb', metacritic: 'metacritic', rtCritic: 'rt', rtAudience: 'rt', tmdb: 'tmdb' }
+const OUTLET = { rtCritic: 'rt', rtAudience: 'rt' }
 const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source] ?? source)).size
 
 // Undici holds the connection until a body is read or cancelled, and every path here
@@ -82,7 +89,7 @@ class ScoreService {
 
     if (!data) return log.warn('Score lookup data undefined', { key })
 
-    const { tmdbScore, imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
+    const { imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
     try {
       const [imdbScore, resolved] = await Promise.all([
@@ -95,23 +102,20 @@ class ScoreService {
         imdb: imdbScore,
         metacritic: resolved.mc?.page?.value,
         rtCritic: resolved.rt?.page?.critic,
-        rtAudience: resolved.rt?.page?.audience,
-        // TMDB reports 0 when a title has no votes — absence, not a score
-        tmdb: tmdbScore ? toScore(tmdbScore) : undefined
+        rtAudience: resolved.rt?.page?.audience
       }
 
       for (const [name, value] of Object.entries(scores)) {
         if (value === undefined) delete scores[name]
       }
 
-      const sources = Object.keys(scores)
       const mean = average(Object.values(scores))
       // Round, so the number shown and the number sorted on agree
       // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
       const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
 
-      if (sources.length === 1 && sources[0] === 'tmdb') {
-        log.warn('Score resolved from TMDB alone', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
+      if (!Number.isFinite(mean)) {
+        log.warn('No source resolved a score', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
       // Expire it soon: a blocked or timed-out source may hold a score we simply could not read

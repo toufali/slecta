@@ -13,8 +13,8 @@ const { default: tmdb } = await import('../services/tmdbService.js')
 
 // A run where every source resolved for every title
 const healthy = (over = {}) => ({
-  mediaType: 'movie', total: 20, processed: 20, failed: 0, notCached: 0, tmdbOnly: 0,
-  sources: { imdb: 20, metacritic: 20, rtCritic: 20, rtAudience: 20, tmdb: 20 }, ...over
+  mediaType: 'movie', total: 20, processed: 20, failed: 0, notCached: 0, unscored: 0,
+  sources: { imdb: 20, metacritic: 20, rtCritic: 20, rtAudience: 20 }, ...over
 })
 
 const reasons = result => result.problems.map(p => p.reason ?? p.source)
@@ -24,26 +24,30 @@ test('a healthy run reports no problems', () => {
 })
 
 test('partial critic coverage is tolerated, since new releases lack reviews', () => {
-  const stats = healthy({ sources: { imdb: 20, metacritic: 10, rtCritic: 12, rtAudience: 16, tmdb: 20 } })
+  const stats = healthy({ sources: { imdb: 20, metacritic: 10, rtCritic: 12, rtAudience: 16 } })
   assert.equal(checkRunCoverage([stats], true).ok, true)
 })
 
 test('a dead source trips its floor', () => {
-  const stats = healthy({ sources: { imdb: 20, metacritic: 0, rtCritic: 0, rtAudience: 0, tmdb: 20 } })
+  const stats = healthy({ sources: { imdb: 0, metacritic: 0, rtCritic: 0, rtAudience: 0 } })
   const result = checkRunCoverage([stats], true)
 
   assert.equal(result.ok, false)
-  assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
+  // Every floor, so one cannot drop out of the loop without a test noticing
+  assert.deepEqual(reasons(result), ['imdb', 'metacritic', 'rtCritic', 'rtAudience'])
 })
 
-test('scores built from TMDB alone trip, even at a low rate', () => {
-  assert.ok(reasons(checkRunCoverage([healthy({ tmdbOnly: 3 })], true)).includes('aggregates built from TMDB alone'))
+// Every source failing for one title shows as no aggregate at all, which no rate catches: the
+// title still counts as processed and contributes nothing to any source tally.
+test('titles no source could score trip their own floor', () => {
+  assert.equal(checkRunCoverage([healthy({ unscored: 1 })], true).ok, true)
+  assert.ok(reasons(checkRunCoverage([healthy({ unscored: 3 })], true)).includes('titles no source could score'))
 })
 
 test('a batch where almost every title failed does not pass as full coverage', () => {
   // Rates divide by `processed`, so one fully-resolved title out of twenty used to report
   // 100% for every source
-  const stats = healthy({ processed: 1, failed: 19, sources: { imdb: 1, metacritic: 1, rtCritic: 1, rtAudience: 1, tmdb: 1 } })
+  const stats = healthy({ processed: 1, failed: 19, sources: { imdb: 1, metacritic: 1, rtCritic: 1, rtAudience: 1 } })
   const result = checkRunCoverage([stats], true)
 
   assert.equal(result.ok, false)
@@ -112,7 +116,7 @@ test('a detail field TMDB stops populating fails the title', async () => {
 
 // Half the measured rate is the drop worth catching: a source degrading rather than disappearing
 test('a source at half its measured rate trips', () => {
-  const stats = healthy({ sources: { imdb: 20, metacritic: 3, rtCritic: 5, rtAudience: 5, tmdb: 20 } })
+  const stats = healthy({ sources: { imdb: 20, metacritic: 3, rtCritic: 5, rtAudience: 5 } })
   const result = checkRunCoverage([stats], true)
 
   assert.equal(result.ok, false)
@@ -121,16 +125,16 @@ test('a source at half its measured rate trips', () => {
 
 // Measured, so the floors cannot drift above what a healthy run produces
 test('the rates a full run measures at the current vote floor are tolerated', () => {
-  const movies = healthy({ total: 814, processed: 814, sources: { imdb: 806, metacritic: 324, rtCritic: 441, rtAudience: 443, tmdb: 814 } })
-  const shows = healthy({ mediaType: 'tv', total: 365, processed: 365, tmdbOnly: 13, sources: { imdb: 351, metacritic: 126, rtCritic: 193, rtAudience: 185, tmdb: 365 } })
+  const movies = healthy({ total: 814, processed: 814, sources: { imdb: 806, metacritic: 324, rtCritic: 441, rtAudience: 443 } })
+  const shows = healthy({ mediaType: 'tv', total: 365, processed: 365, sources: { imdb: 351, metacritic: 126, rtCritic: 193, rtAudience: 185 } })
 
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
 })
 
 // The rates before the floor dropped, kept so a regression toward them still passes
 test('the richer rates of the smaller catalogue are tolerated too', () => {
-  const movies = healthy({ total: 537, processed: 537, sources: { imdb: 536, metacritic: 294, rtCritic: 356, rtAudience: 375, tmdb: 537 } })
-  const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, tmdbOnly: 5, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137, tmdb: 194 } })
+  const movies = healthy({ total: 537, processed: 537, sources: { imdb: 536, metacritic: 294, rtCritic: 356, rtAudience: 375 } })
+  const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137 } })
 
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
 })

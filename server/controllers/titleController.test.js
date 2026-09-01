@@ -7,6 +7,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
+const { scoreKey } = await import('../services/scoreService.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
 const { default: reviewService } = await import('../services/reviewService.js')
@@ -22,7 +23,7 @@ function recordCalls() {
   tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7 } }
   tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7 } }
   scoreService.getScoreFromCache = async key => { calls.push(['scoreCache', key]); return null }
-  scoreService.getScore = async (key, data) => { calls.push(['score', key, data.mediaType]); return { avgScore: 70 } }
+  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache]); return { avgScore: 70 } }
   // Defaulted as the service defaults it, so the assertion is on the effective type rather than
   // on whether the argument was passed explicitly
   reviewService.getQuotes = async (id, name, date, mediaType = 'movie') => { calls.push(['quotes', id, mediaType]); return [] }
@@ -47,7 +48,7 @@ for (const { mediaType, segment } of MEDIA) {
 
     await getList(mediaType)(ctx)
 
-    assert.deepEqual(calls, [[`list:${mediaType}`], ['scoreCache', `${segment}/1/score`]])
+    assert.deepEqual(calls, [[`list:${mediaType}`], ['scoreCache', scoreKey(segment, 1)]])
     assert.deepEqual(ctx.body[segment], [{ id: 1 }])
     // A Map cannot cross JSON, so the API path converts it and the page path does not
     assert.deepEqual(ctx.body.allGenres, [[28, 'Action']])
@@ -69,9 +70,11 @@ for (const { mediaType, segment } of MEDIA) {
     await getScore(mediaType)(ctx)
 
     assert.deepEqual(calls, [
-      ['scoreCache', `${segment}/7/score`],
+      ['scoreCache', scoreKey(segment, 7)],
       [`detail:${mediaType}`, 7],
-      ['score', `${segment}/7/score`, mediaType]
+      // Undefined, not false: the detail fetch above gives another request time to fill the cache,
+      // so the score lookup has to check it again before paying for the sources
+      ['score', scoreKey(segment, 7), mediaType, undefined]
     ])
   })
 

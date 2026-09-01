@@ -1,7 +1,7 @@
 // Refreshes the IMDb dataset, warms score caches across both full catalogues, then verifies.
 
 import tmdb from '../services/tmdbService.js'
-import scoreService from '../services/scoreService.js'
+import scoreService, { scoreKey } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import log from '../utils/logger.js'
@@ -127,7 +127,7 @@ async function publishIndex(mediaType, rows) {
 }
 
 async function cacheScoresFor(mediaType, { titles, expected, complete }) {
-  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, tmdbOnly: 0, sources: {} }
+  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, sources: {} }
   const rows = []
 
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
@@ -155,7 +155,7 @@ async function cacheScoresFor(mediaType, { titles, expected, complete }) {
 }
 
 async function scoreTitle(mediaType, title, stats) {
-  const key = `${SEGMENT[mediaType]}/${title.id}/score`
+  const key = scoreKey(SEGMENT[mediaType], title.id)
 
   // Null means TMDB has no such title; a throw means the lookup failed. Both count as one failure.
   let detail
@@ -172,8 +172,8 @@ async function scoreTitle(mediaType, title, stats) {
     return
   }
 
-  const { tmdbScore, imdbId, wikiId, title: name, releaseDate } = detail
-  const score = await scoreService.getScore(key, { tmdbScore, imdbId, wikiId, title: name, releaseDate, mediaType }, false)
+  const { imdbId, wikiId, title: name, releaseDate } = detail
+  const score = await scoreService.getScore(key, { imdbId, wikiId, title: name, releaseDate, mediaType }, false)
 
   if (!score) {
     stats.failed++
@@ -186,7 +186,7 @@ async function scoreTitle(mediaType, title, stats) {
   if (!score.cached) stats.notCached++
 
   for (const source of sources) stats.sources[source] = (stats.sources[source] ?? 0) + 1
-  if (sources.length === 1 && sources[0] === 'tmdb') stats.tmdbOnly++
+  if (!sources.length) stats.unscored++
   stats.processed++
 
   // Publish what storage holds, so a row cannot disagree with the detail page reading the same record
