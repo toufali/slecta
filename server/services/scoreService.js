@@ -5,9 +5,15 @@ import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
-export const SCORE_TTL = 60 * 60 * 48 // 48 hours
-const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
+// Long enough that a title's next scheduled refresh lands inside it: a record expiring before it is
+// due to be rewritten leaves the title with no score at all.
+export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
+export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
+
+// ms, so halve the seconds Redis takes. Never-degrade holds a record against a thinner write and
+// expiry is what corrects a wrong one, which a life this long is too slow to do on its own.
+export const DEGRADE_AFTER = (SCORE_TTL / 2) * 1000
 
 // Bump when the set of scored sources changes. Never-degrade compares outlet counts, so records
 // holding a source the code no longer produces would refuse every write until they expired.
@@ -156,15 +162,22 @@ class ScoreService {
       // Read here, not before the fetches above: in that window the record can expire, or a request
       // can store a richer one that an unconditional write would then clobber
       const stored = await this.getScoreFromCache(key)
-      const thinner = Boolean(stored && outlets(stored.scores) > outlets(scores))
+      const degrades = Boolean(stored && outlets(stored.scores) > outlets(scores))
+      // Past half its life a record has outlasted attempts that could not match it, so a thinner
+      // result is the world rather than one bad night. No stamp keeps the guard.
+      const guarded = degrades && !(Date.now() - stored.fetchedAt >= DEGRADE_AFTER)
       const candidate = { ...score, fetchedAt: Date.now() }
+
+      if (degrades && !guarded) {
+        log.warn('Score degraded, the record is past its guard', { key, title, outlets: outlets(scores), stored: outlets(stored.scores) })
+      }
 
       // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
       // at expiry, while a record that vanished is rebuilt rather than left absent
       // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
       // that writer to resolve more outlets than this run did, at the same instant, from the same
       // sources; the cost if it happens is one title thinner until it rebuilds.
-      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
+      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
       // Re-read what declined this write, since `stored` predates it
       const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
       const result = outcome === WRITTEN ? candidate : score

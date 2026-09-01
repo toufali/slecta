@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, orderCandidates, scoreKey } = await import('./scoreService.js')
+const { default: scoreService, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL, DEGRADE_AFTER } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -296,7 +296,7 @@ test('a score missing a source that refused expires early', async () => {
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-  assert.equal(ttlOf('test/movie/refusedsource'), 60 * 60)
+  assert.equal(ttlOf('test/movie/refusedsource'), SCORE_RETRY_TTL)
 })
 
 // A 404 is the title's own answer, so the thinner score is settled and keeps the full life
@@ -312,7 +312,7 @@ test('a score missing a source that has no page keeps the full life', async () =
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-  assert.equal(ttlOf('test/movie/nopage'), 60 * 60 * 48)
+  assert.equal(ttlOf('test/movie/nopage'), SCORE_TTL)
 })
 
 // A block arrives as whatever status the CDN in front of the source happens to use
@@ -328,7 +328,7 @@ test('a block on any status shortens the record, a 404 does not', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(ttlOf(`test/movie/${status}`), 60 * 60, `status ${status}`)
+    assert.equal(ttlOf(`test/movie/${status}`), SCORE_RETRY_TTL, `status ${status}`)
     assert.deepEqual(Object.keys(wrote(`test/movie/${status}`).scores), ['metacritic'], `status ${status}`)
   }
 })
@@ -357,7 +357,7 @@ for (const [label, id, wikidata] of [
     assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience'],
       'both score sources were read despite the lookup failing')
     // Both slugs resolved by guessing, so nothing is missing and the score keeps its full life
-    assert.equal(ttlOf(key), 60 * 60 * 48)
+    assert.equal(ttlOf(key), SCORE_TTL)
     assert.equal(wrote(`slugs/v1/movie/${id}/Wiki Throw/2010-07-16`), undefined,
       'an unanswered lookup still leaves the stored record alone')
   })
@@ -376,7 +376,7 @@ test('a Metacritic page with no Metascore keeps the full life', async () => {
     wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.equal(ttlOf('test/movie/unrated'), 60 * 60 * 48)
+  assert.equal(ttlOf('test/movie/unrated'), SCORE_TTL)
 })
 
 // A challenge page answers 200 and parses; the absence of a whole-title block is the tell
@@ -393,7 +393,7 @@ test('a page with no whole-title block shortens the record', async () => {
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['rtCritic', 'rtAudience'], 'the challenge page yielded no Metascore')
-  assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
+  assert.equal(ttlOf('test/movie/challenge'), SCORE_RETRY_TTL)
 })
 
 // Caching an unanswered guess would outlive the score's retry window, so the rebuild an hour
@@ -410,7 +410,7 @@ test('an unanswered slug lookup is not cached, so the retry re-asks', async () =
     wikiId: 'Q777', title: 'Nothing Answers', releaseDate: '2026-01-01', mediaType: 'movie'
   }, false)
 
-  assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
+  assert.equal(ttlOf('test/movie/noslug'), SCORE_RETRY_TTL)
   assert.equal(ttlOf('slugs/v1/movie/Q777/Nothing Answers/2026-01-01'), undefined)
 })
 
@@ -427,7 +427,7 @@ test('an empty body shortens the record despite the status', async () => {
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic'], 'the empty RT body yielded no scores')
-  assert.equal(ttlOf('test/movie/empty'), 60 * 60)
+  assert.equal(ttlOf('test/movie/empty'), SCORE_RETRY_TTL)
 })
 
 // Wikidata rate-limits readily, and it is only a shortcut: if the probes resolve both slugs and
@@ -444,7 +444,7 @@ test('a Wikidata blip does not shorten a score the probes resolved', async () =>
   }, false)
 
   assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience'])
-  assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
+  assert.equal(ttlOf('test/movie/wikiblip'), SCORE_TTL)
   assert.equal(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), undefined,
     'an unread lookup leaves the record alone, so the guesses are re-resolved next run')
 })
@@ -463,7 +463,7 @@ test('a malformed JSON-LD block does not lose a rating', async () => {
   }, false)
 
   assert.equal(score.scores.metacritic, 52)
-  assert.equal(ttlOf('test/movie/mixedld'), 60 * 60 * 48)
+  assert.equal(ttlOf('test/movie/mixedld'), SCORE_TTL)
 })
 
 
@@ -763,7 +763,7 @@ test('a Wikidata blip shortens the score when a slug is still missing', async ()
   // also hold if neither had
   assert.equal(score.scores.metacritic, 52)
   assert.equal(score.scores.rtCritic, undefined)
-  assert.equal(ttlOf('test/movie/wikigap'), 60 * 60)
+  assert.equal(ttlOf('test/movie/wikigap'), SCORE_RETRY_TTL)
 })
 
 // Fall-through on a 404, which became a path of its own once `!page` and `!answered` split. The
@@ -789,7 +789,70 @@ test('a 404 on the first guess falls through to the year variant', async () => {
 // night and make a wrong score permanent.
 const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
 
-const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: 1 }
+// Fresh, so the guard holds. An aged record is the override's case and says so at the point of use.
+const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() }
+
+// A record now outlives the interval it is rewritten on, so expiry is far too slow to be
+// never-degrade's correction path. The guard has to end somewhere short of it.
+test('a record past its guard accepts the thinner write', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ ...RICH, fetchedAt: Date.now() - DEGRADE_AFTER - 1000 })
+
+  try {
+    const score = await scoreService.getScore('test/movie/aged', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/aged').scores), ['metacritic'])
+    assert.equal(score.kept, undefined, 'nothing declined it')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// The other side of the same boundary, so moving it has to move both
+test('a record one moment inside its guard still refuses the thinner write', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ ...RICH, fetchedAt: Date.now() - DEGRADE_AFTER + 5000 })
+
+  try {
+    await scoreService.getScore('test/movie/nearlyaged', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/nearlyaged'), undefined, 'no write at all')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// Losing an outlet is worse than holding one another cycle, so an unaged record keeps the guard
+test('a record with no stamp cannot be aged out of its guard', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 } })
+
+  try {
+    await scoreService.getScore('test/movie/unstamped', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/unstamped'), undefined, 'no write at all')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
 
 test('a run resolving fewer outlets leaves the record untouched and still returns tonight numbers', async () => {
   stubHosts({
@@ -822,7 +885,7 @@ test('RT critic and audience count as one outlet', async () => {
     'www.rottentomatoes.com': () => new Response('', { status: 403 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: 1 })
+  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() })
 
   try {
     await scoreService.getScore('test/movie/rtoutlet', {
@@ -841,7 +904,7 @@ test('a richer result replaces a thinner record', async () => {
     'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 67, scores: { tmdb: 67 }, fetchedAt: 1 })
+  storedScore({ avgScore: 67, scores: { tmdb: 67 }, fetchedAt: Date.now() })
 
   try {
     const score = await scoreService.getScore('test/movie/richer', {
@@ -878,7 +941,7 @@ test('an accepted write stamps when the numbers are from, a refused one does not
     }, false)
 
     assert.equal('fetchedAt' in score, false, 'a refused result carries no stamp of its own')
-    assert.equal(score.kept.fetchedAt, 1, 'the stored stamp is left as it was')
+    assert.equal(score.kept.fetchedAt, RICH.fetchedAt, 'the stored stamp is left as it was')
   } finally {
     redis.getCache = realGetCache
   }
@@ -943,7 +1006,7 @@ test('a source with no outlet mapping counts as its own outlet', async () => {
     'www.rottentomatoes.com': () => new Response('', { status: 403 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: 1 })
+  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: Date.now() })
 
   try {
     await scoreService.getScore('test/movie/unmapped', {
