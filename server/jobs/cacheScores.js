@@ -180,6 +180,7 @@ async function scoreTitle(mediaType, title, stats) {
     return
   }
 
+  // Tonight's attempt, not what is stored: these rates are the live outage detector
   const sources = Object.keys(score.scores)
 
   if (!score.cached) stats.notCached++
@@ -188,8 +189,11 @@ async function scoreTitle(mediaType, title, stats) {
   if (sources.length === 1 && sources[0] === 'tmdb') stats.tmdbOnly++
   stats.processed++
 
+  // Publish what storage holds, so a row cannot disagree with the detail page reading the same record
+  const row = score.kept ?? score
+
   // Unscorable titles would sort as NaN
-  if (!Number.isFinite(score.avgScore)) return
+  if (!Number.isFinite(row.avgScore)) return
 
   // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
   // names, not a count: RT contributes two keys, so a count hides outlets and critic presence.
@@ -202,8 +206,8 @@ async function scoreTitle(mediaType, title, stats) {
     votes: title.tmdbScoreCount,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
-    score: score.avgScore,
-    sources
+    score: row.avgScore,
+    sources: Object.keys(row.scores)
   }
 }
 

@@ -704,3 +704,103 @@ test('a 404 on the first guess falls through to the year variant', async () => {
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
     ['https://www.rottentomatoes.com/m/fall_through', 'https://www.rottentomatoes.com/m/fall_through_2026'])
 })
+
+
+// Refusing has to mean not writing: rewriting the stored value to keep it would renew its TTL every
+// night and make a wrong score permanent.
+const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
+
+const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 }
+
+test('a run resolving fewer outlets leaves the record untouched and still returns tonight numbers', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+
+  try {
+    const score = await scoreService.getScore('test/movie/degraded', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
+    // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
+    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+    assert.equal(score.kept.avgScore, 80, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(score.cached, true, 'a refusal is not a persistence failure')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// RT's two keys come from one page. Counted apart, this stored record would read as 3 outlets
+// against tonight's 2 and be refused.
+test('RT critic and audience count as one outlet', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    await scoreService.getScore('test/movie/rtoutlet', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.ok(wrote('test/movie/rtoutlet'), 'equal outlet counts still write, refreshing the record')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+test('a richer result replaces a thinner record', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 67, scores: { tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    const score = await scoreService.getScore('test/movie/richer', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/richer').scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+    assert.equal(score.kept, undefined)
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// Phase 4's "as of" label and the refresh cadence both read this, so it must mean when the numbers
+// were taken, not when they were last attempted
+test('an accepted write stamps when the numbers are from, a refused one does not', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  await scoreService.getScore('test/movie/stamped', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.ok(wrote('test/movie/stamped').fetchedAt > 0)
+
+  storedScore(RICH)
+
+  try {
+    const score = await scoreService.getScore('test/movie/unstamped', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal('fetchedAt' in score, false, 'a refused result carries no stamp of its own')
+    assert.equal(score.kept.fetchedAt, 1, 'the stored stamp is left as it was')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})

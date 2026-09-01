@@ -457,3 +457,35 @@ test('a short catalogue walk withholds the index even at full row coverage', asy
     restore()
   }
 })
+
+// A refused write leaves the richer record in place, so the row has to carry that record's numbers
+// or the ranked list contradicts the detail page reading the same key
+test('a refused write publishes the stored score, not tonight thinner one', async () => {
+  const movies = [{ page: 1, id: 7, title: 'kept', releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const writes = new Map()
+  const realSet = redis.setCache
+
+  redis.setCache = async (key, value) => Boolean(writes.set(key, value))
+  scoreService.getScore = async () => {
+    const fresh = { avgScore: 40, scores: { tmdb: 40 } }
+
+    Object.defineProperty(fresh, 'cached', { value: true })
+    Object.defineProperty(fresh, 'kept', { value: { avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, tmdb: 70 } } })
+    return fresh
+  }
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+    const [row] = writes.get('index/movies/v1')
+
+    assert.equal(row.score, 82, 'the row carries the stored score')
+    assert.deepEqual(row.sources, ['imdb', 'metacritic', 'rtCritic', 'tmdb'])
+    // Coverage still measures tonight's attempt, which is what detects a source going down
+    assert.deepEqual(stats.sources, { tmdb: 1 })
+    assert.equal(stats.notCached, 0, 'a refusal is not a persistence failure')
+  } finally {
+    redis.setCache = realSet
+    restore()
+  }
+})

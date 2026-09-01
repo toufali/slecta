@@ -19,6 +19,10 @@ const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run ha
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
+// One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
+const OUTLET = { imdb: 'imdb', metacritic: 'metacritic', rtCritic: 'rt', rtAudience: 'rt', tmdb: 'tmdb' }
+const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source])).size
+
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
 // sustained outage would otherwise starve the pool. Cleanup must never mask a real error.
@@ -71,11 +75,10 @@ class ScoreService {
   }
 
   async getScore(key, data, tryCache = true) {
-    // TODO: a more sophisticated caching strategy
-    if (tryCache) {
-      const score = await this.getScoreFromCache(key)
-      if (score) return score
-    }
+    // One read serves both the cache hit and the never-degrade comparison below
+    const stored = await this.getScoreFromCache(key)
+
+    if (tryCache && stored) return stored
 
     if (!data) return log.warn('Score lookup data undefined', { key })
 
@@ -115,12 +118,25 @@ class ScoreService {
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
       if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
 
+      // Refuse by not writing at all: rewriting the stored value would renew its TTL nightly and
+      // make a wrong score permanent
+      const kept = stored && outlets(stored.scores) > outlets(scores) ? stored : undefined
+
+      if (kept) {
+        log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
+      } else {
+        score.fetchedAt = Date.now()
+      }
+
       // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
-      // `cached` mirrors getCache's `cacheHit` flag.
-      const cached = await redis.setCache(key, score, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL)
+      const written = kept ? false : await redis.setCache(key, score, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL)
 
-      Object.defineProperty(score, 'cached', { value: Boolean(cached) })
+      // True whenever Redis holds a record, written now or kept: a refusal is not a failed write
+      Object.defineProperty(score, 'cached', { value: Boolean(written || kept) })
+      // What Redis holds, for a caller that must not publish tonight's thinner numbers
+      Object.defineProperty(score, 'kept', { value: kept })
 
+      // Return tonight's result, never the stored one, or the nightly check passes while a source is down
       return score
     } catch (e) {
       log.error('Error getting average score', { key, title, error: e })
