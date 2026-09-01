@@ -119,8 +119,7 @@ test('a source at half its measured rate trips', () => {
   assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
 })
 
-// The rates a healthy full run really produces must stay inside the floors. Measured over the
-// 1,178-title set the lowered vote floor admits, which is the set these floors now govern.
+// Measured, so the floors cannot drift above what a healthy run produces
 test('the rates a full run measures at the current vote floor are tolerated', () => {
   const movies = healthy({ total: 814, processed: 814, sources: { imdb: 806, metacritic: 324, rtCritic: 441, rtAudience: 443, tmdb: 814 } })
   const shows = healthy({ mediaType: 'tv', total: 365, processed: 365, tmdbOnly: 13, sources: { imdb: 351, metacritic: 126, rtCritic: 193, rtAudience: 185, tmdb: 365 } })
@@ -128,8 +127,7 @@ test('the rates a full run measures at the current vote floor are tolerated', ()
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
 })
 
-// The set before the vote floor dropped, which resolved far better. Kept so a regression back
-// toward those rates is not mistaken for the obscure titles the floor now admits.
+// The rates before the floor dropped, kept so a regression toward them still passes
 test('the richer rates of the smaller catalogue are tolerated too', () => {
   const movies = healthy({ total: 537, processed: 537, sources: { imdb: 536, metacritic: 294, rtCritic: 356, rtAudience: 375, tmdb: 537 } })
   const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, tmdbOnly: 5, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137, tmdb: 194 } })

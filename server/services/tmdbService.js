@@ -60,8 +60,7 @@ const CATALOGUE = {
 }
 
 class TmdbService {
-  // TMDB votes a title needs to enter the catalogue, on the job and the list path alike. Below
-  // this it is too thinly sourced to score; search plus a live detail lookup reaches the rest.
+  // TMDB votes a title needs to enter the catalogue, on the job and the list path alike
   minVotes = 25
   pageMax = 500 // TMDB 400s on a higher page
   language = 'en-US' // TODO: base on user/browser preference
