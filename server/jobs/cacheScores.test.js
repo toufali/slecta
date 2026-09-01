@@ -429,6 +429,7 @@ test('a title with no stored score contributes no row', async () => {
     const { stats: [stats] } = await cacheScores()
 
     assert.equal(stats.processed, 20)
+    assert.equal(stats.failed, 0, 'a missing record is not a thrown one')
     assert.equal(stats.indexFailed, false)
     assert.equal(written.get('index/movies/v1').length, 17)
   } finally {
@@ -529,6 +530,76 @@ test('a carried row takes its score from the record, not from the previous index
 
     assert.equal(carried.score, 55)
     assert.deepEqual(carried.sources, ['metacritic'])
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// `getCache` answers undefined for an unreadable Redis and null for a miss. Collapsing them drops a
+// title over a failed read, which is the same mistake in three places, so each is pinned.
+test('a title whose record could not be read keeps the row it had, even on a complete walk', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 2, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 2) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+    const rows = written.get('index/movies/v1')
+
+    assert.equal(stats.failed, 0)
+    assert.deepEqual(rows.map(row => row.id), [2, 1], 'the unreadable title keeps its place')
+    assert.equal(rows.find(row => row.id === 2).score, 88)
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+test('an unreadable previous index withholds publication rather than replacing it', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? undefined : realGetCache(key)
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(written.has('index/movies/v1'), false)
+    assert.equal(stats.indexFailed, true)
+  } finally {
+    redis.getCache = realGetCache
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+test('a carried row whose record could not be read is kept, not dropped', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === 'index/movies/v1' ? [{ id: 99, score: 88, votes: 1 }] : realGetCache(key)
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99) ? undefined : { avgScore: 70, scores: { imdb: 1 } }
+
+  try {
+    await cacheScores()
+    const rows = written.get('index/movies/v1')
+
+    assert.deepEqual(rows.map(row => row.id), [99, 1])
+    assert.equal(rows.find(row => row.id === 99).score, 88, 'kept as it was, since nothing said otherwise')
   } finally {
     redis.getCache = realGetCache
     redis.setCache = realSetCache
