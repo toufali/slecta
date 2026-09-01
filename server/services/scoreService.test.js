@@ -12,7 +12,13 @@ const { default: log } = await import('../utils/logger.js')
 
 // Redis is never connected here, so the write is recorded rather than made
 const writes = new Map()
-redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
+// Models NX: a conditional write declines while the record is present, which is the refusal path.
+// `vanished` flips it, standing in for a record that expired while the sources were being fetched.
+let vanished = false
+redis.setCache = async (key, value, ttl, ifAbsent) => {
+  if (ifAbsent && !vanished) return false
+  return Boolean(writes.set(key, { value, ttl }))
+}
 const ttlOf = key => writes.get(key)?.ttl
 const realGetCache = redis.getCache
 // Through JSON, because that is what Redis stores: undefined keys do not survive the trip
@@ -801,6 +807,33 @@ test('an accepted write stamps when the numbers are from, a refused one does not
     assert.equal('fetchedAt' in score, false, 'a refused result carries no stamp of its own')
     assert.equal(score.kept.fetchedAt, 1, 'the stored stamp is left as it was')
   } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+
+// The record read at the start can reach its TTL while the sources are being fetched. Skipping the
+// write outright would leave the title with no score at all and still report one.
+test('a record that expires mid-run is rebuilt rather than left absent', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+  vanished = true
+
+  try {
+    const score = await scoreService.getScore('test/movie/vanished', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/vanished').scores), ['metacritic', 'tmdb'],
+      'a thin score beats none once the richer record is gone')
+    assert.equal(score.kept, undefined)
+    assert.ok(score.fetchedAt > 0, 'the rebuild is an accepted write, so it is stamped')
+  } finally {
+    vanished = false
     redis.getCache = realGetCache
   }
 })

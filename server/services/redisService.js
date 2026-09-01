@@ -79,14 +79,16 @@ class RedisService {
     }
   }
 
-  async setCache(key, value, ttl = TTL_DEFAULT) {
+  async setCache(key, value, ttl = TTL_DEFAULT, ifAbsent = false) {
     if (!client?.isReady) return false
 
     try {
       const res = await bounded(client.set(key, JSON.stringify(value, this.#jsonReplacer), {
         EX: ttl, // seconds, eg 60 * 60 * 12 -> sec * min * hr
-        NX: false, // true -> only set the key if it does not already exist.
+        NX: ifAbsent
       }))
+      // Redis answers null when NX finds the key present, which is a decline rather than a failure
+      if (res === null && ifAbsent) return false
       if (res !== 'OK') throw new Error(res)
       return true
     } catch (e) {

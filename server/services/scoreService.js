@@ -118,26 +118,28 @@ class ScoreService {
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
       if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
 
-      // Refuse by not writing at all: rewriting the stored value would renew its TTL nightly and
-      // make a wrong score permanent
-      const kept = stored && outlets(stored.scores) > outlets(scores) ? stored : undefined
+      // Refuse a thinner result, and refuse conditionally rather than by skipping the write: the
+      // record read above can expire mid-run, and NX rebuilds a vanished one while declining a live
+      // one, whose TTL keeps running so a wrong score still dies at expiry
+      const thinner = Boolean(stored && outlets(stored.scores) > outlets(scores))
+      const candidate = { ...score, fetchedAt: Date.now() }
+
+      // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
+      const written = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
+      const kept = thinner && !written ? stored : undefined
+      const result = kept ? score : candidate
 
       if (kept) {
         log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
-      } else {
-        score.fetchedAt = Date.now()
       }
 
-      // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
-      const written = kept ? false : await redis.setCache(key, score, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL)
-
       // True whenever Redis holds a record, written now or kept: a refusal is not a failed write
-      Object.defineProperty(score, 'cached', { value: Boolean(written || kept) })
+      Object.defineProperty(result, 'cached', { value: Boolean(written || kept) })
       // What Redis holds, for a caller that must not publish tonight's thinner numbers
-      Object.defineProperty(score, 'kept', { value: kept })
+      Object.defineProperty(result, 'kept', { value: kept })
 
       // Return tonight's result, never the stored one, or the nightly check passes while a source is down
-      return score
+      return result
     } catch (e) {
       log.error('Error getting average score', { key, title, error: e })
     }
