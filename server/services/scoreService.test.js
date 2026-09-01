@@ -40,8 +40,8 @@ function warnings(message) {
   return () => seen
 }
 
-const LD = (value, year = 2010) => `<script type="application/ld+json">${JSON.stringify({
-  '@type': 'Movie', aggregateRating: { ratingValue: value }, dateCreated: `${year}-07-16`
+const LD = (value, year = 2010, reviewCount) => `<script type="application/ld+json">${JSON.stringify({
+  '@type': 'Movie', aggregateRating: { ratingValue: value, reviewCount }, dateCreated: `${year}-07-16`
 })}</script>`
 
 const ok = body => new Response(body, { status: 200 })
@@ -59,8 +59,8 @@ function stubHosts(routes) {
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
 // The year matches the fixtures' usual release date, since a guessed slug is only accepted when it does
-const rtScorecard = (critic, audience, year = 2010) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
-  criticsScore: { score: critic }, audienceScore: { score: audience }
+const rtScorecard = (critic, audience, year = 2010, criticCount, audienceCount) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+  criticsScore: { score: critic, reviewCount: criticCount }, audienceScore: { score: audience, reviewCount: audienceCount }
 })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
 const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
@@ -200,6 +200,44 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   // (52 + 50 + 85) / 3 is 62.3
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
   assert.equal(score.avgScore, 62)
+})
+
+// Every source publishes how many reviews its score came from, and an unweighted mean over a
+// 37-rating audience score and a 2,780-rating one favours whichever thin component happens to be high
+test('each score is stored beside the sample size it came from', async () => {
+  const { default: imdb } = await import('./imdbService.js')
+  const realGetRating = imdb.getRating
+  imdb.getRating = async () => ({ rating: 8.4, votes: 912_000 })
+
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(87, 91, 2010, 526, 9065),
+    'www.metacritic.com': () => ok(LD(74, 2010, 68))
+  })
+
+  const score = await scoreService.getScore('test/movie/counts', {
+    imdbId: 'tt1375666', wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  imdb.getRating = realGetRating
+
+  assert.deepEqual(score.scores, { imdb: 84, metacritic: 74, rtCritic: 87, rtAudience: 91 })
+  assert.deepEqual(score.counts, { imdb: 912_000, metacritic: 68, rtCritic: 526, rtAudience: 9065 })
+})
+
+// RT reports 0 where it has no reviews, and a zero sample would read as a real one a weighting could divide by
+test('a source with no reviews has no count rather than a zero', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(87, undefined, 2010, 526, 0),
+    'www.metacritic.com': () => ok(LD(74))
+  })
+
+  const score = await scoreService.getScore('test/movie/nocount', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.counts, { rtCritic: 526 })
 })
 
 // NaN serialises to null, which would order ahead of real scores and lose the badge placeholder

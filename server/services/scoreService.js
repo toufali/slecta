@@ -1,4 +1,4 @@
-import { average, toScore } from '../utils/math.js'
+import { average, toCount, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
 import { space } from '../utils/throttle.js'
 import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
@@ -36,6 +36,9 @@ const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET
 const discard = res => res?.body?.cancel().catch(() => {})
 
 const parseJson = value => { try { return JSON.parse(value) } catch { return null } }
+
+// Drop absent keys rather than nulling them: outlet counting reads key count
+const defined = obj => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined))
 
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
@@ -92,27 +95,30 @@ class ScoreService {
     const { imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
 
     try {
-      const [imdbScore, resolved] = await Promise.all([
-        this.getIMDBScore(imdbId),
+      const [imdbRating, resolved] = await Promise.all([
+        this.#readIMDB(imdbId),
         this.#resolveSources({ wikiId, title, releaseDate, mediaType })
       ])
 
-      // Omitted rather than nulled, so key count is source count
-      const scores = {
-        imdb: imdbScore,
+      const scores = defined({
+        imdb: imdbRating?.value,
         metacritic: resolved.mc?.page?.value,
         rtCritic: resolved.rt?.page?.critic,
         rtAudience: resolved.rt?.page?.audience
-      }
+      })
 
-      for (const [name, value] of Object.entries(scores)) {
-        if (value === undefined) delete scores[name]
-      }
+      // Absent where a source publishes none — RT gives no number for a TV audience score
+      const counts = defined({
+        imdb: imdbRating?.count,
+        metacritic: resolved.mc?.page?.count,
+        rtCritic: resolved.rt?.page?.criticCount,
+        rtAudience: resolved.rt?.page?.audienceCount
+      })
 
       const mean = average(Object.values(scores))
       // Round, so the number shown and the number sorted on agree
       // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
-      const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores }
+      const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores, counts }
 
       if (!Number.isFinite(mean)) {
         log.warn('No source resolved a score', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
@@ -156,9 +162,11 @@ class ScoreService {
 
   // No `answered` flag: a missing dataset reads the same however soon we ask again, and only the
   // nightly refresh can fix it — which alerts on its own
-  async getIMDBScore(imdbId) {
+  async #readIMDB(imdbId) {
     const rating = await imdb.getRating(imdbId)
-    return rating && Math.round(rating.rating * 10) // adjusted to 100 scale
+    if (!rating) return
+
+    return { value: Math.round(rating.rating * 10), count: toCount(rating.votes) } // adjusted to 100 scale
   }
 
   // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
@@ -175,7 +183,13 @@ class ScoreService {
       if (!json) throw new Error('media-scorecard-json not found')
 
       const { criticsScore, audienceScore } = JSON.parse(json[1])
-      const page = { critic: toScore(criticsScore?.score), audience: toScore(audienceScore?.score), year: pageYear(body) }
+      const page = {
+        critic: toScore(criticsScore?.score),
+        audience: toScore(audienceScore?.score),
+        criticCount: toCount(criticsScore?.reviewCount),
+        audienceCount: toCount(audienceScore?.reviewCount),
+        year: pageYear(body)
+      }
 
       return { answered: true, page }
     } catch (e) {
@@ -202,9 +216,9 @@ class ScoreService {
       // rating is different: that is Metacritic saying it has no Metascore yet, which is an answer.
       if (!titles.length) return unanswered(`${MC_BASE_URL}${path}/`, { reason: 'no whole-title block' })
 
-      const rated = titles.find(item => item.aggregateRating?.ratingValue != null)
+      const rating = titles.find(item => item.aggregateRating?.ratingValue != null)?.aggregateRating
 
-      return { answered: true, page: { value: toScore(rated?.aggregateRating.ratingValue), year: pageYear(body) } }
+      return { answered: true, page: { value: toScore(rating?.ratingValue), count: toCount(rating?.reviewCount), year: pageYear(body) } }
     } catch (e) {
       log.warn('Error getting Metacritic score', { path, error: e })
 

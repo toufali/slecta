@@ -28,3 +28,16 @@ export function toScore(value) {
   const score = parseInt(value)
   return Number.isFinite(score) ? score : undefined
 }
+
+/**
+ * Coerce an external sample size to a positive integer, or undefined when there is none.
+ * A zero is a source with nothing to count, which is the same as not reporting one.
+ * Parsed strictly, not with parseInt: `parseInt('1,234')` is 1, and a thick component
+ * reading as thin is worse than one carrying no count at all.
+ * @param {*} value
+ * @return {(number|undefined)}
+ */
+export function toCount(value) {
+  const count = Number(value)
+  return Number.isInteger(count) && count > 0 ? count : undefined
+}
