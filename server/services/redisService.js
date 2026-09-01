@@ -16,6 +16,12 @@ const TIMED_OUT = Symbol('timed out')
 let client
 let degraded = false
 
+// A write has three outcomes and callers need to tell them apart, so it answers which rather than
+// a boolean two of them would share
+export const WRITTEN = 'written'
+export const DECLINED = 'declined'
+export const FAILED = 'failed'
+
 class RedisService {
   // Reports whether Redis is usable, so a batch process can refuse to run without a cache
   async init() {
@@ -79,8 +85,13 @@ class RedisService {
     }
   }
 
+  /**
+   * Write a value, optionally only when the key is absent.
+   * @return {'written'|'declined'|'failed'} `declined` only when `ifAbsent` found the key present.
+   *   A caller that needs to know *why* a write did not happen must branch on this, not on falsiness.
+   */
   async setCache(key, value, ttl = TTL_DEFAULT, ifAbsent = false) {
-    if (!client?.isReady) return false
+    if (!client?.isReady) return FAILED
 
     try {
       const res = await bounded(client.set(key, JSON.stringify(value, this.#jsonReplacer), {
@@ -88,12 +99,12 @@ class RedisService {
         NX: ifAbsent
       }))
       // Redis answers null when NX finds the key present, which is a decline rather than a failure
-      if (res === null && ifAbsent) return false
+      if (res === null && ifAbsent) return DECLINED
       if (res !== 'OK') throw new Error(res)
-      return true
+      return WRITTEN
     } catch (e) {
       log.error('Unable to write to the Redis cache', { key, error: e })
-      return false
+      return FAILED
     }
   }
 

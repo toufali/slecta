@@ -1,7 +1,7 @@
 import { average, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
 import { space } from '../utils/throttle.js'
-import redis from './redisService.js'
+import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
@@ -21,7 +21,7 @@ const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the tit
 
 // One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
 const OUTLET = { imdb: 'imdb', metacritic: 'metacritic', rtCritic: 'rt', rtAudience: 'rt', tmdb: 'tmdb' }
-const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source])).size
+const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source] ?? source)).size
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -75,10 +75,10 @@ class ScoreService {
   }
 
   async getScore(key, data, tryCache = true) {
-    // One read serves both the cache hit and the never-degrade comparison below
-    const stored = await this.getScoreFromCache(key)
-
-    if (tryCache && stored) return stored
+    if (tryCache) {
+      const hit = await this.getScoreFromCache(key)
+      if (hit) return hit
+    }
 
     if (!data) return log.warn('Score lookup data undefined', { key })
 
@@ -118,23 +118,24 @@ class ScoreService {
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
       if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
 
-      // Refuse a thinner result, and refuse conditionally rather than by skipping the write: the
-      // record read above can expire mid-run, and NX rebuilds a vanished one while declining a live
-      // one, whose TTL keeps running so a wrong score still dies at expiry
+      // Read here, not before the fetches above: in that window the record can expire, or a request
+      // can store a richer one that an unconditional write would then clobber
+      const stored = await this.getScoreFromCache(key)
       const thinner = Boolean(stored && outlets(stored.scores) > outlets(scores))
       const candidate = { ...score, fetchedAt: Date.now() }
 
-      // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
-      const written = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
-      const kept = thinner && !written ? stored : undefined
-      const result = kept ? score : candidate
+      // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
+      // at expiry, while a record that vanished is rebuilt rather than left absent
+      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
+      const kept = outcome === DECLINED ? stored : undefined
+      const result = outcome === WRITTEN ? candidate : score
 
       if (kept) {
         log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
       }
 
-      // True whenever Redis holds a record, written now or kept: a refusal is not a failed write
-      Object.defineProperty(result, 'cached', { value: Boolean(written || kept) })
+      // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing
+      Object.defineProperty(result, 'cached', { value: outcome !== FAILED })
       // What Redis holds, for a caller that must not publish tonight's thinner numbers
       Object.defineProperty(result, 'kept', { value: kept })
 

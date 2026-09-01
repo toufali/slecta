@@ -11,7 +11,7 @@ const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
 const { default: imdb } = await import('../services/imdbService.js')
 const { default: log } = await import('../utils/logger.js')
-const { default: redis } = await import('../services/redisService.js')
+const { default: redis, WRITTEN, FAILED } = await import('../services/redisService.js')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
@@ -268,7 +268,7 @@ test('the run publishes a score index a card could be rendered from', async () =
   const written = new Map()
   const realSetCache = redis.setCache
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
 
   try {
     await cacheScores()
@@ -307,7 +307,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const realSetCache = redis.setCache
   const scores = { 'movies/1/score': 80, 'movies/2/score': 90, 'movies/3/score': 90, 'movies/4/score': 90, 'movies/5/score': 90 }
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   scoreService.getScore = async key =>
     Object.defineProperty({ avgScore: scores[key], scores: { tmdb: 1 } }, 'cached', { value: true })
 
@@ -329,7 +329,7 @@ test('an incomplete run leaves the previous index alone', async () => {
   const written = new Map()
   const realSetCache = redis.setCache
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
 
   try {
     await cacheScores()
@@ -350,7 +350,7 @@ test('a run whose catalogue size could not be verified leaves the index alone', 
   const realSetCache = redis.setCache
 
   tmdb.getMovies = async () => ({ movies }) // no totalPages, no totalResults
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
 
   try {
     await cacheScores()
@@ -368,7 +368,7 @@ test('a failed index write fails the run', async () => {
   const { restore } = stub({ movies })
   const realSetCache = redis.setCache
 
-  redis.setCache = async key => !key.startsWith('index/')
+  redis.setCache = async key => key.startsWith('index/') ? FAILED : WRITTEN
 
   try {
     const { stats: [stats], coverage } = await cacheScores()
@@ -390,7 +390,7 @@ test('a run short a few titles still publishes', async () => {
   const realSetCache = redis.setCache
   const realGetScore = scoreService.getScore
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   // one of twenty fails, which is inside the 10% the ranking tolerates
   scoreService.getScore = async key => key === 'movies/1000/score' ? null
     : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
@@ -417,7 +417,7 @@ test('too many unscorable titles fails the run, not just a warning', async () =>
   const realSetCache = redis.setCache
   const realGetScore = scoreService.getScore
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   // 3 of 20 unscorable leaves 17 rows, under the 18 that 90% of the catalogue requires
   scoreService.getScore = async key => [1100, 1101, 1102].some(id => key === `movies/${id}/score`) ? null
     : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
@@ -444,7 +444,7 @@ test('a short catalogue walk withholds the index even at full row coverage', asy
   const written = new Map()
   const realSetCache = redis.setCache
 
-  redis.setCache = async (key, value) => Boolean(written.set(key, value))
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
 
   try {
     const { stats: [stats] } = await cacheScores()
@@ -466,7 +466,7 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
   const writes = new Map()
   const realSet = redis.setCache
 
-  redis.setCache = async (key, value) => Boolean(writes.set(key, value))
+  redis.setCache = async (key, value) => { writes.set(key, value); return WRITTEN }
   scoreService.getScore = async () => {
     const fresh = { avgScore: 40, scores: { tmdb: 40 } }
 

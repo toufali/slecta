@@ -7,7 +7,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: scoreService, orderCandidates } = await import('./scoreService.js')
-const { default: redis } = await import('./redisService.js')
+const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
 // Redis is never connected here, so the write is recorded rather than made
@@ -15,9 +15,13 @@ const writes = new Map()
 // Models NX: a conditional write declines while the record is present, which is the refusal path.
 // `vanished` flips it, standing in for a record that expired while the sources were being fetched.
 let vanished = false
+let writeFails = false
 redis.setCache = async (key, value, ttl, ifAbsent) => {
-  if (ifAbsent && !vanished) return false
-  return Boolean(writes.set(key, { value, ttl }))
+  if (writeFails) return FAILED
+  if (ifAbsent && !vanished) return DECLINED
+
+  writes.set(key, { value, ttl })
+  return WRITTEN
 }
 const ttlOf = key => writes.get(key)?.ttl
 const realGetCache = redis.getCache
@@ -834,6 +838,51 @@ test('a record that expires mid-run is rebuilt rather than left absent', async (
     assert.ok(score.fetchedAt > 0, 'the rebuild is an accepted write, so it is stamped')
   } finally {
     vanished = false
+    redis.getCache = realGetCache
+  }
+})
+
+
+// A failed write stores nothing, so the result must not claim a stamp or a cached record — the job
+// alerts on exactly this, and the index must never carry a row Redis does not hold
+test('a failed write reports nothing stored', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  writeFails = true
+
+  try {
+    const score = await scoreService.getScore('test/movie/writefail', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.cached, false)
+    assert.equal(score.kept, undefined)
+    assert.equal('fetchedAt' in score, false, 'nothing was stored, so nothing is stamped')
+  } finally {
+    writeFails = false
+  }
+})
+
+// Outlet names are looked up, and an unmapped one used to fall to undefined so every future source
+// collapsed into a single entry. Two of them is what makes that visible.
+test('a source with no outlet mapping counts as its own outlet', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68, tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    await scoreService.getScore('test/movie/unmapped', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/unmapped'), undefined, 'three stored outlets beat tonight two')
+  } finally {
     redis.getCache = realGetCache
   }
 })

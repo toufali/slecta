@@ -3,7 +3,7 @@
 import tmdb from '../services/tmdbService.js'
 import scoreService from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
-import redis from '../services/redisService.js'
+import redis, { WRITTEN } from '../services/redisService.js'
 import log from '../utils/logger.js'
 import { checkReferenceTitles, checkRunCoverage } from './checks.js'
 
@@ -121,7 +121,7 @@ async function publishIndex(mediaType, rows) {
   // id, so an order does not reshuffle nightly on the pool's finish order alone.
   rows.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
 
-  if (await redis.setCache(`index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`, rows, INDEX_TTL)) return true
+  if (await redis.setCache(`index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`, rows, INDEX_TTL) === WRITTEN) return true
 
   log.error('Score index write failed', { mediaType, rows: rows.length })
 }
