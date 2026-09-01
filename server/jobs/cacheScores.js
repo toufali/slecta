@@ -19,8 +19,7 @@ const TMDB_PAGE_SIZE = 20
 // incomplete. A title added while we page through shifts a row onto the next page, arriving twice.
 const MAX_MISSING_TITLES = 5
 
-// No longer than the records it projects. Not a coupling — a retry TTL is an hour and a refused
-// write keeps whatever remained — but the systematic gap where every row outlived every record.
+// No longer than the records it projects
 const INDEX_TTL = SCORE_TTL
 
 // The deploy runs the checks only, so a row-shape change is not rewritten until the nightly run.
@@ -70,7 +69,7 @@ export async function cacheScores() {
   return { stats, coverage, reference }
 }
 
-// Walk every page TMDB reports; page 1 alone is 20 titles of 538 movies or 195 shows.
+// Walk every page TMDB reports; page 1 alone is a fraction of the catalogue.
 async function listAll(fetchPage, resultsKey) {
   const first = await fetchPage(1)
   const titles = [...first[resultsKey]]
@@ -106,24 +105,23 @@ async function publishIndex(mediaType, rows, titles, complete, confirmed) {
   const key = `index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`
   const walked = new Set(titles.map(title => title.id))
 
-  // Keep a previous row for a title this run did not confirm: one the walk may have missed, or one
-  // whose record could not be read. Only a complete walk may drop the rest — they left the window.
+  // Keep a previous row for a title this run could not confirm, whether the walk missed it or its
+  // record would not read. Only a complete walk may drop the rest: they left the window.
   const carry = id => !confirmed.has(id) && (!complete || walked.has(id))
   const previous = complete && confirmed.size === walked.size ? [] : await redis.getCache(key)
 
-  // undefined is Redis unreadable, null is no prior index. Publishing over one we could not read
-  // would silently drop every row this run did not confirm.
+  // undefined is Redis unreadable, null is no prior index — only the second is safe to publish over
   if (previous === undefined) return log.error('Score index left in place, the previous one could not be read', { mediaType })
 
   const carried = await carryRows(mediaType, previous ?? [], carry)
   const all = [...rows, ...carried]
 
-  // Publishing nothing is worse than yesterday's ranking, which still has its own TTL to run
+  // Leave yesterday's ranking rather than replace it with nothing
   if (!all.length) return log.error('Score index left in place, nothing to publish', { mediaType })
 
-  // TMDB cannot sort on a score it does not hold, and sorting one fetched page would rank 20 of 733.
-  // Stored ranked so a request only filters and slices. Votes break the ~7-way ties per point, then
-  // id, so an order does not reshuffle nightly on the pool's finish order alone.
+  // TMDB cannot sort on a score it does not hold, and sorting one fetched page would rank a page
+  // rather than the catalogue. Stored ranked so a request only filters and slices. Votes then id
+  // break the ties an integer score produces, so the order does not reshuffle on finish order.
   all.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
 
   if (await redis.setCache(key, all, INDEX_TTL) === WRITTEN) return true
@@ -131,14 +129,12 @@ async function publishIndex(mediaType, rows, titles, complete, confirmed) {
   log.error('Score index write failed', { mediaType, rows: all.length })
 }
 
-// Re-read rather than copied: a carried row's record can have expired since it was published, and
-// carrying it forward would renew a row nothing backs.
+// Re-read rather than copied: the record can have expired, and carrying the row renews it
 async function carryRows(mediaType, previous, carry) {
   const rows = await Promise.all(previous.filter(row => carry(row.id)).map(async row => {
     const stored = await scoreService.getScoreFromCache(scoreKey(SEGMENT[mediaType], row.id))
 
-    // Unreadable is not gone: keep the row we already had rather than dropping a title over a
-    // failed read, which is the same distinction the carry itself exists to make
+    // Unreadable is not gone: keep the row rather than drop a title over a failed read
     if (stored === undefined) return row
 
     return Number.isFinite(stored?.avgScore) ? { ...row, score: stored.avgScore, sources: Object.keys(stored.scores) } : null
@@ -211,8 +207,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
     stats.processed++
   }
 
-  // The row is whatever storage holds, so it cannot disagree with the detail page reading the same
-  // record, and a title that failed tonight keeps the score it already had
+  // The row is whatever storage holds, so it cannot disagree with the detail page
   const row = await scoreService.getScoreFromCache(key)
 
   // undefined is Redis unreadable, null is no record. Only the second says anything about the title
@@ -240,7 +235,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
   }
 }
 
-// Workers sharing one iterator. The old serial loop was a Playwright memory constraint; fetch has none.
+// Workers sharing one iterator. Nothing here holds per-title memory, so concurrency costs nothing.
 async function pool(items, limit, worker) {
   const queue = items[Symbol.iterator]()
 

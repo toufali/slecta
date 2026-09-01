@@ -343,8 +343,8 @@ test('a run with nothing to publish leaves the previous index alone', async () =
   }
 })
 
-// Being unable to verify the walk is the same as knowing it was short: the rows it did not confirm
-// are kept rather than read as titles leaving the window
+// A walk that cannot be verified is treated as short, so its unconfirmed rows are kept rather than
+// read as titles leaving the window
 test('a walk that cannot be verified publishes, keeping the rows it could not confirm', async () => {
   const movies = Array.from({ length: 20 }, (_, i) => ({ page: 1, id: 900 + i, releaseDate: '2026-01-01' }))
   const { restore } = stub({ movies })
@@ -438,8 +438,8 @@ test('a title with no stored score contributes no row', async () => {
   }
 })
 
-// The one rule the gate leaves behind, in both directions: a short walk keeps what it did not
-// confirm, and a walked title is refreshed rather than carried twice
+// Both directions of the carry rule: a short walk keeps what it did not confirm, and a walked title
+// is refreshed rather than carried a second time
 test('a short catalogue walk keeps the rows it could not confirm, and duplicates none', async () => {
   const movies = [1, 2, 3].flatMap(page => Array.from({ length: page === 3 ? 14 : 20 }, (_, i) => ({ page, id: page * 100 + i, releaseDate: '2026-01-01' })))
   const { restore } = stub({ movies, totalPages: 3, totalResults: 60 })
@@ -466,8 +466,7 @@ test('a short catalogue walk keeps the rows it could not confirm, and duplicates
   }
 })
 
-// A row is only as good as the record it projects, so the index cannot be given a longer life than
-// the records get — the gap is where a ranking keeps serving scores the detail page has lost
+// A gap here is where a ranking keeps serving scores the detail page has already lost
 test('the index is written with the score TTL, not a longer one', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies })
@@ -486,8 +485,7 @@ test('the index is written with the score TTL, not a longer one', async () => {
   }
 })
 
-// A carried row's record can have expired since the row was published, and carrying it forward
-// would renew a row nothing backs — index rows outlive score records otherwise
+// The record can have expired since the row was published, and carrying the row renews it
 test('a carried row whose score record is gone is dropped', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies, totalPages: 2, totalResults: 40 })
@@ -537,8 +535,8 @@ test('a carried row takes its score from the record, not from the previous index
   }
 })
 
-// `getCache` answers undefined for an unreadable Redis and null for a miss. Collapsing them drops a
-// title over a failed read, which is the same mistake in three places, so each is pinned.
+// `getCache` answers undefined for an unreadable Redis and null for a miss; collapsing them drops a
+// title over a failed read. Three places make the same mistake, so each gets its own test.
 test('a title whose record could not be read keeps the row it had, even on a complete walk', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies })
