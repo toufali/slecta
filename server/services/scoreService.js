@@ -40,6 +40,22 @@ const parseJson = value => { try { return JSON.parse(value) } catch { return nul
 // Drop absent keys rather than nulling them: outlet counting reads key count
 const defined = obj => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined))
 
+// Why a source produced no score. Named rather than literal, so a mistyped comparison is a link
+// error and not a silent false.
+export const UNREACHABLE = 'unreachable' // we could not read the source
+export const ABSENT = 'absent' // the source answered and has no page for this title
+export const UNSCORED = 'unscored' // the page is there and carries no score of this kind
+export const SCORED = 'scored'
+
+// A count of resolved scores cannot tell an outage from a title the source does not carry, and a
+// coverage rate that conflates them moves with the catalogue instead of with source health
+function sourceOutcome(host, value) {
+  if (!host?.answered) return UNREACHABLE
+  if (!host.page) return ABSENT
+
+  return value === undefined ? UNSCORED : SCORED
+}
+
 // Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
 const MC_TYPES = ['Movie', 'TVSeries']
 
@@ -115,6 +131,15 @@ class ScoreService {
         rtAudience: resolved.rt?.page?.audienceCount
       })
 
+      // IMDb is a local dataset: nothing to reach, and a title it holds no usable rating for is one
+      // it does not carry
+      const outcomes = {
+        imdb: imdbRating ? SCORED : ABSENT,
+        metacritic: sourceOutcome(resolved.mc, scores.metacritic),
+        rtCritic: sourceOutcome(resolved.rt, scores.rtCritic),
+        rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
+      }
+
       const mean = average(Object.values(scores))
       // Round, so the number shown and the number sorted on agree
       // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
@@ -152,6 +177,8 @@ class ScoreService {
       Object.defineProperty(result, 'cached', { value: outcome !== FAILED })
       // What Redis holds, for a caller that must not publish tonight's thinner numbers
       Object.defineProperty(result, 'kept', { value: kept })
+      // Tonight's attempt per source, for the coverage check. Not stored: it describes the run.
+      Object.defineProperty(result, 'outcomes', { value: outcomes })
 
       // Return tonight's result, never the stored one, or the nightly check passes while a source is down
       return result

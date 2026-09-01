@@ -22,9 +22,15 @@ const REQUIRED_DETAIL = {
   tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'languages', 'genres']
 }
 
-// ~10 points below what a full run measures, whichever media type binds. Re-measure after any
-// change to the vote floor — see `decisions.md`.
-const MIN_SOURCE_RATE = { imdb: 0.9, metacritic: 0.25, rtCritic: 0.45, rtAudience: 0.4 }
+// `minResolved` and `maxUnreachable` divide by every title tried; `minScored` divides by the titles
+// the source carries, which the vote floor moves far less. Numbers in `decisions.md`.
+const SOURCE_LIMITS = {
+  // IMDb is a local dataset: nothing to reach and no page to be absent from, so only `minResolved` binds
+  imdb: { minResolved: 0.9, maxUnreachable: 0.02, minScored: 0.9 },
+  metacritic: { minResolved: 0.25, maxUnreachable: 0.02, minScored: 0.55 },
+  rtCritic: { minResolved: 0.45, maxUnreachable: 0.02, minScored: 0.55 },
+  rtAudience: { minResolved: 0.4, maxUnreachable: 0.02, minScored: 0.55 }
+}
 
 // Source rates divide by titles scored, which hides a batch where almost everything failed
 const MAX_FAILED_RATE = 0.1
@@ -100,12 +106,29 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
     // Scores cached but nothing sortable published is a failed run, not a healthy one
     if (stats.indexFailed) problems.push({ mediaType: stats.mediaType, reason: 'score index not published' })
 
-    // Driven by the floors themselves, so a source cannot be listed for checking without one and
+    // Driven by the limits themselves, so a source cannot be listed for checking without one and
     // then skipped silently, which `rate < undefined` would do
-    for (const [source, min] of Object.entries(MIN_SOURCE_RATE)) {
-      const rate = (stats.sources[source] ?? 0) / stats.processed
+    for (const [source, limits] of Object.entries(SOURCE_LIMITS)) {
+      const { unreachable = 0, unscored = 0, scored = 0 } = stats.outcomes?.[source] ?? {}
+      const resolvedRate = scored / stats.processed
 
-      if (rate < min) problems.push({ mediaType: stats.mediaType, source, rate: round(rate), min })
+      if (resolvedRate < limits.minResolved) {
+        problems.push({ mediaType: stats.mediaType, source, rate: round(resolvedRate), min: limits.minResolved })
+      }
+
+      const unreachableRate = unreachable / stats.processed
+
+      if (unreachableRate > limits.maxUnreachable) {
+        problems.push({ mediaType: stats.mediaType, source, reason: 'could not be read', rate: round(unreachableRate), max: limits.maxUnreachable })
+      }
+
+      // A denominator of zero fails rather than dividing to NaN, which `< min` would read as a pass
+      const carried = scored + unscored
+      const scoredRate = carried ? scored / carried : 0
+
+      if (scoredRate < limits.minScored) {
+        problems.push({ mediaType: stats.mediaType, source, reason: 'no score on the pages that carry it', rate: round(scoredRate), min: limits.minScored })
+      }
     }
 
     const failedRate = stats.failed / stats.total
@@ -128,7 +151,7 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
     }
   }
 
-  const summary = problems.map(p => [p.mediaType, p.reason ?? `${p.source} resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')
+  const summary = problems.map(p => [p.mediaType, p.source, p.reason ?? `resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')
 
   if (problems.length) log.error('Run coverage FAILED', { summary, problems })
   else log.info('Run coverage passed')

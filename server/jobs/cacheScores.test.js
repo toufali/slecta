@@ -473,6 +473,7 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
 
     Object.defineProperty(fresh, 'cached', { value: true })
     Object.defineProperty(fresh, 'kept', { value: { avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } } })
+    Object.defineProperty(fresh, 'outcomes', { value: { imdb: 'scored', metacritic: 'unreachable', rtCritic: 'unreachable', rtAudience: 'unreachable' } })
     return fresh
   }
 
@@ -483,7 +484,9 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
     assert.equal(row.score, 82, 'the row carries the stored score')
     assert.deepEqual(row.sources, ['imdb', 'metacritic', 'rtCritic', 'rtAudience'])
     // Coverage still measures tonight's attempt, which is what detects a source going down
-    assert.deepEqual(stats.sources, { imdb: 1 })
+    assert.deepEqual(stats.outcomes, {
+      imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }
+    })
     assert.equal(stats.notCached, 0, 'a refusal is not a persistence failure')
   } finally {
     redis.setCache = realSet

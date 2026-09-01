@@ -240,6 +240,37 @@ test('a source with no reviews has no count rather than a zero', async () => {
   assert.deepEqual(score.counts, { rtCritic: 526 })
 })
 
+// The coverage check divides by these, so a page carrying no score has to be told from a title the
+// source does not carry
+test('each source reports why it produced no score', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(87, undefined),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/outcomes', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.outcomes, { imdb: 'absent', metacritic: 'absent', rtCritic: 'scored', rtAudience: 'unscored' })
+})
+
+// A source we were blocked from reading is the one outcome no count of resolved scores can reveal
+test('a source that could not be read is unreachable, not absent', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(74))
+  })
+
+  const score = await scoreService.getScore('test/movie/blocked', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.outcomes, { imdb: 'absent', metacritic: 'scored', rtCritic: 'unreachable', rtAudience: 'unreachable' })
+})
+
 // NaN serialises to null, which would order ahead of real scores and lose the badge placeholder
 test('a title with no resolvable source has no aggregate at all', async () => {
   stubHosts({})
