@@ -223,6 +223,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
   // Unscorable titles would sort as NaN
   if (!Number.isFinite(row?.avgScore)) return
 
+  // `score` and `sources` rank and filter; the badge is read from the record, never from the row.
   // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
   // names, not a count: RT contributes two keys, so a count hides outlets and critic presence.
   return {
