@@ -886,3 +886,28 @@ test('a source with no outlet mapping counts as its own outlet', async () => {
     redis.getCache = realGetCache
   }
 })
+
+// `kept` is published to the ranked index, so it has to be what Redis holds now, not what the
+// comparison read a moment earlier
+test('a declined write reports the record that declined it', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  let reads = 0
+  const replaced = { avgScore: 91, scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92, tmdb: 90 } }
+
+  redis.getCache = async key => key.startsWith('test/') ? (reads++ === 0 ? RICH : replaced) : null
+
+  try {
+    const score = await scoreService.getScore('test/movie/replaced', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.kept.avgScore, 91, 'the value that won, not the one the comparison saw')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})

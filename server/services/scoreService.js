@@ -126,8 +126,12 @@ class ScoreService {
 
       // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
       // at expiry, while a record that vanished is rebuilt rather than left absent
+      // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
+      // that writer to resolve more outlets than this run did, at the same instant, from the same
+      // sources; the cost if it happens is one title thinner until it rebuilds.
       const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
-      const kept = outcome === DECLINED ? stored : undefined
+      // Re-read what declined this write, since `stored` predates it
+      const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
       const result = outcome === WRITTEN ? candidate : score
 
       if (kept) {

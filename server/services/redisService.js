@@ -16,8 +16,7 @@ const TIMED_OUT = Symbol('timed out')
 let client
 let degraded = false
 
-// A write has three outcomes and callers need to tell them apart, so it answers which rather than
-// a boolean two of them would share
+// Named rather than literal, so a mistyped comparison is a link error and not a silent false
 export const WRITTEN = 'written'
 export const DECLINED = 'declined'
 export const FAILED = 'failed'
