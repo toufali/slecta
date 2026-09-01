@@ -7,12 +7,22 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: scoreService, orderCandidates } = await import('./scoreService.js')
-const { default: redis } = await import('./redisService.js')
+const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
 // Redis is never connected here, so the write is recorded rather than made
 const writes = new Map()
-redis.setCache = async (key, value, ttl) => Boolean(writes.set(key, { value, ttl }))
+// Models NX: a conditional write declines while the record is present, which is the refusal path.
+// `vanished` flips it, standing in for a record that expired while the sources were being fetched.
+let vanished = false
+let writeFails = false
+redis.setCache = async (key, value, ttl, ifAbsent) => {
+  if (writeFails) return FAILED
+  if (ifAbsent && !vanished) return DECLINED
+
+  writes.set(key, { value, ttl })
+  return WRITTEN
+}
 const ttlOf = key => writes.get(key)?.ttl
 const realGetCache = redis.getCache
 // Through JSON, because that is what Redis stores: undefined keys do not survive the trip
@@ -703,4 +713,201 @@ test('a 404 on the first guess falls through to the year variant', async () => {
   assert.equal(score.scores.rtCritic, 70, 'the year variant resolved after the bare guess 404d')
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
     ['https://www.rottentomatoes.com/m/fall_through', 'https://www.rottentomatoes.com/m/fall_through_2026'])
+})
+
+
+// Refusing has to mean not writing: rewriting the stored value to keep it would renew its TTL every
+// night and make a wrong score permanent.
+const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
+
+const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 }
+
+test('a run resolving fewer outlets leaves the record untouched and still returns tonight numbers', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+
+  try {
+    const score = await scoreService.getScore('test/movie/degraded', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
+    // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
+    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+    assert.equal(score.kept.avgScore, 80, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(score.cached, true, 'a refusal is not a persistence failure')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// RT's two keys come from one page. Counted apart, this stored record would read as 3 outlets
+// against tonight's 2 and be refused.
+test('RT critic and audience count as one outlet', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    await scoreService.getScore('test/movie/rtoutlet', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.ok(wrote('test/movie/rtoutlet'), 'equal outlet counts still write, refreshing the record')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+test('a richer result replaces a thinner record', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 67, scores: { tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    const score = await scoreService.getScore('test/movie/richer', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/richer').scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+    assert.equal(score.kept, undefined)
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// Phase 4's "as of" label and the refresh cadence both read this, so it must mean when the numbers
+// were taken, not when they were last attempted
+test('an accepted write stamps when the numbers are from, a refused one does not', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  await scoreService.getScore('test/movie/stamped', {
+    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.ok(wrote('test/movie/stamped').fetchedAt > 0)
+
+  storedScore(RICH)
+
+  try {
+    const score = await scoreService.getScore('test/movie/unstamped', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal('fetchedAt' in score, false, 'a refused result carries no stamp of its own')
+    assert.equal(score.kept.fetchedAt, 1, 'the stored stamp is left as it was')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+
+// The record read at the start can reach its TTL while the sources are being fetched. Skipping the
+// write outright would leave the title with no score at all and still report one.
+test('a record that expires mid-run is rebuilt rather than left absent', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+  vanished = true
+
+  try {
+    const score = await scoreService.getScore('test/movie/vanished', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/vanished').scores), ['metacritic', 'tmdb'],
+      'a thin score beats none once the richer record is gone')
+    assert.equal(score.kept, undefined)
+    assert.ok(score.fetchedAt > 0, 'the rebuild is an accepted write, so it is stamped')
+  } finally {
+    vanished = false
+    redis.getCache = realGetCache
+  }
+})
+
+
+// A failed write stores nothing, so the result must not claim a stamp or a cached record — the job
+// alerts on exactly this, and the index must never carry a row Redis does not hold
+test('a failed write reports nothing stored', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  writeFails = true
+
+  try {
+    const score = await scoreService.getScore('test/movie/writefail', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.cached, false)
+    assert.equal(score.kept, undefined)
+    assert.equal('fetchedAt' in score, false, 'nothing was stored, so nothing is stamped')
+  } finally {
+    writeFails = false
+  }
+})
+
+// Outlet names are looked up, and an unmapped one used to fall to undefined so every future source
+// collapsed into a single entry. Two of them is what makes that visible.
+test('a source with no outlet mapping counts as its own outlet', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68, tmdb: 67 }, fetchedAt: 1 })
+
+  try {
+    await scoreService.getScore('test/movie/unmapped', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/unmapped'), undefined, 'three stored outlets beat tonight two')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// `kept` is published to the ranked index, so it has to be what Redis holds now, not what the
+// comparison read a moment earlier
+test('a declined write reports the record that declined it', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  let reads = 0
+  const replaced = { avgScore: 91, scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92, tmdb: 90 } }
+
+  redis.getCache = async key => key.startsWith('test/') ? (reads++ === 0 ? RICH : replaced) : null
+
+  try {
+    const score = await scoreService.getScore('test/movie/replaced', {
+      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.kept.avgScore, 91, 'the value that won, not the one the comparison saw')
+  } finally {
+    redis.getCache = realGetCache
+  }
 })

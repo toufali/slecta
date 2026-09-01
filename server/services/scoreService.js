@@ -1,7 +1,7 @@
 import { average, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
 import { space } from '../utils/throttle.js'
-import redis from './redisService.js'
+import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
@@ -18,6 +18,10 @@ const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run has a task timeout to finish inside
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
+
+// One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
+const OUTLET = { imdb: 'imdb', metacritic: 'metacritic', rtCritic: 'rt', rtAudience: 'rt', tmdb: 'tmdb' }
+const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source] ?? source)).size
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -71,10 +75,9 @@ class ScoreService {
   }
 
   async getScore(key, data, tryCache = true) {
-    // TODO: a more sophisticated caching strategy
     if (tryCache) {
-      const score = await this.getScoreFromCache(key)
-      if (score) return score
+      const hit = await this.getScoreFromCache(key)
+      if (hit) return hit
     }
 
     if (!data) return log.warn('Score lookup data undefined', { key })
@@ -115,13 +118,33 @@ class ScoreService {
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
       if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
 
-      // Awaited so a failed write is visible: setCache hides Redis errors, and the job must not report a cache it never wrote.
-      // `cached` mirrors getCache's `cacheHit` flag.
-      const cached = await redis.setCache(key, score, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL)
+      // Read here, not before the fetches above: in that window the record can expire, or a request
+      // can store a richer one that an unconditional write would then clobber
+      const stored = await this.getScoreFromCache(key)
+      const thinner = Boolean(stored && outlets(stored.scores) > outlets(scores))
+      const candidate = { ...score, fetchedAt: Date.now() }
 
-      Object.defineProperty(score, 'cached', { value: Boolean(cached) })
+      // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
+      // at expiry, while a record that vanished is rebuilt rather than left absent
+      // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
+      // that writer to resolve more outlets than this run did, at the same instant, from the same
+      // sources; the cost if it happens is one title thinner until it rebuilds.
+      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
+      // Re-read what declined this write, since `stored` predates it
+      const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
+      const result = outcome === WRITTEN ? candidate : score
 
-      return score
+      if (kept) {
+        log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
+      }
+
+      // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing
+      Object.defineProperty(result, 'cached', { value: outcome !== FAILED })
+      // What Redis holds, for a caller that must not publish tonight's thinner numbers
+      Object.defineProperty(result, 'kept', { value: kept })
+
+      // Return tonight's result, never the stored one, or the nightly check passes while a source is down
+      return result
     } catch (e) {
       log.error('Error getting average score', { key, title, error: e })
     }

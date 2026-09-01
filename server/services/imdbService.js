@@ -3,7 +3,7 @@
 import { createGunzip } from 'node:zlib'
 import { Readable } from 'node:stream'
 import { createInterface } from 'node:readline'
-import redis from './redisService.js'
+import redis, { WRITTEN } from './redisService.js'
 import log from '../utils/logger.js'
 
 const DATASET_URL = 'https://datasets.imdbws.com/title.ratings.tsv.gz'
@@ -57,11 +57,11 @@ class ImdbService {
     const entries = [...buckets]
     for (let i = 0; i < entries.length; i += 100) {
       const written = await Promise.all(entries.slice(i, i + 100).map(([key, rows]) => redis.setCache(key, rows.join('\n'), TTL)))
-      if (!written.every(Boolean)) throw new Error('IMDb dataset write to Redis failed')
+      if (!written.every(outcome => outcome === WRITTEN)) throw new Error('IMDb dataset write to Redis failed')
     }
 
     const meta = { titles: kept, buckets: buckets.size, lastModified: res.headers.get('last-modified') }
-    if (!await redis.setCache(META_KEY, meta, TTL)) throw new Error('IMDb metadata write to Redis failed')
+    if (await redis.setCache(META_KEY, meta, TTL) !== WRITTEN) throw new Error('IMDb metadata write to Redis failed')
 
     log.info('IMDb ratings refreshed', { ...meta, scanned: total, seconds: Math.round((Date.now() - started) / 1000) })
     return meta
