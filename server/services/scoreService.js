@@ -11,10 +11,6 @@ export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
 export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
-// ms, so halve the seconds Redis takes. Never-degrade holds a record against a thinner write and
-// expiry is what corrects a wrong one, which a life this long is too slow to do on its own.
-export const DEGRADE_AFTER = (SCORE_TTL / 2) * 1000
-
 // Bump when the set of scored sources changes. Never-degrade compares outlet counts, so records
 // holding a source the code no longer produces would refuse every write until they expired.
 const SCORE_CACHE_VERSION = 1
@@ -31,10 +27,6 @@ const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run has a task timeout to finish inside
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
-
-// One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
-const OUTLET = { rtCritic: 'rt', rtAudience: 'rt' }
-const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source] ?? source)).size
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -162,28 +154,24 @@ class ScoreService {
       // Read here, not before the fetches above: in that window the record can expire, or a request
       // can store a richer one that an unconditional write would then clobber
       const stored = await this.getScoreFromCache(key)
-      const degrades = Boolean(stored && outlets(stored.scores) > outlets(scores))
-      // Past half its life a record has outlasted attempts that could not match it, so a thinner
-      // result is the world rather than one bad night. No stamp keeps the guard.
-      const guarded = degrades && !(Date.now() - stored.fetchedAt >= DEGRADE_AFTER)
+      const lost = Object.keys(stored?.scores ?? {}).filter(source => scores[source] === undefined)
+      // A thinner result is a bad night only while a source we lost could not be read. Once one
+      // answers, it is the world that changed and the record has to follow.
+      const guarded = lost.some(source => outcomes[source] === UNREACHABLE)
       const candidate = { ...score, fetchedAt: Date.now() }
 
-      if (degrades && !guarded) {
-        log.warn('Score degraded, the record is past its guard', { key, title, outlets: outlets(scores), stored: outlets(stored.scores) })
-      }
-
-      // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
-      // at expiry, while a record that vanished is rebuilt rather than left absent
+      // Conditional when guarded, so a live record keeps its own clock while a record that vanished
+      // is rebuilt rather than left absent
       // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
-      // that writer to resolve more outlets than this run did, at the same instant, from the same
-      // sources; the cost if it happens is one title thinner until it rebuilds.
+      // that writer to reach a source this run could not, at the same instant; the cost if it
+      // happens is one title thinner until it rebuilds.
       const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
       // Re-read what declined this write, since `stored` predates it
       const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
       const result = outcome === WRITTEN ? candidate : score
 
       if (kept) {
-        log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
+        log.warn('Score not stored, it lost a source that could not be read', { key, title, lost })
       }
 
       // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing

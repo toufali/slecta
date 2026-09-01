@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL, DEGRADE_AFTER } = await import('./scoreService.js')
+const { default: scoreService, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -792,63 +792,63 @@ const storedScore = record => { redis.getCache = async key => key.startsWith('te
 // Fresh, so the guard holds. An aged record is the override's case and says so at the point of use.
 const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() }
 
-// A record now outlives the interval it is rewritten on, so expiry is far too slow to be
-// never-degrade's correction path. The guard has to end somewhere short of it.
-test('a record past its guard accepts the thinner write', async () => {
+// The guard exists for a source that is down, so it has to end when the source starts answering:
+// a record cannot be held against a 404 until it expires, least of all at this TTL.
+test('a source that answered lets the record follow it down', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ ...RICH, fetchedAt: Date.now() - DEGRADE_AFTER - 1000 })
+  storedScore(RICH)
 
   try {
-    const score = await scoreService.getScore('test/movie/aged', {
+    await scoreService.getScore('test/movie/answered404', {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.deepEqual(Object.keys(wrote('test/movie/aged').scores), ['metacritic'])
-    assert.equal(score.kept, undefined, 'nothing declined it')
+    assert.deepEqual(Object.keys(wrote('test/movie/answered404').scores), ['metacritic'])
   } finally {
     redis.getCache = realGetCache
   }
 })
 
-// The other side of the same boundary, so moving it has to move both
-test('a record one moment inside its guard still refuses the thinner write', async () => {
+// The other side: a source that could not be read is a bad night, whatever the record's age
+test('a source that could not be read holds the record', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
     'www.rottentomatoes.com': () => new Response('', { status: 403 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ ...RICH, fetchedAt: Date.now() - DEGRADE_AFTER + 5000 })
+  storedScore({ ...RICH, fetchedAt: 1 })
 
   try {
-    await scoreService.getScore('test/movie/nearlyaged', {
+    await scoreService.getScore('test/movie/blocked403', {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(wrote('test/movie/nearlyaged'), undefined, 'no write at all')
+    assert.equal(wrote('test/movie/blocked403'), undefined, 'age does not enter into it')
   } finally {
     redis.getCache = realGetCache
   }
 })
 
-// Losing an outlet is worse than holding one another cycle, so an unaged record keeps the guard
-test('a record with no stamp cannot be aged out of its guard', async () => {
+// Retiring a source used to need a cache-version bump, since a record holding one the code no
+// longer produces refused every write. Nothing tonight can reach it, so nothing holds it.
+test('a source we no longer produce is not held', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 } })
+  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: Date.now() })
 
   try {
-    await scoreService.getScore('test/movie/unstamped', {
+    await scoreService.getScore('test/movie/retired', {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(wrote('test/movie/unstamped'), undefined, 'no write at all')
+    assert.deepEqual(Object.keys(wrote('test/movie/retired').scores), ['metacritic', 'rtCritic', 'rtAudience'])
   } finally {
     redis.getCache = realGetCache
   }
@@ -879,10 +879,10 @@ test('a run resolving fewer outlets leaves the record untouched and still return
 
 // RT's two keys come from one page. Counted apart, this stored record would read as 3 outlets
 // against tonight's 2 and be refused.
-test('RT critic and audience count as one outlet', async () => {
+test('a run that loses nothing writes, refreshing the record', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
     'www.metacritic.com': () => ok(LD(52))
   })
   storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() })
@@ -892,7 +892,7 @@ test('RT critic and audience count as one outlet', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.ok(wrote('test/movie/rtoutlet'), 'equal outlet counts still write, refreshing the record')
+    assert.ok(wrote('test/movie/rtoutlet'), 'nothing was lost, so the record is refreshed')
   } finally {
     redis.getCache = realGetCache
   }
@@ -933,6 +933,11 @@ test('an accepted write stamps when the numbers are from, a refused one does not
 
   assert.ok(wrote('test/movie/stamped').fetchedAt > 0)
 
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
   storedScore(RICH)
 
   try {
@@ -1000,25 +1005,6 @@ test('a failed write reports nothing stored', async () => {
 
 // Outlet names are looked up, and an unmapped one used to fall to undefined so every future source
 // collapsed into a single entry. Two of them is what makes that visible.
-test('a source with no outlet mapping counts as its own outlet', async () => {
-  stubHosts({
-    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'www.rottentomatoes.com': () => new Response('', { status: 403 }),
-    'www.metacritic.com': () => ok(LD(52))
-  })
-  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: Date.now() })
-
-  try {
-    await scoreService.getScore('test/movie/unmapped', {
-      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
-    }, false)
-
-    assert.equal(wrote('test/movie/unmapped'), undefined, 'three stored outlets beat tonight two')
-  } finally {
-    redis.getCache = realGetCache
-  }
-})
-
 // `kept` is published to the ranked index, so it has to be what Redis holds now, not what the
 // comparison read a moment earlier
 test('a declined write reports the record that declined it', async () => {
