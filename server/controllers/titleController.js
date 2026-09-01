@@ -115,8 +115,8 @@ export const getScore = mediaType => async ctx => {
 
   const { imdbId, wikiId, title, releaseDate } = found
 
-  // Already missed above, so do not read the cache a second time
-  data = await scoreService.getScore(key, { imdbId, wikiId, title, releaseDate, mediaType }, false)
+  // Checks the cache again, since the detail fetch above gives another request time to fill it
+  data = await scoreService.getScore(key, { imdbId, wikiId, title, releaseDate, mediaType })
 
   return ctx.body = data
 }
