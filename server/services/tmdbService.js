@@ -266,7 +266,6 @@ class TmdbService {
         releaseDate: item[media.dateField],
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
         posterPath: item.poster_path,
-        tmdbScore: item.vote_average,
         tmdbScoreCount: item.vote_count,
         popularity: item.popularity,
         detailPath: `/${media.segment}/${item.id}`
@@ -359,7 +358,6 @@ class TmdbService {
       title: json[media.titleField],
       overview: json.overview,
       releaseDate: json[media.dateField],
-      tmdbScore: Math.round(json.vote_average * 10),
       ...media.detail(json, this.region),
       languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
       genres: json.genres.map(genre => genre.name).join(', '),

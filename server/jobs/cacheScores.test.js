@@ -12,6 +12,7 @@ const { default: scoreService } = await import('../services/scoreService.js')
 const { default: imdb } = await import('../services/imdbService.js')
 const { default: log } = await import('../utils/logger.js')
 const { default: redis, WRITTEN, FAILED } = await import('../services/redisService.js')
+const { scoreKey } = await import('../services/scoreService.js')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
@@ -23,12 +24,12 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   imdb.refresh = async () => {}
   tmdb.getMovies = async ({ page }) => ({ movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length })
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
-  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, tmdbScore: 70, rating: 'PG-13', providers: [{ provider_id: 8 }] })
-  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, tmdbScore: 70, rating: 'TV-14', providers: [{ provider_id: 8 }] })
+  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }] })
+  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', providers: [{ provider_id: 8 }] })
   scoreService.getScore = async key => {
     scored.push(key)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
-    return Object.defineProperty({ avgScore: 70, scores: { tmdb: 70, imdb: 80 } }, 'cached', { value: true })
+    return Object.defineProperty({ avgScore: 70, scores: { imdb: 80, rtCritic: 70 } }, 'cached', { value: true })
   }
 
   return { scored, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
@@ -57,7 +58,7 @@ test('every page of the window is scored, not just the first', async () => {
 
     assert.equal(stats.total, 6)
     assert.equal(stats.processed, 6)
-    assert.deepEqual(movieKeys(scored), movies.map(movie => `movies/${movie.id}/score`).sort())
+    assert.deepEqual(movieKeys(scored), movies.map(movie => scoreKey('movies', movie.id)).sort())
   } finally {
     restore()
   }
@@ -73,7 +74,7 @@ test('a title appearing on two pages is scored once', async () => {
     const { stats: [stats] } = await cacheScores()
 
     assert.equal(stats.total, 1)
-    assert.deepEqual(movieKeys(scored), ['movies/55/score'])
+    assert.deepEqual(movieKeys(scored), [scoreKey('movies', 55)])
   } finally {
     restore()
   }
@@ -94,7 +95,7 @@ test('a page that fails does not cost the pages after it', async () => {
     const { stats: [stats] } = await cacheScores()
 
     assert.equal(stats.total, 2, 'page 3 should still have been fetched')
-    assert.deepEqual(movieKeys(scored), ['movies/21/score', 'movies/23/score'])
+    assert.deepEqual(movieKeys(scored), [scoreKey('movies', 21), scoreKey('movies', 23)])
   } finally {
     restore()
   }
@@ -176,8 +177,8 @@ test('a title that throws is counted, and the run still finishes', async () => {
   const realGetScore = scoreService.getScore
 
   scoreService.getScore = async key => {
-    if (key === 'movies/2/score') throw new TypeError('unexpected')
-    return Object.defineProperty({ avgScore: 70, scores: { tmdb: 70 } }, 'cached', { value: true })
+    if (key === scoreKey('movies', 2)) throw new TypeError('unexpected')
+    return Object.defineProperty({ avgScore: 70, scores: { imdb: 70 } }, 'cached', { value: true })
   }
 
   try {
@@ -283,7 +284,7 @@ test('the run publishes a score index a card could be rendered from', async () =
       certification: 'PG-13',
       providers: [8],
       score: 70,
-      sources: ['tmdb', 'imdb']
+      sources: ['imdb', 'rtCritic']
     }])
   } finally {
     redis.setCache = realSetCache
@@ -305,11 +306,11 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const { restore } = stub({ movies })
   const written = new Map()
   const realSetCache = redis.setCache
-  const scores = { 'movies/1/score': 80, 'movies/2/score': 90, 'movies/3/score': 90, 'movies/4/score': 90, 'movies/5/score': 90 }
+  const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 90, [scoreKey('movies', 3)]: 90, [scoreKey('movies', 4)]: 90, [scoreKey('movies', 5)]: 90 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   scoreService.getScore = async key =>
-    Object.defineProperty({ avgScore: scores[key], scores: { tmdb: 1 } }, 'cached', { value: true })
+    Object.defineProperty({ avgScore: scores[key], scores: { imdb: 1 } }, 'cached', { value: true })
 
   try {
     await cacheScores()
@@ -392,8 +393,8 @@ test('a run short a few titles still publishes', async () => {
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   // one of twenty fails, which is inside the 10% the ranking tolerates
-  scoreService.getScore = async key => key === 'movies/1000/score' ? null
-    : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
+  scoreService.getScore = async key => key === scoreKey('movies', 1000) ? null
+    : Object.defineProperty({ avgScore: 70, scores: { imdb: 1 } }, 'cached', { value: true })
 
   try {
     const { stats: [stats] } = await cacheScores()
@@ -419,8 +420,8 @@ test('too many unscorable titles fails the run, not just a warning', async () =>
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   // 3 of 20 unscorable leaves 17 rows, under the 18 that 90% of the catalogue requires
-  scoreService.getScore = async key => [1100, 1101, 1102].some(id => key === `movies/${id}/score`) ? null
-    : Object.defineProperty({ avgScore: 70, scores: { tmdb: 1 } }, 'cached', { value: true })
+  scoreService.getScore = async key => [1100, 1101, 1102].some(id => key === scoreKey('movies', id)) ? null
+    : Object.defineProperty({ avgScore: 70, scores: { imdb: 1 } }, 'cached', { value: true })
 
   try {
     const { stats: [stats], coverage } = await cacheScores()
@@ -468,10 +469,10 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
 
   redis.setCache = async (key, value) => { writes.set(key, value); return WRITTEN }
   scoreService.getScore = async () => {
-    const fresh = { avgScore: 40, scores: { tmdb: 40 } }
+    const fresh = { avgScore: 40, scores: { imdb: 40 } }
 
     Object.defineProperty(fresh, 'cached', { value: true })
-    Object.defineProperty(fresh, 'kept', { value: { avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, tmdb: 70 } } })
+    Object.defineProperty(fresh, 'kept', { value: { avgScore: 82, scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } } })
     return fresh
   }
 
@@ -480,12 +481,31 @@ test('a refused write publishes the stored score, not tonight thinner one', asyn
     const [row] = writes.get('index/movies/v1')
 
     assert.equal(row.score, 82, 'the row carries the stored score')
-    assert.deepEqual(row.sources, ['imdb', 'metacritic', 'rtCritic', 'tmdb'])
+    assert.deepEqual(row.sources, ['imdb', 'metacritic', 'rtCritic', 'rtAudience'])
     // Coverage still measures tonight's attempt, which is what detects a source going down
-    assert.deepEqual(stats.sources, { tmdb: 1 })
+    assert.deepEqual(stats.sources, { imdb: 1 })
     assert.equal(stats.notCached, 0, 'a refusal is not a persistence failure')
   } finally {
     redis.setCache = realSet
+    restore()
+  }
+})
+
+// The state that TMDB used to mask: with no source resolving, the title still scores and still
+// counts as processed, so only this tally reveals it
+test('a title no source could score is counted, not treated as a failure', async () => {
+  const movies = [{ page: 1, id: 9, title: 'nothing', releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+
+  scoreService.getScore = async () => Object.defineProperty({ scores: {} }, 'cached', { value: true })
+
+  try {
+    const { stats: [stats] } = await cacheScores()
+
+    assert.equal(stats.unscored, 1)
+    assert.equal(stats.failed, 0)
+    assert.equal(stats.processed, 1)
+  } finally {
     restore()
   }
 })

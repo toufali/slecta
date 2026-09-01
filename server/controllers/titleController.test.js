@@ -7,6 +7,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
+const { scoreKey } = await import('../services/scoreService.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
 const { default: reviewService } = await import('../services/reviewService.js')
@@ -47,7 +48,7 @@ for (const { mediaType, segment } of MEDIA) {
 
     await getList(mediaType)(ctx)
 
-    assert.deepEqual(calls, [[`list:${mediaType}`], ['scoreCache', `${segment}/1/score`]])
+    assert.deepEqual(calls, [[`list:${mediaType}`], ['scoreCache', scoreKey(segment, 1)]])
     assert.deepEqual(ctx.body[segment], [{ id: 1 }])
     // A Map cannot cross JSON, so the API path converts it and the page path does not
     assert.deepEqual(ctx.body.allGenres, [[28, 'Action']])
@@ -69,9 +70,9 @@ for (const { mediaType, segment } of MEDIA) {
     await getScore(mediaType)(ctx)
 
     assert.deepEqual(calls, [
-      ['scoreCache', `${segment}/7/score`],
+      ['scoreCache', scoreKey(segment, 7)],
       [`detail:${mediaType}`, 7],
-      ['score', `${segment}/7/score`, mediaType]
+      ['score', scoreKey(segment, 7), mediaType]
     ])
   })
 

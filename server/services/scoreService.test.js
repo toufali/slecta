@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, orderCandidates } = await import('./scoreService.js')
+const { default: scoreService, orderCandidates, scoreKey } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -191,15 +191,15 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/27205', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   // Wikidata carried both slugs, so no probe was needed and no source was retried
   assert.equal(calls.count, 3)
 
-  // (52 + 50 + 85 + 67) / 4 is 63.5
-  assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85, tmdb: 67 })
-  assert.equal(score.avgScore, 64)
+  // (52 + 50 + 85) / 3 is 62.3
+  assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
+  assert.equal(score.avgScore, 62)
 })
 
 // NaN serialises to null, which would order ahead of real scores and lose the badge placeholder
@@ -223,10 +223,10 @@ test('a score missing a source that refused expires early', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/refusedsource', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.deepEqual(Object.keys(score.scores), ['metacritic'])
   assert.equal(ttlOf('test/movie/refusedsource'), 60 * 60)
 })
 
@@ -239,10 +239,10 @@ test('a score missing a source that has no page keeps the full life', async () =
   })
 
   const score = await scoreService.getScore('test/movie/nopage', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+  assert.deepEqual(Object.keys(score.scores), ['metacritic'])
   assert.equal(ttlOf('test/movie/nopage'), 60 * 60 * 48)
 })
 
@@ -256,11 +256,11 @@ test('a block on any status shortens the record, a 404 does not', async () => {
     })
 
     await scoreService.getScore(`test/movie/${status}`, {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(ttlOf(`test/movie/${status}`), 60 * 60, `status ${status}`)
-    assert.deepEqual(Object.keys(wrote(`test/movie/${status}`).scores), ['metacritic', 'tmdb'], `status ${status}`)
+    assert.deepEqual(Object.keys(wrote(`test/movie/${status}`).scores), ['metacritic'], `status ${status}`)
   }
 })
 
@@ -282,10 +282,10 @@ for (const [label, id, wikidata] of [
 
     const key = `test/movie/${id}`
     const score = await scoreService.getScore(key, {
-      tmdbScore: 67, wikiId: id, title: 'Wiki Throw', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: id, title: 'Wiki Throw', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'],
+    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience'],
       'both score sources were read despite the lookup failing')
     // Both slugs resolved by guessing, so nothing is missing and the score keeps its full life
     assert.equal(ttlOf(key), 60 * 60 * 48)
@@ -304,7 +304,7 @@ test('a Metacritic page with no Metascore keeps the full life', async () => {
   })
 
   await scoreService.getScore('test/movie/unrated', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   assert.equal(ttlOf('test/movie/unrated'), 60 * 60 * 48)
@@ -320,10 +320,10 @@ test('a page with no whole-title block shortens the record', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/challenge', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.deepEqual(Object.keys(score.scores), ['rtCritic', 'rtAudience', 'tmdb'], 'the challenge page yielded no Metascore')
+  assert.deepEqual(Object.keys(score.scores), ['rtCritic', 'rtAudience'], 'the challenge page yielded no Metascore')
   assert.equal(ttlOf('test/movie/challenge'), 60 * 60)
 })
 
@@ -338,7 +338,7 @@ test('an unanswered slug lookup is not cached, so the retry re-asks', async () =
 
   // A key of its own: the recorded writes are shared across tests in this file
   await scoreService.getScore('test/movie/noslug', {
-    tmdbScore: 67, wikiId: 'Q777', title: 'Nothing Answers', releaseDate: '2026-01-01', mediaType: 'movie'
+    wikiId: 'Q777', title: 'Nothing Answers', releaseDate: '2026-01-01', mediaType: 'movie'
   }, false)
 
   assert.equal(ttlOf('test/movie/noslug'), 60 * 60)
@@ -354,10 +354,10 @@ test('an empty body shortens the record despite the status', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/empty', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'], 'the empty RT body yielded no scores')
+  assert.deepEqual(Object.keys(score.scores), ['metacritic'], 'the empty RT body yielded no scores')
   assert.equal(ttlOf('test/movie/empty'), 60 * 60)
 })
 
@@ -371,10 +371,10 @@ test('a Wikidata blip does not shorten a score the probes resolved', async () =>
   })
 
   const score = await scoreService.getScore('test/movie/wikiblip', {
-    tmdbScore: 67, wikiId: 'Q42', title: 'Probed Fine', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q42', title: 'Probed Fine', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
-  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+  assert.deepEqual(Object.keys(score.scores), ['metacritic', 'rtCritic', 'rtAudience'])
   assert.equal(ttlOf('test/movie/wikiblip'), 60 * 60 * 48)
   assert.equal(ttlOf('slugs/v1/movie/Q42/Probed Fine/2010-07-16'), undefined,
     'an unread lookup leaves the record alone, so the guesses are re-resolved next run')
@@ -390,7 +390,7 @@ test('a malformed JSON-LD block does not lose a rating', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/mixedld', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   assert.equal(score.scores.metacritic, 52)
@@ -412,7 +412,7 @@ test('a set throttle spaces repeat requests to one host', async () => {
 
   try {
     await scoreService.getScore('test/movie/spaced', {
-      tmdbScore: 67, wikiId: 'Q4', title: 'Spaced', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q4', title: 'Spaced', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
   } finally {
     scoreService.throttleMs = 0
@@ -440,7 +440,7 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
   }
 
   const score = await scoreService.getScore('test/movie/trailing', {
-    tmdbScore: 67, wikiId: 'Q5', title: 'Trailing', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q5', title: 'Trailing', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   // Every request, not the last: an untrimmed slug 404s and the guessed candidate is the same
@@ -476,7 +476,7 @@ test('a guessed slug for a different film is rejected, and the year variant trie
   })
 
   const score = await scoreService.getScore('test/movie/breach', {
-    tmdbScore: 67, title: 'Breach', releaseDate: '2026-05-01', mediaType: 'movie'
+    title: 'Breach', releaseDate: '2026-05-01', mediaType: 'movie'
   }, false)
 
   assert.equal(score.scores.rtCritic, 70, 'the 2026 page, not the 2007 one')
@@ -496,7 +496,7 @@ test('a Wikidata slug is accepted even when the page year differs', async () => 
   })
 
   const score = await scoreService.getScore('test/movie/authoritative', {
-    tmdbScore: 67, wikiId: 'Q9', title: 'Authoritative', releaseDate: '2026-05-01', mediaType: 'movie'
+    wikiId: 'Q9', title: 'Authoritative', releaseDate: '2026-05-01', mediaType: 'movie'
   }, false)
 
   assert.equal(score.scores.rtCritic, 55)
@@ -512,7 +512,7 @@ test('resolving a guess costs one request, not a probe and a read', async () => 
   })
 
   await scoreService.getScore('test/movie/onerequest', {
-    tmdbScore: 67, title: 'One Request', releaseDate: '2026-05-01', mediaType: 'movie'
+    title: 'One Request', releaseDate: '2026-05-01', mediaType: 'movie'
   }, false)
 
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')), ['https://www.rottentomatoes.com/m/one_request'])
@@ -529,7 +529,7 @@ test('a guessed slug whose page has no year is rejected, not trusted', async () 
   })
 
   const score = await scoreService.getScore('test/movie/noyear', {
-    tmdbScore: 67, title: 'No Year', releaseDate: '2026-05-01', mediaType: 'movie'
+    title: 'No Year', releaseDate: '2026-05-01', mediaType: 'movie'
   }, false)
 
   assert.equal(score.scores.rtCritic, undefined, 'an unverifiable page cannot resolve a guess')
@@ -549,7 +549,7 @@ test('a cached guess that Wikidata confirms stops being treated as a guess', asy
 
   try {
     const score = await scoreService.getScore('test/movie/confirmed', {
-      tmdbScore: 67, wikiId: 'Q11', title: 'Confirmed', releaseDate: '2026-05-01', mediaType: 'movie'
+      wikiId: 'Q11', title: 'Confirmed', releaseDate: '2026-05-01', mediaType: 'movie'
     }, false)
 
     assert.equal(score.scores.rtCritic, 55, 'the confirmed slug is authoritative, so the year is not checked')
@@ -573,7 +573,7 @@ test('a source refusing to answer does not erase its cached slug', async () => {
 
   try {
     await scoreService.getScore('test/movie/refused', {
-      tmdbScore: 67, wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q12', title: 'Refused', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(wrote('slugs/v1/movie/Q12/Refused/2010-07-16'), undefined,
@@ -599,7 +599,7 @@ test('a refused authoritative slug is not replaced by a guess that verifies', as
 
   try {
     await scoreService.getScore('test/movie/displaced', {
-      tmdbScore: 67, wikiId: 'Q13', title: 'Displaced', releaseDate: '2026-05-01', mediaType: 'movie'
+      wikiId: 'Q13', title: 'Displaced', releaseDate: '2026-05-01', mediaType: 'movie'
     }, false)
 
     assert.equal(wrote('slugs/v1/movie/Q13/Displaced/2026-05-01'), undefined,
@@ -622,7 +622,7 @@ test('Wikidata outranks a cached guess for the same title', async () => {
 
   try {
     await scoreService.getScore('test/movie/outranked', {
-      tmdbScore: 67, wikiId: 'Q14', title: 'Outranked', releaseDate: '2026-05-01', mediaType: 'movie'
+      wikiId: 'Q14', title: 'Outranked', releaseDate: '2026-05-01', mediaType: 'movie'
     }, false)
 
     const record = wrote('slugs/v1/movie/Q14/Outranked/2026-05-01')
@@ -648,7 +648,7 @@ test('a cached slug that 404s is dropped, and takes its source with it', async (
 
   try {
     await scoreService.getScore('test/movie/verdict', {
-      tmdbScore: 67, wikiId: 'Q15', title: 'Verdict', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q15', title: 'Verdict', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     const record = wrote('slugs/v1/movie/Q15/Verdict/2010-07-16')
@@ -668,7 +668,7 @@ test('a refusing host is asked once, not once per candidate', async () => {
   })
 
   await scoreService.getScore('test/movie/amplified', {
-    tmdbScore: 67, title: 'Amplified', releaseDate: '2010-07-16', mediaType: 'movie'
+    title: 'Amplified', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   // Two guesses exist, `m/amplified` and `m/amplified_2010`. Only the first is tried, and it
@@ -687,7 +687,7 @@ test('a Wikidata blip shortens the score when a slug is still missing', async ()
   })
 
   const score = await scoreService.getScore('test/movie/wikigap', {
-    tmdbScore: 67, wikiId: 'Q43', title: 'Wiki Gap', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q43', title: 'Wiki Gap', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   // Metacritic resolved and RT did not, which is the case this exists for — a 1h TTL alone would
@@ -707,7 +707,7 @@ test('a 404 on the first guess falls through to the year variant', async () => {
   })
 
   const score = await scoreService.getScore('test/movie/fallthrough', {
-    tmdbScore: 67, title: 'Fall Through', releaseDate: '2026-05-01', mediaType: 'movie'
+    title: 'Fall Through', releaseDate: '2026-05-01', mediaType: 'movie'
   }, false)
 
   assert.equal(score.scores.rtCritic, 70, 'the year variant resolved after the bare guess 404d')
@@ -720,7 +720,7 @@ test('a 404 on the first guess falls through to the year variant', async () => {
 // night and make a wrong score permanent.
 const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
 
-const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 }
+const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: 1 }
 
 test('a run resolving fewer outlets leaves the record untouched and still returns tonight numbers', async () => {
   stubHosts({
@@ -732,12 +732,12 @@ test('a run resolving fewer outlets leaves the record untouched and still return
 
   try {
     const score = await scoreService.getScore('test/movie/degraded', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
     // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
-    assert.deepEqual(Object.keys(score.scores), ['metacritic', 'tmdb'])
+    assert.deepEqual(Object.keys(score.scores), ['metacritic'])
     assert.equal(score.kept.avgScore, 80, 'the record it preserved, for a caller that must not publish tonight')
     assert.equal(score.cached, true, 'a refusal is not a persistence failure')
   } finally {
@@ -753,11 +753,11 @@ test('RT critic and audience count as one outlet', async () => {
     'www.rottentomatoes.com': () => new Response('', { status: 403 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80, tmdb: 67 }, fetchedAt: 1 })
+  storedScore({ avgScore: 75, scores: { rtCritic: 80, rtAudience: 80 }, fetchedAt: 1 })
 
   try {
     await scoreService.getScore('test/movie/rtoutlet', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.ok(wrote('test/movie/rtoutlet'), 'equal outlet counts still write, refreshing the record')
@@ -776,10 +776,10 @@ test('a richer result replaces a thinner record', async () => {
 
   try {
     const score = await scoreService.getScore('test/movie/richer', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.deepEqual(Object.keys(wrote('test/movie/richer').scores), ['metacritic', 'rtCritic', 'rtAudience', 'tmdb'])
+    assert.deepEqual(Object.keys(wrote('test/movie/richer').scores), ['metacritic', 'rtCritic', 'rtAudience'])
     assert.equal(score.kept, undefined)
   } finally {
     redis.getCache = realGetCache
@@ -796,7 +796,7 @@ test('an accepted write stamps when the numbers are from, a refused one does not
   })
 
   await scoreService.getScore('test/movie/stamped', {
-    tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
   }, false)
 
   assert.ok(wrote('test/movie/stamped').fetchedAt > 0)
@@ -805,7 +805,7 @@ test('an accepted write stamps when the numbers are from, a refused one does not
 
   try {
     const score = await scoreService.getScore('test/movie/unstamped', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal('fetchedAt' in score, false, 'a refused result carries no stamp of its own')
@@ -829,10 +829,10 @@ test('a record that expires mid-run is rebuilt rather than left absent', async (
 
   try {
     const score = await scoreService.getScore('test/movie/vanished', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.deepEqual(Object.keys(wrote('test/movie/vanished').scores), ['metacritic', 'tmdb'],
+    assert.deepEqual(Object.keys(wrote('test/movie/vanished').scores), ['metacritic'],
       'a thin score beats none once the richer record is gone')
     assert.equal(score.kept, undefined)
     assert.ok(score.fetchedAt > 0, 'the rebuild is an accepted write, so it is stamped')
@@ -855,7 +855,7 @@ test('a failed write reports nothing stored', async () => {
 
   try {
     const score = await scoreService.getScore('test/movie/writefail', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(score.cached, false)
@@ -874,11 +874,11 @@ test('a source with no outlet mapping counts as its own outlet', async () => {
     'www.rottentomatoes.com': () => new Response('', { status: 403 }),
     'www.metacritic.com': () => ok(LD(52))
   })
-  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68, tmdb: 67 }, fetchedAt: 1 })
+  storedScore({ avgScore: 70, scores: { letterboxd: 72, mubi: 68 }, fetchedAt: 1 })
 
   try {
     await scoreService.getScore('test/movie/unmapped', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(wrote('test/movie/unmapped'), undefined, 'three stored outlets beat tonight two')
@@ -897,16 +897,68 @@ test('a declined write reports the record that declined it', async () => {
   })
 
   let reads = 0
-  const replaced = { avgScore: 91, scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92, tmdb: 90 } }
+  const replaced = { avgScore: 91, scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92 } }
 
   redis.getCache = async key => key.startsWith('test/') ? (reads++ === 0 ? RICH : replaced) : null
 
   try {
     const score = await scoreService.getScore('test/movie/replaced', {
-      tmdbScore: 67, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
     assert.equal(score.kept.avgScore, 91, 'the value that won, not the one the comparison saw')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+
+// TMDB supplies the catalogue and the vote counts, not a score
+test('a supplied TMDB score never reaches the aggregate', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  const score = await scoreService.getScore('test/movie/notmdb', {
+    tmdbScore: 90, wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.scores, { metacritic: 52 })
+  assert.equal(score.avgScore, 52)
+})
+
+test('a title only TMDB could have scored has no aggregate at all', async () => {
+  stubHosts({})
+
+  const score = await scoreService.getScore('test/movie/tmdbonly', {
+    tmdbScore: 90, title: 'Nothing Resolves', releaseDate: '2026-01-01', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.scores, {})
+  assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
+})
+
+// Records written before TMDB was dropped hold one outlet more than anything computed now, so
+// without a versioned key never-degrade would refuse every write until they expired
+test('a record under the previous key does not decline today writes', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  // Five outlets, as a pre-TMDB record held; only reachable under the unversioned key
+  redis.getCache = async key => key === 'test/movie/legacy'
+    ? { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80, tmdb: 67 } }
+    : null
+
+  try {
+    await scoreService.getScore(scoreKey('test/movie', 'legacy'), {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.ok(wrote(scoreKey('test/movie', 'legacy')), 'the versioned key has nothing to compare against')
   } finally {
     redis.getCache = realGetCache
   }
