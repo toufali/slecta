@@ -155,7 +155,7 @@ test('a healthy response is not retried', async () => {
 
 
 // A thin component is noisy in both directions, so it is shrunk toward the better-sampled ones
-// rather than penalised. Constants and their derivation are in `decisions.md`.
+// rather than penalised.
 test('a thin component pulls less than a well-sampled one', () => {
   const thin = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 12 } }
   const thick = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 50000 } }

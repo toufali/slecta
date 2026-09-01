@@ -28,9 +28,8 @@ const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run ha
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
-// Samples at which a component reaches half weight, and ~90% at nine times it. Set from each
-// source's dispersion knee, the count where its spread stops falling; see `decisions.md` for which
-// knees are measured and which are analogies.
+// Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
+// that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
 const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
 
 /**
