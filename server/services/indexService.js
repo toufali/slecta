@@ -14,20 +14,13 @@ export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 // Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
 
-// RT's two keys come from one page, so counting them apart would report three sources for a title
-// with no critic at all
-const OUTLET = { rtCritic: 'rt', rtAudience: 'rt' }
-
 /**
- * A title is rankable with a critic score and three distinct outlets. Only three outlets exist, so
- * this asks for all of them — the strictest the rule can be without admitting nothing, and it means
- * the critic clause cannot fire yet. It guards the fourth outlet: Letterboxd is an audience source,
- * and imdb plus rt plus Letterboxd would be three of them with no critic among them.
+ * A ranking needs a critic opinion in it, and that is the whole rule. An outlet count on top of it
+ * only ever bit at three, which meant demanding Metacritic — our thinnest source — and rejecting
+ * well-evidenced titles for its coverage rather than for their own. Numbers in `decisions.md`.
  */
 function rankable({ sources = [] }) {
-  const outlets = new Set(sources.map(source => OUTLET[source] ?? source))
-
-  return outlets.size >= 3 && (sources.includes('metacritic') || sources.includes('rtCritic'))
+  return sources.includes('metacritic') || sources.includes('rtCritic')
 }
 
 // The panel sends one value or several, and a genre matches if any of them does

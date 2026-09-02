@@ -34,30 +34,30 @@ async function listing(rows, query = {}) {
   }
 }
 
-// Ungated, the head of the list is single-source scores — the reason the gate exists
-test('a title short of three outlets is not rankable', async () => {
+// Ungated, the head of the list is single-source audience scores — what the rule is for
+test('a title with no critic score is not rankable', async () => {
   const data = await listing([
-    row({ id: 1, title: 'three outlets', sources: ALL }),
-    row({ id: 2, title: 'rt and imdb only', sources: ['imdb', 'rtCritic', 'rtAudience'] }),
-    row({ id: 3, title: 'one source', sources: ['imdb'] })
+    row({ id: 1, title: 'metacritic', sources: ['imdb', 'metacritic'] }),
+    row({ id: 2, title: 'rt critic', sources: ['imdb', 'rtCritic'] }),
+    row({ id: 3, title: 'audience only', sources: ['imdb', 'rtAudience'] }),
+    row({ id: 4, title: 'imdb alone', sources: ['imdb'] })
   ])
 
-  assert.deepEqual(titles(data), ['three outlets'])
+  assert.deepEqual(titles(data), ['metacritic', 'rt critic'])
 })
 
-// Unreachable while only three outlets exist, since reaching three requires Metacritic. It guards
-// the fourth: Letterboxd is an audience source, and imdb + rt + letterboxd is three without a critic.
-test('three outlets with no critic score among them is not rankable', async () => {
+// A source count would admit this: three of them, none a critic. Letterboxd lands here next.
+test('any number of audience scores is still not a critic score', async () => {
   const data = await listing([row({ title: 'audiences only', sources: ['imdb', 'rtAudience', 'letterboxd'] })])
 
   assert.deepEqual(titles(data), [])
 })
 
-// RT's two keys are one outlet, so a raw count of three sources would let this through
-test('rt and imdb alone are two outlets, not three', async () => {
-  const data = await listing([row({ title: 'rt and imdb', sources: ['imdb', 'rtCritic', 'rtAudience'] })])
+// Metacritic is the thinnest source, so requiring it rejected titles for its coverage, not theirs
+test('a title RT reviewed but Metacritic did not is rankable', async () => {
+  const data = await listing([row({ title: 'rt only', sources: ['imdb', 'rtCritic', 'rtAudience'] })])
 
-  assert.deepEqual(titles(data), [])
+  assert.deepEqual(titles(data), ['rt only'])
 })
 
 // The row's score ranks and filters; the rendered one comes from the score record. Passing it
