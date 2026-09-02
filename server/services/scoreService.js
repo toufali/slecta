@@ -5,12 +5,14 @@ import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
 import imdb from './imdbService.js'
 import log from '../utils/logger.js'
 
-export const SCORE_TTL = 60 * 60 * 48 // 48 hours
-const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
+// Long enough that a title's next scheduled refresh lands inside it: a record expiring before it is
+// due to be rewritten leaves the title with no score at all.
+export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
+export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
-// Bump when the set of scored sources changes. Never-degrade compares outlet counts, so records
-// holding a source the code no longer produces would refuse every write until they expired.
+// Bump when the record's shape changes. A source leaving the set does not need one: nothing
+// tonight can reach it, so nothing holds it against the write that drops it.
 const SCORE_CACHE_VERSION = 1
 
 /** `prefix` is the media segment, or a caller's own namespace. */
@@ -26,10 +28,6 @@ const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run ha
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
 
-// One outlet per fetch: RT's two keys come from one page, so counting them apart double-counts it
-const OUTLET = { rtCritic: 'rt', rtAudience: 'rt' }
-const outlets = scores => new Set(Object.keys(scores ?? {}).map(source => OUTLET[source] ?? source)).size
-
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
 // sustained outage would otherwise starve the pool. Cleanup must never mask a real error.
@@ -37,7 +35,7 @@ const discard = res => res?.body?.cancel().catch(() => {})
 
 const parseJson = value => { try { return JSON.parse(value) } catch { return null } }
 
-// Drop absent keys rather than nulling them: outlet counting reads key count
+// Drop absent keys rather than nulling them: a null source would still read as a source
 const defined = obj => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined))
 
 // Why a source produced no score. Named rather than literal, so a mistyped comparison is a link
@@ -131,10 +129,10 @@ class ScoreService {
         rtAudience: resolved.rt?.page?.audienceCount
       })
 
-      // IMDb is a local dataset: nothing to reach, and a title it holds no usable rating for is one
-      // it does not carry
+      // The dataset is IMDb's page: unreadable is a failure to ask, a dataset without the title is
+      // an answer. Same rule as the fetched sources, so a blip cannot discard a stored score.
       const outcomes = {
-        imdb: imdbRating ? SCORED : ABSENT,
+        imdb: sourceOutcome({ answered: imdbRating !== undefined, page: imdbRating ?? null }, scores.imdb),
         metacritic: sourceOutcome(resolved.mc, scores.metacritic),
         rtCritic: sourceOutcome(resolved.rt, scores.rtCritic),
         rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
@@ -149,28 +147,36 @@ class ScoreService {
         log.warn('No source resolved a score', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
-      // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
+      // One question over every source, not just the fetched ones. `resolved.answered` covers what
+      // `#resolveSources` reached; an unreadable IMDb dataset is as worth retrying soon as a blocked
+      // host, now that the dataset says which of the two a missing rating was.
+      const answered = resolved.answered && outcomes.imdb !== UNREACHABLE
+
+      // Expire it soon: a source we could not read may hold a score that is simply unread
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
-      if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
+      if (!answered) log.warn('Score is missing a source it could not read', { key, title })
 
       // Read here, not before the fetches above: in that window the record can expire, or a request
       // can store a richer one that an unconditional write would then clobber
       const stored = await this.getScoreFromCache(key)
-      const thinner = Boolean(stored && outlets(stored.scores) > outlets(scores))
+      const lost = Object.keys(stored?.scores ?? {}).filter(source => scores[source] === undefined)
+      // A thinner result is a bad night only while a source we lost could not be read. Once one
+      // answers, it is the world that changed and the record has to follow.
+      const guarded = lost.some(source => outcomes[source] === UNREACHABLE)
       const candidate = { ...score, fetchedAt: Date.now() }
 
-      // Conditional when thinner, so a live record keeps its own clock and a wrong score still dies
-      // at expiry, while a record that vanished is rebuilt rather than left absent
+      // Conditional when guarded, so a live record keeps its own clock while a record that vanished
+      // is rebuilt rather than left absent
       // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
-      // that writer to resolve more outlets than this run did, at the same instant, from the same
-      // sources; the cost if it happens is one title thinner until it rebuilds.
-      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, thinner)
+      // that writer to reach a source this run could not, at the same instant; the cost if it
+      // happens is one title thinner until it rebuilds.
+      const outcome = await redis.setCache(key, candidate, answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
       // Re-read what declined this write, since `stored` predates it
       const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
       const result = outcome === WRITTEN ? candidate : score
 
       if (kept) {
-        log.warn('Score not stored, thinner than the record', { key, title, outlets: outlets(scores), stored: outlets(kept.scores) })
+        log.warn('Score not stored, it lost a source that could not be read', { key, title, lost })
       }
 
       // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing
@@ -187,11 +193,13 @@ class ScoreService {
     }
   }
 
-  // No `answered` flag: a missing dataset reads the same however soon we ask again, and only the
-  // nightly refresh can fix it — which alerts on its own
+  // Answered or not, like the fetched sources: the dataset distinguishes holding no rating for the
+  // title from not being readable, and only the second is worth asking again soon
   async #readIMDB(imdbId) {
     const rating = await imdb.getRating(imdbId)
-    if (!rating) return
+
+    // Passed through, since only the dataset knows which of the two a missing rating was
+    if (!rating) return rating
 
     return { value: Math.round(rating.rating * 10), count: toCount(rating.votes) } // adjusted to 100 scale
   }
@@ -305,10 +313,15 @@ class ScoreService {
       // the lookup that could still supply the authoritative one is never asked again.
       if (hostsAnswered && wikiAnswered) redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
 
+      // A host with no slug may only have been asked the wrong URL, since the lookup that could have
+      // supplied the right one did not answer. Unread, not the host's answer, or a run like that
+      // would discard a stored score on a 404 from a guess.
+      const unread = source => !source.slug && !wikiAnswered ? { ...source, answered: false } : source
+
       // Only RT and Metacritic carry scores, so they alone settle the score. A quiet lookup counts
       // against it only while a slug is still missing, since the one thing it could have supplied
       // is a slug we now already have.
-      return { rt, mc, answered: hostsAnswered && (wikiAnswered || haveBothSlugs) }
+      return { rt: unread(rt), mc: unread(mc), answered: hostsAnswered && (wikiAnswered || haveBothSlugs) }
     } catch (e) {
       log.warn('Error resolving slugs', { title, mediaType, error: e })
 

@@ -67,15 +67,22 @@ class ImdbService {
     return meta
   }
 
+  /**
+   * @return {({rating: number, votes: number}|null|undefined)} `null` when the dataset holds no
+   *   rating for this title, `undefined` when the dataset could not be read. A caller that would
+   *   discard a stored score must tell those apart.
+   */
   async getRating(imdbId) {
-    if (!imdbId || !ID_PATTERN.test(imdbId)) return
+    if (!imdbId || !ID_PATTERN.test(imdbId)) return null
 
+    // Absent as well as unreadable: every id maps to a bucket, so a missing one is a dataset that
+    // did not load rather than a title it does not carry
     const bucket = await redis.getCache(bucketKey(imdbId))
     if (!bucket) return
 
     // Match the one line rather than parsing the whole bucket on every lookup
     const row = bucket.match(new RegExp(`^${imdbId}\t([\\d.]+)\t(\\d+)$`, 'm'))
-    if (!row) return
+    if (!row) return null
 
     return { rating: parseFloat(row[1]), votes: parseInt(row[2]) }
   }
