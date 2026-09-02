@@ -882,6 +882,47 @@ test('an unreadable IMDb dataset holds the record, a dataset without the title d
   }
 })
 
+// The lookup may have held the slug the guesses missed, so a 404 from a guess is not the host
+// saying it has no page for the title — and a stored score must survive it
+test('a 404 from a guess holds the record while the lookup went unanswered', async () => {
+  stubHosts({
+    'www.wikidata.org': () => new Response('', { status: 429 }),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+
+  try {
+    await scoreService.getScore('test/movie/lookupdown', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/lookupdown'), undefined, 'no write at all, so the stored RT scores stay')
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
+// With the lookup answering, a 404 on every candidate is the host's own verdict and the record follows
+test('a 404 from a guess lets the record go once the lookup answered', async () => {
+  stubHosts({
+    'www.wikidata.org': () => ok('{}'),
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  storedScore(RICH)
+
+  try {
+    await scoreService.getScore('test/movie/lookupfine', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.deepEqual(Object.keys(wrote('test/movie/lookupfine').scores), ['metacritic'])
+  } finally {
+    redis.getCache = realGetCache
+  }
+})
+
 // The other side: a source that could not be read is a bad night, whatever the record's age
 test('a source that could not be read holds the record', async () => {
   stubHosts({

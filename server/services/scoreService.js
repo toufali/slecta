@@ -313,10 +313,15 @@ class ScoreService {
       // the lookup that could still supply the authoritative one is never asked again.
       if (hostsAnswered && wikiAnswered) redis.setCache(key, record, record.rt || record.mc ? SLUG_TTL : SLUG_MISS_TTL)
 
+      // A host with no slug may only have been asked the wrong URL, since the lookup that could have
+      // supplied the right one did not answer. Unread, not the host's answer, or a run like that
+      // would discard a stored score on a 404 from a guess.
+      const unread = source => !source.slug && !wikiAnswered ? { ...source, answered: false } : source
+
       // Only RT and Metacritic carry scores, so they alone settle the score. A quiet lookup counts
       // against it only while a slug is still missing, since the one thing it could have supplied
       // is a slug we now already have.
-      return { rt, mc, answered: hostsAnswered && (wikiAnswered || haveBothSlugs) }
+      return { rt: unread(rt), mc: unread(mc), answered: hostsAnswered && (wikiAnswered || haveBothSlugs) }
     } catch (e) {
       log.warn('Error resolving slugs', { title, mediaType, error: e })
 
