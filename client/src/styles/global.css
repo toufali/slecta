@@ -140,6 +140,25 @@ footer::before{
   mix-blend-mode: soft-light;
 }
 
+footer .pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--padding-md);
+  margin-bottom: var(--padding-md);
+}
+
+/* Equal thirds, so the label stays centred as the buttons appear and disappear at the boundaries */
+footer .pagination > * {
+  flex: 1 1 0;
+  max-width: 12rem;
+}
+
+footer .pagination .page-of {
+  color: var(--gray-70);
+  font: var(--h4-font);
+}
+
 h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;

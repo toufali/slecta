@@ -2,6 +2,7 @@ import tmdb from '../services/tmdbService.js'
 import scoreService, { aggregate, scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
+import { pageLinks } from '../utils/pagination.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
 import { movieDetail } from '../views/partials/movieDetail.js'
@@ -46,10 +47,14 @@ async function list(ctx, media) {
 // names it, so nothing downstream has to work out which catalogue it is serving.
 export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
+  const data = await list(ctx, media)
+
+  // Built here rather than in `list`: the API shares that and would carry hrefs to its own path
+  data.pagination = pageLinks(ctx.path, ctx.query, data.totalPages)
 
   return ctx.body = mainView({
     partial: media.listView,
-    content: await list(ctx, media)
+    content: data
   })
 }
 
