@@ -242,8 +242,7 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   assert.equal(aggregate(score), 62)
 })
 
-// Every source publishes how many reviews its score came from, and an unweighted mean over a
-// 37-rating audience score and a 2,780-rating one favours whichever thin component happens to be high
+// Each component's weight comes from the sample its score came from, so the count is stored with it
 test('each score is stored beside the sample size it came from', async () => {
   const { default: imdb } = await import('./imdbService.js')
   const realGetRating = imdb.getRating
