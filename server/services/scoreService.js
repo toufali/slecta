@@ -11,8 +11,8 @@ export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
 export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 
-// Bump when the set of scored sources changes. Never-degrade compares outlet counts, so records
-// holding a source the code no longer produces would refuse every write until they expired.
+// Bump when the record's shape changes. A source leaving the set does not need one: nothing
+// tonight can reach it, so nothing holds it against the write that drops it.
 const SCORE_CACHE_VERSION = 1
 
 /** `prefix` is the media segment, or a caller's own namespace. */

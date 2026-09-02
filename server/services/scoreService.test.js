@@ -789,7 +789,7 @@ test('a 404 on the first guess falls through to the year variant', async () => {
 // night and make a wrong score permanent.
 const storedScore = record => { redis.getCache = async key => key.startsWith('test/') ? record : null }
 
-// Fresh, so the guard holds. An aged record is the override's case and says so at the point of use.
+// Stamped, since one test below checks that a refused write leaves the stored stamp alone.
 const RICH = { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80 }, fetchedAt: Date.now() }
 
 // The guard exists for a source that is down, so it has to end when the source starts answering:
