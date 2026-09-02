@@ -1,5 +1,5 @@
 import tmdb from '../services/tmdbService.js'
-import scoreService, { scoreKey } from '../services/scoreService.js'
+import scoreService, { aggregate, scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { mainView } from '../views/mainView.js'
@@ -62,7 +62,7 @@ export const showDetail = mediaType => async ctx => {
   const score = await scoreService.getScoreFromCache(scoreKey(media.segment, ctx.params.id))
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id, mediaType)
 
-  data.score = score?.avgScore
+  data.score = aggregate(score)
   data.quotes = quotes
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -106,7 +106,7 @@ export const getScore = mediaType => async ctx => {
 
   if (data) {
     ctx.set('x-server-cache-hit', 'true')
-    return ctx.body = data
+    return ctx.body = served(data)
   }
 
   const found = await detail(ctx.params.id)
@@ -118,8 +118,11 @@ export const getScore = mediaType => async ctx => {
   // Checks the cache again, since the detail fetch above gives another request time to fill it
   data = await scoreService.getScore(key, { imdbId, wikiId, title, releaseDate, mediaType })
 
-  return ctx.body = data
+  return ctx.body = served(data)
 }
+
+// The aggregate is derived, and the browser reads it off this response rather than recomputing
+const served = record => record && { ...record, avgScore: aggregate(record) }
 
 export const getQuotes = mediaType => async ctx => {
   const data = await reviewService.getQuotes(ctx.params.id, ctx.query.title, ctx.query.releaseDate, mediaType)

@@ -23,7 +23,7 @@ const REQUIRED_DETAIL = {
 }
 
 // `minResolved` and `maxUnreachable` divide by every title tried; `minScored` divides by the titles
-// the source carries, which the vote floor moves far less. Numbers in `decisions.md`.
+// the source carries, which the vote floor moves far less.
 const SOURCE_LIMITS = {
   // IMDb is a local dataset: nothing to reach and no page to be absent from, so only `minResolved` binds
   imdb: { minResolved: 0.9, maxUnreachable: 0.02, minScored: 0.9 },

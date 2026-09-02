@@ -41,3 +41,13 @@ export function toCount(value) {
   const count = Number(value)
   return Number.isInteger(count) && count > 0 ? count : undefined
 }
+
+/**
+ * Read the lower bound out of a banded count such as `"250+ Ratings"`.
+ * A band with no floor — `"Fewer than 50"` — has nothing usable in it.
+ * @param {*} value
+ * @return {(number|undefined)}
+ */
+export function toFloor(value) {
+  return toCount(String(value ?? '').replace(/,/g, '').match(/^(\d+)\+/)?.[1])
+}

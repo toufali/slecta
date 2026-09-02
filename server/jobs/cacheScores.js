@@ -1,7 +1,7 @@
 // Refreshes the IMDb dataset, warms score caches across both full catalogues, then verifies.
 
 import tmdb from '../services/tmdbService.js'
-import scoreService, { scoreKey, SCORE_TTL } from '../services/scoreService.js'
+import scoreService, { aggregate, scoreKey, SCORE_TTL } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import log from '../utils/logger.js'
@@ -137,7 +137,9 @@ async function carryRows(mediaType, previous, carry) {
     // Unreadable is not gone: keep the row rather than drop a title over a failed read
     if (stored === undefined) return row
 
-    return Number.isFinite(stored?.avgScore) ? { ...row, score: stored.avgScore, sources: Object.keys(stored.scores) } : null
+    const score = aggregate(stored)
+
+    return score === undefined ? null : { ...row, score, sources: Object.keys(stored.scores) }
   }))
 
   return rows.filter(Boolean)
@@ -215,8 +217,10 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
 
   confirmed.add(title.id)
 
+  const avgScore = aggregate(row)
+
   // Unscorable titles would sort as NaN
-  if (!Number.isFinite(row?.avgScore)) return
+  if (avgScore === undefined) return
 
   // `score` and `sources` rank and filter; the badge is read from the record, never from the row.
   // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
@@ -230,7 +234,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
     votes: title.tmdbScoreCount,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
-    score: row.avgScore,
+    score: avgScore,
     sources: Object.keys(row.scores)
   }
 }

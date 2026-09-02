@@ -1,4 +1,4 @@
-import { average, toCount, toScore } from '../utils/math.js'
+import { average, toCount, toFloor, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
 import { space } from '../utils/throttle.js'
 import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
@@ -27,6 +27,37 @@ const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run has a task timeout to finish inside
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
+
+// Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
+// that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
+const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
+
+/**
+ * Aggregate a stored record's components, weighting each by how well sampled it is.
+ * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
+ */
+export function aggregate(record) {
+  const scores = record?.scores ?? {}
+  let weighted = 0
+  let total = 0
+
+  for (const [source, value] of Object.entries(scores)) {
+    // A floor stands in where RT bands a count instead of publishing it, and under-states it
+    const samples = record.counts?.[source] ?? record.floors?.[source] ?? 0
+    const half = HALF_CONFIDENCE[source]
+    // A source with no constant carries full weight, so adding one cannot silently drop it
+    const weight = half === undefined ? 1 : samples / (samples + half)
+
+    weighted += weight * value
+    total += weight
+  }
+
+  // Nothing carries a usable sample, so nothing is known to be better and the plain mean returns
+  const mean = total ? weighted / total : average(Object.values(scores))
+
+  // Round here, so the number shown and the number sorted on are the same one
+  return Number.isFinite(mean) ? Math.round(mean) : undefined
+}
 
 // Undici holds the connection until a body is read or cancelled, and every path here
 // throws bodies away: probes read only the status, and both readers bail on !ok. A
@@ -138,12 +169,13 @@ class ScoreService {
         rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
       }
 
-      const mean = average(Object.values(scores))
-      // Round, so the number shown and the number sorted on agree
-      // Omit rather than store NaN, which caches as a null that both sorts and renders wrong
-      const score = { avgScore: Number.isFinite(mean) ? Math.round(mean) : undefined, scores, counts }
+      // RT bands a cross-season audience count rather than publishing one, so a floor is all there
+      // is for half the TV catalogue. Kept apart from `counts`: a lower bound is a weaker claim.
+      const floors = defined({ rtAudience: resolved.rt?.page?.audienceFloor })
+      const score = { scores, counts, floors }
+      const mean = aggregate(score)
 
-      if (!Number.isFinite(mean)) {
+      if (mean === undefined) {
         log.warn('No source resolved a score', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
@@ -223,6 +255,7 @@ class ScoreService {
         audience: toScore(audienceScore?.score),
         criticCount: toCount(criticsScore?.reviewCount),
         audienceCount: toCount(audienceScore?.reviewCount),
+        audienceFloor: toFloor(audienceScore?.bandedRatingCount),
         year: pageYear(body)
       }
 
