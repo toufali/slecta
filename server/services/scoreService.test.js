@@ -1071,8 +1071,6 @@ test('a failed write reports nothing stored', async () => {
   }
 })
 
-// Outlet names are looked up, and an unmapped one used to fall to undefined so every future source
-// collapsed into a single entry. Two of them is what makes that visible.
 // `kept` is published to the ranked index, so it has to be what Redis holds now, not what the
 // comparison read a moment earlier
 test('a declined write reports the record that declined it', async () => {

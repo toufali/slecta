@@ -193,8 +193,8 @@ class ScoreService {
     }
   }
 
-  // No `answered` flag: a missing dataset reads the same however soon we ask again, and only the
-  // nightly refresh can fix it — which alerts on its own
+  // Answered or not, like the fetched sources: the dataset distinguishes holding no rating for the
+  // title from not being readable, and only the second is worth asking again soon
   async #readIMDB(imdbId) {
     const rating = await imdb.getRating(imdbId)
 
