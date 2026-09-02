@@ -13,16 +13,17 @@ const headers = {
 const DETAIL_CACHE_VERSION = 3
 
 // Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
-// silently limit the nightly run to page one.
+// silently limit the nightly run to page one. Only the rows and those counts are cached — the
+// panel's own options are shaped after the read, so adding a sort option needs no bump.
 const LIST_CACHE_VERSION = 3
 
-// Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
-// list, since both are built at init. `segment` covers the cache-key prefix, the list property and
-// the detail path — they are already the same word.
 // Every other sort value is a discover parameter. This one is not: it names the local ranked index,
 // which is why the controller has to branch on it rather than pass it through.
 export const SCORE_SORT = 'score'
 
+// Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
+// list, since both are built at init. `segment` covers the cache-key prefix, the list property and
+// the detail path — they are already the same word.
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -208,6 +209,14 @@ class TmdbService {
     }
   }
 
+  /** The catalogue's release-date bound, as discover is sent it. Not overridable by query. */
+  dateWindow() {
+    const to = new Date()
+    const from = new Date(new Date().setFullYear(to.getFullYear() - 1))
+
+    return { from: from.toISOString().substring(0, 10), to: to.toISOString().substring(0, 10) }
+  }
+
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
   catalogue(mediaType) {
     return CATALOGUE[mediaType]
@@ -252,6 +261,7 @@ class TmdbService {
     const media = CATALOGUE[mediaType]
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]
+    const window = this.dateWindow()
 
     // TMDB silently ignores `certification` without `certification_country`, and
     // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.
@@ -262,8 +272,8 @@ class TmdbService {
       include_adult: this.includeAdult,
       include_video: media.video ? this.includeVideo : undefined,
       sort_by: query?.sort || sorts[0].value,
-      [`${media.dateParam}.lte`]: new Date().toISOString().substring(0, 10),
-      [`${media.dateParam}.gte`]: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
+      [`${media.dateParam}.lte`]: window.to,
+      [`${media.dateParam}.gte`]: window.from,
       'vote_count.gte': query?.minVotes || this.minVotes,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
@@ -283,8 +293,11 @@ class TmdbService {
     const url = `${TMDB_API_URL}/discover/${media.path}?${urlParams}`
     const cacheKey = `${media.segment}/v${LIST_CACHE_VERSION}?${urlParams}`
 
-    let data = await redis.getCache(cacheKey)
-    if (data) return data
+    const cached = await redis.getCache(cacheKey)
+
+    // Shaped after the read, never cached with the rows: `allSorting` and the rest are this service's
+    // own config, and caching them left a new sort option invisible until every entry expired
+    if (cached) return Object.assign(cached, this.listShape(mediaType, query))
 
     const res = await fetch(url, { headers })
 
@@ -292,7 +305,7 @@ class TmdbService {
 
     const json = await res.json()
 
-    data = {
+    const data = {
       [media.segment]: json.results.map(item => new Object({
         id: item.id,
         title: item[media.titleField],
@@ -307,14 +320,14 @@ class TmdbService {
       }))
     }
 
-    Object.assign(data, this.listShape(mediaType, query))
     // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
     // caches as null, and the job would multiply that to a zero expectation and accept page one.
     data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
     data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
-    return data
+
+    return Object.assign(data, this.listShape(mediaType, query))
   }
 
   async getMovieDetail(id) {

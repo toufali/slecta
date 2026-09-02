@@ -7,6 +7,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: tmdb } = await import('./tmdbService.js')
+const { default: redis } = await import('./redisService.js')
 
 const respond = (status, body = '') => { globalThis.fetch = async () => new Response(body, { status }) }
 
@@ -250,4 +251,25 @@ test('the vote floor reaches the query for both catalogues, and a caller can ove
   assert.match(seen[0], /vote_count\.gte=25(&|$)/)
   assert.match(seen[1], /vote_count\.gte=25(&|$)/)
   assert.match(seen[2], /vote_count\.gte=200(&|$)/)
+})
+
+// A list response used to be cached whole, including this service's own config, so adding a sort
+// option left it missing from every cached browse page until the entries expired a day later
+test('a cached list is reshaped on the way out, not served as it was stored', async () => {
+  const realGetCache = redis.getCache
+
+  tmdb.genres.movie = new Map([[28, 'Action']])
+  tmdb.ratings = ['R']
+  // Stored before Top Rated existed, and with the wrong query echoed back
+  redis.getCache = async () => ({ movies: [], allSorting: [{ name: 'Most Recent', value: 'stale' }], sortBy: 'stale' })
+
+  try {
+    const data = await tmdb.getMovies({ sort: 'score' })
+
+    assert.deepEqual(data.allSorting.map(option => option.value),
+      ['primary_release_date.desc', 'popularity.desc', 'score'])
+    assert.equal(data.sortBy, 'score')
+  } finally {
+    redis.getCache = realGetCache
+  }
 })

@@ -16,7 +16,7 @@ tmdb.ratings = ['G', 'PG', 'PG-13', 'R']
 
 const ALL = ['imdb', 'metacritic', 'rtCritic', 'rtAudience']
 const row = over => ({
-  id: 1, title: 'A Film', posterPath: '/a.jpg', releaseDate: '2026-01-01', genreIds: [35],
+  id: 1, title: 'A Film', posterPath: '/a.jpg', releaseDate: new Date().toISOString().substring(0, 10), genreIds: [35],
   votes: 100, certification: 'R', providers: [8], score: 80, sources: ALL, ...over
 })
 
@@ -76,7 +76,7 @@ test('a card carries everything the card component renders', async () => {
     title: 'A Film',
     genres: ['Comedy'],
     genreIds: [35],
-    releaseDate: '2026-01-01',
+    releaseDate: new Date().toISOString().substring(0, 10),
     posterThumb: 'https://img/w92/a.jpg',
     posterPath: '/a.jpg',
     tmdbScoreCount: 100,
@@ -120,6 +120,37 @@ test('the streaming filter drops a title no provider carries', async () => {
   ], { streaming: 'on' })
 
   assert.deepEqual(titles(data), ['streaming'])
+})
+
+// Changing the sort must not change what a filter means, so every parameter discover is sent has
+// to hold here too
+test('an excluded genre is dropped', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'comedy', genreIds: [35] }),
+    row({ id: 2, title: 'drama', genreIds: [18] })
+  ], { wog: '35' })
+
+  assert.deepEqual(titles(data), ['drama'])
+})
+
+// The index is built at the catalogue's own floor, so an override can only narrow from there
+test('a vote override narrows the list', async () => {
+  const rows = [row({ id: 1, title: 'popular', votes: 500 }), row({ id: 2, title: 'obscure', votes: 30 })]
+
+  assert.deepEqual(titles(await listing(rows, { minVotes: '200' })), ['popular'])
+  assert.deepEqual(titles(await listing(rows)), ['popular', 'obscure'])
+})
+
+// An incomplete walk keeps rows it could not confirm, so one can outlast the window it came from.
+// Discover bounds its own results; here the bound has to be applied on the way out.
+test('a title that has left the release window is dropped', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'in window', releaseDate: new Date().toISOString().substring(0, 10) }),
+    row({ id: 2, title: 'long past', releaseDate: '2019-04-01' }),
+    row({ id: 3, title: 'unreleased', releaseDate: '2099-01-01' })
+  ])
+
+  assert.deepEqual(titles(data), ['in window'])
 })
 
 test('a page is twenty titles, and the count follows the filter', async () => {

@@ -11,6 +11,7 @@ export const INDEX_VERSION = 1
 
 export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 
+// Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
 
 // RT's two keys come from one page, so counting them apart would report three sources for a title
@@ -32,18 +33,27 @@ function rankable({ sources = [] }) {
 // The panel sends one value or several, and a genre matches if any of them does
 const asList = value => value === undefined ? undefined : [].concat(value)
 
-function matches(row, query) {
+// Every filter discover is sent has to hold here too, or changing the sort changes the results
+function matches(row, query, window) {
   const genres = asList(query.wg)?.map(Number)
+  const without = asList(query.wog)?.map(Number)
   const ratings = asList(query.wr)
+  const minVotes = Number(query.minVotes)
 
   if (genres && !row.genreIds?.some(id => genres.includes(id))) return false
+  if (without?.some(id => row.genreIds?.includes(id))) return false
   if (ratings && !ratings.includes(row.certification)) return false
+
+  // The index is built at the catalogue's own vote floor, so an override can only narrow from there
+  if (minVotes && !(row.votes >= minVotes)) return false
 
   // Close to discover's own filter but not identical — it reads monetization buckets this row has
   // already flattened. Measured at a handful of titles either way; see `decisions.md`.
   if (query.streaming && !row.providers?.length) return false
 
-  return true
+  // An incomplete walk keeps rows it could not confirm, so one can outlast the window it was listed
+  // from. Discover applies this bound on its own; here it has to be applied on the way out.
+  return row.releaseDate >= window.from && row.releaseDate <= window.to
 }
 
 class IndexService {
@@ -61,7 +71,7 @@ class IndexService {
       return
     }
 
-    const found = rows.filter(row => rankable(row) && matches(row, query))
+    const found = rows.filter(row => rankable(row) && matches(row, query, tmdb.dateWindow()))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE
 
