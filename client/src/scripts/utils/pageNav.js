@@ -24,6 +24,8 @@ export function resetPageNav(params, totalPages) {
   const nav = existing ?? footer.insertBefore(document.createElement('nav'), footer.firstChild)
 
   nav.className = 'pagination'
+  // Named like the server's, or a created landmark is one the shell's own nav cannot be told from
+  nav.ariaLabel = 'Pagination'
   nav.innerHTML = `
     <span></span>
     <span class='page-number'>Page 1</span>

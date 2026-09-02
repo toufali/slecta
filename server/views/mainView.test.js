@@ -34,6 +34,14 @@ test('content with no pagination renders the footer unchanged', () => {
   assert.doesNotMatch(footer({}), /pagination/)
 })
 
+// Two navigation landmarks now, and a screen reader's landmark menu cannot tell apart two unnamed ones
+test('both navigation landmarks are named', () => {
+  const rendered = mainView({ partial: movieList, content: { pagination: pageLinks('/movies', {}, 41) } })
+
+  assert.match(rendered, /<nav class='primary' aria-label='[^']+'>/)
+  assert.match(rendered, /<nav class='pagination' aria-label='[^']+'>/)
+})
+
 test('the page number is shown without a total', () => {
   assert.match(footer({ pagination: pageLinks('/movies', { page: '7' }, 41) }), /Page 7<\/span>/)
 })
