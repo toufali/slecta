@@ -1,4 +1,5 @@
-import tmdb from '../services/tmdbService.js'
+import tmdb, { SCORE_SORT } from '../services/tmdbService.js'
+import index from '../services/indexService.js'
 import scoreService, { aggregate, scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
@@ -14,6 +15,7 @@ import { tvShowDetail } from '../views/partials/tvShowDetail.js'
 // string, which is why no property rename was needed to make these converge.
 const MEDIA = {
   movie: {
+    mediaType: 'movie',
     segment: 'movies',
     list: query => tmdb.getMovies(query),
     detail: id => tmdb.getMovieDetail(id),
@@ -21,6 +23,7 @@ const MEDIA = {
     detailView: movieDetail
   },
   tv: {
+    mediaType: 'tv',
     segment: 'shows',
     list: query => tmdb.getTvShows(query),
     detail: id => tmdb.getTvShowDetail(id),
@@ -34,7 +37,11 @@ const CACHE_CONTROL = 'max-age=43200, stale-while-revalidate=43200'
 // Shared by the page and the API: both need the same rows, the same badges and the same cache-hit
 // header, and differ only in how they serialise the result
 async function list(ctx, media) {
-  const data = await media.list(ctx.query)
+  // Top Rated is the one sort discover cannot serve, so it comes from the ranked index instead.
+  // A failed read is a 503 rather than an empty list: the filter did not answer, we did not ask.
+  const data = ctx.query.sort === SCORE_SORT
+    ? await index.getList(media.mediaType, ctx.query) ?? ctx.throw(503)
+    : await media.list(ctx.query)
 
   await attachScores(data[media.segment], media.segment)
 

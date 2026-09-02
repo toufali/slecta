@@ -19,6 +19,10 @@ const LIST_CACHE_VERSION = 3
 // Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
 // list, since both are built at init. `segment` covers the cache-key prefix, the list property and
 // the detail path — they are already the same word.
+// Every other sort value is a discover parameter. This one is not: it names the local ranked index,
+// which is why the controller has to branch on it rather than pass it through.
+export const SCORE_SORT = 'score'
+
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -69,11 +73,13 @@ class TmdbService {
   sortingOptions = {
     movies: [
       { name: 'Most Recent', value: 'primary_release_date.desc' },
-      { name: 'Popularity', value: 'popularity.desc' }
+      { name: 'Popularity', value: 'popularity.desc' },
+      { name: 'Top Rated', value: SCORE_SORT }
     ],
     shows: [
       { name: 'Most Recent', value: 'first_air_date.desc' },
-      { name: 'Popularity', value: 'popularity.desc' }
+      { name: 'Popularity', value: 'popularity.desc' },
+      { name: 'Top Rated', value: SCORE_SORT }
     ]
   }
   region = 'US'
@@ -202,6 +208,35 @@ class TmdbService {
     }
   }
 
+  /** The per-media-type constants, for a caller building the same shapes this service builds. */
+  catalogue(mediaType) {
+    return CATALOGUE[mediaType]
+  }
+
+  /**
+   * The panel's options and the query echoed back — everything a list page renders that is not the
+   * titles themselves. Shared, so the ranked path cannot drift from the discover path.
+   */
+  listShape(mediaType, query) {
+    const media = CATALOGUE[mediaType]
+    const sorts = this.sortingOptions[media.segment]
+    const shape = {
+      allGenres: this.genres[media.genreKey],
+      withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
+      allSorting: sorts,
+      sortBy: query?.sort || sorts[0].value,
+      streamingNow: query?.streaming
+    }
+
+    // TMDB offers no TV equivalent, which `filterRules` already reflects
+    if (media.certifications) {
+      shape.allRatings = this.ratings
+      shape.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
+    }
+
+    return shape
+  }
+
   async getMovies(query) {
     return this.#getList('movie', query)
   }
@@ -272,18 +307,7 @@ class TmdbService {
       }))
     }
 
-    data.allGenres = genres
-    data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-
-    // TMDB offers no TV equivalent, which `filterRules` already reflects
-    if (media.certifications) {
-      data.allRatings = this.ratings
-      data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
-    }
-
-    data.allSorting = sorts
-    data.sortBy = params.sort_by
-    data.streamingNow = query?.streaming
+    Object.assign(data, this.listShape(mediaType, query))
     // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
     // caches as null, and the job would multiply that to a zero expectation and accept page one.
     data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
