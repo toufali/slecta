@@ -1,3 +1,5 @@
+import { resetPageNav } from '../utils/pageNav.js'
+
 const list = document.querySelector('[data-partial="movieList"] ul')
 const listDescription = document.querySelector('.list-description')
 const filterPanel = document.querySelector('.filter-panel')
@@ -30,6 +32,7 @@ async function handleSubmit(e) {
   renderMovieList(data.movies)
   renderlistDescription(data)
   renderScores()
+  resetPageNav(params, data.totalPages)
   updateUrl(params)
 }
 
