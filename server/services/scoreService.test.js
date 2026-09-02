@@ -813,6 +813,43 @@ test('a source that answered lets the record follow it down', async () => {
   }
 })
 
+// The dataset is read from Redis like anything else, and a blip there used to read as "IMDb has no
+// rating", which discarded a stored score for the whole TTL
+test('an unreadable IMDb dataset holds the record, a dataset without the title does not', async () => {
+  const { default: imdb } = await import('./imdbService.js')
+  const realGetRating = imdb.getRating
+  const hosts = () => stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+
+  try {
+    hosts()
+    storedScore(RICH)
+    imdb.getRating = async () => undefined
+
+    await scoreService.getScore('test/movie/imdbunread', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(wrote('test/movie/imdbunread'), undefined, 'unreadable, so the stored IMDb score stays')
+
+    hosts()
+    storedScore(RICH)
+    imdb.getRating = async () => null
+
+    await scoreService.getScore('test/movie/imdbabsent', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.ok(wrote('test/movie/imdbabsent'), 'the dataset answered, so the record follows it')
+  } finally {
+    imdb.getRating = realGetRating
+    redis.getCache = realGetCache
+  }
+})
+
 // The other side: a source that could not be read is a bad night, whatever the record's age
 test('a source that could not be read holds the record', async () => {
   stubHosts({
@@ -877,8 +914,7 @@ test('a run resolving fewer outlets leaves the record untouched and still return
   }
 })
 
-// RT's two keys come from one page. Counted apart, this stored record would read as 3 outlets
-// against tonight's 2 and be refused.
+// Nothing was lost, so the guard has nothing to hold and the record is simply refreshed
 test('a run that loses nothing writes, refreshing the record', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),

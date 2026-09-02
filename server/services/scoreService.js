@@ -129,10 +129,10 @@ class ScoreService {
         rtAudience: resolved.rt?.page?.audienceCount
       })
 
-      // IMDb is a local dataset: nothing to reach, and a title it holds no usable rating for is one
-      // it does not carry
+      // The dataset is IMDb's page: unreadable is a failure to ask, a dataset without the title is
+      // an answer. Same rule as the fetched sources, so a blip cannot discard a stored score.
       const outcomes = {
-        imdb: imdbRating ? SCORED : ABSENT,
+        imdb: sourceOutcome({ answered: imdbRating !== undefined, page: imdbRating ?? null }, scores.imdb),
         metacritic: sourceOutcome(resolved.mc, scores.metacritic),
         rtCritic: sourceOutcome(resolved.rt, scores.rtCritic),
         rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
@@ -192,7 +192,9 @@ class ScoreService {
   // nightly refresh can fix it — which alerts on its own
   async #readIMDB(imdbId) {
     const rating = await imdb.getRating(imdbId)
-    if (!rating) return
+
+    // Passed through, since only the dataset knows which of the two a missing rating was
+    if (!rating) return rating
 
     return { value: Math.round(rating.rating * 10), count: toCount(rating.votes) } // adjusted to 100 scale
   }
