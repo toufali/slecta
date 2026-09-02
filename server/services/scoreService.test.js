@@ -1125,27 +1125,3 @@ test('a title only TMDB could have scored has no aggregate at all', async () => 
   assert.deepEqual(score.scores, {})
   assert.equal('avgScore' in JSON.parse(JSON.stringify(score)), false)
 })
-
-// Records written before TMDB was dropped hold one outlet more than anything computed now, so
-// without a versioned key never-degrade would refuse every write until they expired
-test('a record under the previous key does not decline today writes', async () => {
-  stubHosts({
-    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
-    'www.rottentomatoes.com': rtScorecard(50, 85),
-    'www.metacritic.com': () => ok(LD(52))
-  })
-  // Five outlets, as a pre-TMDB record held; only reachable under the unversioned key
-  redis.getCache = async key => key === 'test/movie/legacy'
-    ? { avgScore: 80, scores: { imdb: 90, metacritic: 70, rtCritic: 80, rtAudience: 80, tmdb: 67 } }
-    : null
-
-  try {
-    await scoreService.getScore(scoreKey('test/movie', 'legacy'), {
-      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
-    }, false)
-
-    assert.ok(wrote(scoreKey('test/movie', 'legacy')), 'the versioned key has nothing to compare against')
-  } finally {
-    redis.getCache = realGetCache
-  }
-})

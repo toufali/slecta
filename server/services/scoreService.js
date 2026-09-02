@@ -35,7 +35,7 @@ const discard = res => res?.body?.cancel().catch(() => {})
 
 const parseJson = value => { try { return JSON.parse(value) } catch { return null } }
 
-// Drop absent keys rather than nulling them: outlet counting reads key count
+// Drop absent keys rather than nulling them: a null source would still read as a source
 const defined = obj => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined))
 
 // Why a source produced no score. Named rather than literal, so a mistyped comparison is a link
