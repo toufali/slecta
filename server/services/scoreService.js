@@ -147,9 +147,14 @@ class ScoreService {
         log.warn('No source resolved a score', { key, title, rt: resolved.rt?.slug, mc: resolved.mc?.slug, imdbId })
       }
 
-      // Expire it soon: a blocked or timed-out source may hold a score we simply could not read
+      // One question over every source, not just the fetched ones. `resolved.answered` covers what
+      // `#resolveSources` reached; an unreadable IMDb dataset is as worth retrying soon as a blocked
+      // host, now that the dataset says which of the two a missing rating was.
+      const answered = resolved.answered && outcomes.imdb !== UNREACHABLE
+
+      // Expire it soon: a source we could not read may hold a score that is simply unread
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
-      if (!resolved.answered) log.warn('Score is missing a source it could not read', { key, title })
+      if (!answered) log.warn('Score is missing a source it could not read', { key, title })
 
       // Read here, not before the fetches above: in that window the record can expire, or a request
       // can store a richer one that an unconditional write would then clobber
@@ -165,7 +170,7 @@ class ScoreService {
       // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
       // that writer to reach a source this run could not, at the same instant; the cost if it
       // happens is one title thinner until it rebuilds.
-      const outcome = await redis.setCache(key, candidate, resolved.answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
+      const outcome = await redis.setCache(key, candidate, answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
       // Re-read what declined this write, since `stored` predates it
       const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
       const result = outcome === WRITTEN ? candidate : score

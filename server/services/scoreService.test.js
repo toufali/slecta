@@ -813,6 +813,38 @@ test('a source that answered lets the record follow it down', async () => {
   }
 })
 
+// The split that made an unreadable dataset retryable also has to reach the TTL, or a record built
+// while the dataset was down keeps its full life and outlives the recovery
+test('a record built while the IMDb dataset was unreadable takes the retry life', async () => {
+  const { default: imdb } = await import('./imdbService.js')
+  const realGetRating = imdb.getRating
+
+  stubHosts({
+    'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(50, 85),
+    'www.metacritic.com': () => ok(LD(52))
+  })
+  imdb.getRating = async () => undefined
+
+  try {
+    await scoreService.getScore('test/movie/imdbttl', {
+      imdbId: 'tt1375666', wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(ttlOf('test/movie/imdbttl'), SCORE_RETRY_TTL)
+
+    imdb.getRating = async () => null
+
+    await scoreService.getScore('test/movie/imdbttlanswered', {
+      imdbId: 'tt1375666', wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(ttlOf('test/movie/imdbttlanswered'), SCORE_TTL, 'the dataset answered, so the record keeps its full life')
+  } finally {
+    imdb.getRating = realGetRating
+  }
+})
+
 // The dataset is read from Redis like anything else, and a blip there used to read as "IMDb has no
 // rating", which discarded a stored score for the whole TTL
 test('an unreadable IMDb dataset holds the record, a dataset without the title does not', async () => {
