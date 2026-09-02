@@ -6,17 +6,24 @@
  *   metadata could not be read
  */
 export function resetPageNav(params, totalPages) {
-  const nav = document.querySelector('footer .pagination')
+  const footer = document.querySelector('footer')
 
-  if (!nav) return
+  if (!footer) return
 
-  // A filtered list can be one page or none, and the nav has to go rather than offer a page that 400s
-  if (!totalPages || totalPages < 2) return nav.replaceChildren()
+  const existing = footer.querySelector('.pagination')
+
+  // A filtered list can be one page, and then the control goes rather than offer a page that 400s
+  if (!totalPages || totalPages < 2) return existing?.remove()
 
   const next = new URLSearchParams(params)
 
   next.set('page', 2)
 
+  // Created when absent, since a list that arrived as one page rendered no nav to update. Filtering
+  // to a wider one would otherwise leave the rest of the results unreachable without a reload.
+  const nav = existing ?? footer.insertBefore(document.createElement('nav'), footer.firstChild)
+
+  nav.className = 'pagination'
   nav.innerHTML = `
     <span></span>
     <span class='page-number'>Page 1</span>

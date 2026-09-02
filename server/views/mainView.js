@@ -1,6 +1,6 @@
 // Above the About link and louder than it: reaching the rest of the window is the more useful
 // thing to do from the bottom of a list. Secondary, so it does not compete with the filter button.
-const pageNav = ({ page, totalPages, prev, next } = {}) => !(totalPages > 1) ? '' : `
+const pageNav = ({ page, prev, next } = {}) => !(prev || next) ? '' : `
     <nav class='pagination'>
       ${prev ? `<a class='button secondary' rel='prev' href='${prev}'>Previous</a>` : '<span></span>'}
       <span class='page-number'>Page ${page}</span>

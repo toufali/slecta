@@ -222,6 +222,13 @@ button.secondary,
   transition: filter .3s;
 }
 
+/* `all: unset` above drops the outline with everything else, so focus has to be put back */
+button:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--blue-90);
+  outline-offset: 2px;
+}
+
 button.primary:enabled:hover,
 button.secondary:enabled:hover,
 .button.primary:enabled:hover,
