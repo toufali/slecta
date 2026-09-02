@@ -3,7 +3,7 @@
 const pageNav = ({ page, totalPages, prev, next } = {}) => !(totalPages > 1) ? '' : `
     <nav class='pagination'>
       ${prev ? `<a class='button secondary' rel='prev' href='${prev}'>Previous</a>` : '<span></span>'}
-      <span class='page-of'>Page ${page} of ${totalPages}</span>
+      <span class='page-number'>Page ${page}</span>
       ${next ? `<a class='button secondary' rel='next' href='${next}'>Next</a>` : '<span></span>'}
     </nav>`
 

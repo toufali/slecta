@@ -154,7 +154,7 @@ footer .pagination > * {
   max-width: 12rem;
 }
 
-footer .pagination .page-of {
+footer .pagination .page-number {
   color: var(--gray-70);
   font: var(--h4-font);
 }

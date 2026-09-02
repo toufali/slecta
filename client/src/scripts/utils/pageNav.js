@@ -2,7 +2,8 @@
  * Rebuild the footer's page nav after a filter change. That always lands on the first page, so the
  * only state it can be in is: no previous, and a next carrying the filters just applied.
  * @param {URLSearchParams} params
- * @param {number} [totalPages] undefined when the list metadata could not be read
+ * @param {number} [totalPages] decides whether there is a next page; undefined when the list
+ *   metadata could not be read
  */
 export function resetPageNav(params, totalPages) {
   const nav = document.querySelector('footer .pagination')
@@ -18,6 +19,6 @@ export function resetPageNav(params, totalPages) {
 
   nav.innerHTML = `
     <span></span>
-    <span class='page-of'>Page 1 of ${totalPages}</span>
+    <span class='page-number'>Page 1</span>
     <a class='button secondary' rel='next' href='${location.pathname}?${next}'>Next</a>`
 }
