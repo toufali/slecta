@@ -119,14 +119,17 @@ test('include_video and certification_country are movie-only', async () => {
   assert.doesNotMatch(seen[1], /certification(_country)?=/)
 })
 
-test('TV alone counts ad-supported as streaming', async () => {
+// Ad-supported is watchable now, which is what the filter asks, so both catalogues count it. Movies
+// excluding it also put the ranked path five titles ahead of discover, which had no way to exclude it.
+test('both catalogues count ad-supported as streaming', async () => {
   const seen = captureUrl()
 
   await tmdb.getMovies({ streaming: 'true' })
   await tmdb.getTvShows({ streaming: 'true' })
 
-  assert.match(decodeURIComponent(seen[0]), /with_watch_monetization_types=buy\|free\|flatrate\|rent$/)
-  assert.match(decodeURIComponent(seen[1]), /with_watch_monetization_types=buy\|free\|flatrate\|rent\|ads$/)
+  for (const url of seen) {
+    assert.match(decodeURIComponent(url), /with_watch_monetization_types=buy\|free\|flatrate\|rent\|ads$/)
+  }
 })
 
 test('a row takes its title, date and genre names from its own catalogue', async () => {

@@ -21,6 +21,7 @@ const LIST_CACHE_VERSION = 3
 // which is why the controller has to branch on it rather than pass it through.
 export const SCORE_SORT = 'score'
 
+// Ad-supported counts as available in both: it is watchable now, which is what the filter asks.
 // Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
 // list, since both are built at init. `segment` covers the cache-key prefix, the list property and
 // the detail path — they are already the same word.
@@ -34,7 +35,7 @@ const CATALOGUE = {
     genreKey: 'movie',
     certifications: true,
     video: true,
-    monetization: 'buy|free|flatrate|rent',
+    monetization: 'buy|free|flatrate|rent|ads',
     append: 'videos,release_dates,watch/providers,external_ids,credits',
     detail: (json, region) => ({
       rating: json.release_dates.results.find(item => item.iso_3166_1 === region)?.release_dates.find(release => release.certification !== '')?.certification ?? '',
@@ -52,7 +53,6 @@ const CATALOGUE = {
     genreKey: 'show',
     certifications: false,
     video: false,
-    // TV alone counts ad-supported as available
     monetization: 'buy|free|flatrate|rent|ads',
     append: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings',
     detail: (json, region) => ({
