@@ -3,6 +3,8 @@ import redis from "./redisService.js"
 
 const { GCP_API_URL, GCP_API_KEY, GCP_SEARCH_ENGINE, PPLX_TOKEN, PPLX_API_URL, PPLX_MODEL, PPLX_SOURCES } = env
 
+const day = date => date.toISOString().substring(0, 10)
+
 class ReviewService {
   async getReviewFromCache(id) {
     return await redis.getCache(`movies/${id}/review`)
@@ -76,15 +78,20 @@ class ReviewService {
 
     if (isNaN(released)) return []
 
-    let dateMinusOneWeek = new Date(released)
-    dateMinusOneWeek.setDate(dateMinusOneWeek.getDate() - 7)
-    dateMinusOneWeek = dateMinusOneWeek.toISOString().substring(0, 10) // yyyy-mm-dd
+    // UTC accessors to match the UTC formatting: read through the local calendar, a span crossing a
+    // DST transition lands a day out
+    const from = new Date(released)
+    const to = new Date(released)
 
-    if (new Date() < dateMinusOneWeek) return [] // current date is at least a week before release date
+    from.setUTCDate(from.getUTCDate() - 7)
+    to.setUTCMonth(to.getUTCMonth() + 1)
 
-    let datePlusOneMonth = new Date(released)
-    datePlusOneMonth.setMonth(datePlusOneMonth.getMonth() + 1)
-    datePlusOneMonth = datePlusOneMonth.toISOString().substring(0, 10) // yyyy-mm-dd
+    // Nothing reviews a title a week before it is out, so there is nothing to search for. Compared
+    // as dates: against the formatted string the comparison was NaN, so this never returned.
+    if (new Date() < from) return []
+
+    const dateMinusOneWeek = day(from)
+    const datePlusOneMonth = day(to)
 
     const params = {
       q: `intitle:"${name}" intitle:review`,
