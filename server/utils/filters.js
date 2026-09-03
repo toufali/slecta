@@ -13,7 +13,9 @@ const isGenre = (value, { genres }) => isDigits(value) && genres.has(+value)
 
 const CHECKS = {
   page: (value, { pageMax }) => isDigits(value) && +value >= 1 && +value <= pageMax,
-  minVotes: value => isDigits(value),
+  // The catalogue is defined by this floor, so asking below it asks for titles outside it — and the
+  // ranked path could not serve them anyway, since the index is built at the floor
+  minVotes: (value, { minVotes }) => isDigits(value) && +value >= minVotes,
   sort: (value, { sorts }) => sorts.some(option => option.value === value),
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',

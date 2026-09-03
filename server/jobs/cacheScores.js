@@ -4,6 +4,7 @@ import tmdb from '../services/tmdbService.js'
 import scoreService, { aggregate, scoreKey, SCORE_TTL } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
+import { indexKey } from '../services/indexService.js'
 import log from '../utils/logger.js'
 import { checkReferenceTitles, checkRunCoverage } from './checks.js'
 
@@ -22,10 +23,6 @@ const MAX_MISSING_TITLES = 5
 // No longer than the records it projects
 const INDEX_TTL = SCORE_TTL
 
-// The deploy runs the checks only, so a row-shape change is not rewritten until the nightly run.
-// Without this, the first serving deploy after one reads the previous generation for a day.
-const INDEX_VERSION = 1
-
 export async function cacheScores() {
   log.info('cacheScores job started')
 
@@ -39,10 +36,14 @@ export async function cacheScores() {
     log.error('IMDb ratings refresh failed, continuing with the previous dataset', { error: e })
   }
 
+  // One window for the whole walk: a page fetched either side of midnight would be bounded by a
+  // different day, shifting titles across page boundaries
+  const window = tmdb.dateWindow()
+
   // An empty batch reports as "nothing processed", which the coverage check already fails
   const [movieList, showList] = await Promise.allSettled([
-    listAll(page => tmdb.getMovies({ page }), SEGMENT.movie),
-    listAll(page => tmdb.getTvShows({ page }), SEGMENT.tv)
+    listAll(page => tmdb.getMovies({ page }, window), SEGMENT.movie),
+    listAll(page => tmdb.getTvShows({ page }, window), SEGMENT.tv)
   ])
   const noTitles = { titles: [], complete: false }
 
@@ -102,7 +103,7 @@ async function listAll(fetchPage, resultsKey) {
 }
 
 async function publishIndex(mediaType, rows, titles, complete, confirmed) {
-  const key = `index/${SEGMENT[mediaType]}/v${INDEX_VERSION}`
+  const key = indexKey(SEGMENT[mediaType])
   const walked = new Set(titles.map(title => title.id))
 
   // Keep a previous row for a title this run could not confirm, whether the walk missed it or its

@@ -17,12 +17,14 @@ const { scoreKey, SCORE_TTL } = await import('../services/scoreService.js')
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   const scored = []
+  const windows = []
   const originals = [[imdb, 'refresh'], [tmdb, 'getMovies'], [tmdb, 'getTvShows'], [tmdb, 'getMovieDetail'],
     [tmdb, 'getTvShowDetail'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
     .map(([target, name]) => [target, name, target[name]])
 
   imdb.refresh = async () => {}
-  tmdb.getMovies = async ({ page }) => ({ movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length })
+  // The window is recorded, since every page of one walk has to be bounded by the same day
+  tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
   tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }] })
   tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', providers: [{ provider_id: 8 }] })
@@ -34,7 +36,7 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
   scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, rtCritic: 70 } })
 
-  return { scored, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
+  return { scored, windows, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
 
 const movieKeys = scored => scored.filter(key => key.startsWith('movies/')).sort()
@@ -676,6 +678,23 @@ test('a title no source could score is counted, not treated as a failure', async
     assert.equal(stats.unscored, 1)
     assert.equal(stats.failed, 0)
     assert.equal(stats.processed, 1)
+  } finally {
+    restore()
+  }
+})
+
+// Pages fetched either side of midnight would be bounded by different days, shifting titles across
+// page boundaries — so the walk derives its window once and every page carries it
+test('every page of a walk is bounded by the same window', async () => {
+  const movies = [1, 2, 3].flatMap(page => [{ page, id: page * 10, releaseDate: '2026-01-01' }])
+  const { windows, restore } = stub({ movies, totalPages: 3 })
+
+  try {
+    await cacheScores()
+
+    assert.equal(windows.length, 3, 'one call per page')
+    assert.ok(windows[0], 'a window was supplied rather than left to the clock')
+    assert.equal(new Set(windows.map(w => JSON.stringify(w))).size, 1)
   } finally {
     restore()
   }

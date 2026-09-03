@@ -11,6 +11,7 @@ const { scoreKey } = await import('../services/scoreService.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
 const { default: reviewService } = await import('../services/reviewService.js')
+const { default: index } = await import('../services/indexService.js')
 
 // Serving one catalogue from the other is the one way this could fail without changing a response
 // shape, so every wire out of the controller is recorded and named.
@@ -18,6 +19,7 @@ function recordCalls() {
   const calls = []
   const rows = segment => ({ [segment]: [{ id: 1 }], allGenres: new Map([[28, 'Action']]) })
 
+  index.getList = async mediaType => { calls.push([`index:${mediaType}`]); return rows(mediaType === 'movie' ? 'movies' : 'shows') }
   tmdb.getMovies = async () => { calls.push(['list:movie']); return rows('movies') }
   tmdb.getTvShows = async () => { calls.push(['list:tv']); return rows('shows') }
   tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7 } }
@@ -101,4 +103,47 @@ test('a cached score is served without touching TMDB', async () => {
   assert.deepEqual(calls, [])
   assert.deepEqual(ctx.body, { scores: { imdb: 81 }, avgScore: 81 }, 'the aggregate is derived into the response the browser reads')
   assert.equal(ctx.headers['x-server-cache-hit'], 'true')
+})
+
+// Top Rated is the one sort discover cannot serve, and serving the wrong catalogue from the index
+// would not change any response shape — so the wire is named, per media type
+for (const { mediaType, segment } of MEDIA) {
+  test(`sorting by score serves ${segment} from the index, not from discover`, async () => {
+    const calls = recordCalls()
+    const ctx = context()
+
+    ctx.query = { sort: 'score' }
+    await getList(mediaType)(ctx)
+
+    assert.ok(calls.some(call => call[0] === `index:${mediaType}`), `expected the index, got ${JSON.stringify(calls)}`)
+    assert.equal(calls.some(call => call[0].startsWith('list:')), false, 'discover must not be asked')
+    assert.ok(ctx.body[segment], 'the page carries its own segment')
+    // The badge comes from the score record even here, so the rows still go through the score cache
+    assert.ok(calls.some(call => call[0] === 'scoreCache' && call[1] === scoreKey(segment, 1)))
+  })
+}
+
+// An empty page would read as "the filter found nothing" when in fact we failed to ask
+test('an unreadable index fails the request rather than serving an empty page', async () => {
+  recordCalls()
+  index.getList = async () => undefined
+
+  const ctx = context()
+  let thrown
+
+  ctx.query = { sort: 'score' }
+  ctx.throw = status => { thrown = status; throw new Error(String(status)) }
+
+  await assert.rejects(() => getList('movie')(ctx))
+  assert.equal(thrown, 503)
+})
+
+test('any other sort still goes to discover', async () => {
+  const calls = recordCalls()
+  const ctx = context()
+
+  ctx.query = { sort: 'popularity.desc' }
+  await getList('movie')(ctx)
+
+  assert.deepEqual(calls.filter(call => call[0].startsWith('index:') || call[0].startsWith('list:')), [['list:movie']])
 })

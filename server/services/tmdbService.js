@@ -13,12 +13,20 @@ const headers = {
 const DETAIL_CACHE_VERSION = 3
 
 // Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
-// silently limit the nightly run to page one.
+// silently limit the nightly run to page one. Only the rows and those counts are cached — the
+// panel's own options are shaped after the read, so adding a sort option needs no bump.
 const LIST_CACHE_VERSION = 3
 
+// Every other sort value is a discover parameter. This one is not: it names the local ranked index,
+// which is why the controller has to branch on it rather than pass it through.
+export const SCORE_SORT = 'score'
+
+// Ad-supported counts as available in both: it is watchable now, which is what the filter asks.
 // Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
 // list, since both are built at init. `segment` covers the cache-key prefix, the list property and
 // the detail path — they are already the same word.
+const day = date => date.toISOString().substring(0, 10)
+
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -29,7 +37,7 @@ const CATALOGUE = {
     genreKey: 'movie',
     certifications: true,
     video: true,
-    monetization: 'buy|free|flatrate|rent',
+    monetization: 'buy|free|flatrate|rent|ads',
     append: 'videos,release_dates,watch/providers,external_ids,credits',
     detail: (json, region) => ({
       rating: json.release_dates.results.find(item => item.iso_3166_1 === region)?.release_dates.find(release => release.certification !== '')?.certification ?? '',
@@ -47,7 +55,6 @@ const CATALOGUE = {
     genreKey: 'show',
     certifications: false,
     video: false,
-    // TV alone counts ad-supported as available
     monetization: 'buy|free|flatrate|rent|ads',
     append: 'videos,watch/providers,external_ids,aggregate_credits,content_ratings',
     detail: (json, region) => ({
@@ -69,11 +76,13 @@ class TmdbService {
   sortingOptions = {
     movies: [
       { name: 'Most Recent', value: 'primary_release_date.desc' },
-      { name: 'Popularity', value: 'popularity.desc' }
+      { name: 'Popularity', value: 'popularity.desc' },
+      { name: 'Top Rated', value: SCORE_SORT }
     ],
     shows: [
       { name: 'Most Recent', value: 'first_air_date.desc' },
-      { name: 'Popularity', value: 'popularity.desc' }
+      { name: 'Popularity', value: 'popularity.desc' },
+      { name: 'Top Rated', value: SCORE_SORT }
     ]
   }
   region = 'US'
@@ -196,24 +205,72 @@ class TmdbService {
 
     return {
       pageMax: this.pageMax,
+      minVotes: this.minVotes,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
       ratings: media.certifications ? this.ratings : undefined
     }
   }
 
-  async getMovies(query) {
-    return this.#getList('movie', query)
+  /**
+   * The catalogue's release-date bound, as discover is sent it. Not overridable by query.
+   * One clock read, passed in: two reads either side of midnight gave a window a day narrow.
+   */
+  dateWindow(now = new Date()) {
+    const from = new Date(now)
+
+    // UTC accessors, since the window is formatted as UTC: the local calendar would make the bound
+    // depend on the host's offset, and a leap day would land a day earlier east of the line
+    from.setUTCFullYear(now.getUTCFullYear() - 1)
+
+    return { from: day(from), to: day(now) }
   }
 
-  async getTvShows(query) {
-    return this.#getList('tv', query)
+  /** The per-media-type constants, for a caller building the same shapes this service builds. */
+  catalogue(mediaType) {
+    return CATALOGUE[mediaType]
+  }
+
+  /**
+   * The panel's options and the query echoed back — everything a list page renders that is not the
+   * titles themselves. Shared, so the ranked path cannot drift from the discover path.
+   */
+  listShape(mediaType, query) {
+    const media = CATALOGUE[mediaType]
+    const sorts = this.sortingOptions[media.segment]
+    const shape = {
+      allGenres: this.genres[media.genreKey],
+      withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
+      allSorting: sorts,
+      sortBy: query?.sort || sorts[0].value,
+      streamingNow: query?.streaming
+    }
+
+    // TMDB offers no TV equivalent, which `filterRules` already reflects
+    if (media.certifications) {
+      shape.allRatings = this.ratings
+      shape.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
+    }
+
+    return shape
+  }
+
+  async getMovies(query, window) {
+    return this.#getList('movie', query, window)
+  }
+
+  async getTvShows(query, window) {
+    return this.#getList('tv', query, window)
   }
 
   // One skeleton for both catalogues: build params, prune, read cache, fetch, map, decorate. The
   // pairs this replaces had already drifted once — TV read `release_date` where TMDB sends
   // `first_air_date` — and the drift was in the mapping, not in anything the two genuinely differ on.
-  async #getList(mediaType, query) {
+  /**
+   * @param {object} [window] one window for a multi-page walk. Its own argument rather than a query
+   *   field, so nothing a request sends can widen the catalogue.
+   */
+  async #getList(mediaType, query, window = this.dateWindow()) {
     const media = CATALOGUE[mediaType]
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]
@@ -227,8 +284,8 @@ class TmdbService {
       include_adult: this.includeAdult,
       include_video: media.video ? this.includeVideo : undefined,
       sort_by: query?.sort || sorts[0].value,
-      [`${media.dateParam}.lte`]: new Date().toISOString().substring(0, 10),
-      [`${media.dateParam}.gte`]: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().substring(0, 10),
+      [`${media.dateParam}.lte`]: window.to,
+      [`${media.dateParam}.gte`]: window.from,
       'vote_count.gte': query?.minVotes || this.minVotes,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
@@ -248,8 +305,11 @@ class TmdbService {
     const url = `${TMDB_API_URL}/discover/${media.path}?${urlParams}`
     const cacheKey = `${media.segment}/v${LIST_CACHE_VERSION}?${urlParams}`
 
-    let data = await redis.getCache(cacheKey)
-    if (data) return data
+    const cached = await redis.getCache(cacheKey)
+
+    // Shaped after the read, never cached with the rows: `allSorting` and the rest are this service's
+    // own config, and caching them left a new sort option invisible until every entry expired
+    if (cached) return Object.assign(cached, this.listShape(mediaType, query))
 
     const res = await fetch(url, { headers })
 
@@ -257,7 +317,7 @@ class TmdbService {
 
     const json = await res.json()
 
-    data = {
+    const data = {
       [media.segment]: json.results.map(item => new Object({
         id: item.id,
         title: item[media.titleField],
@@ -272,25 +332,14 @@ class TmdbService {
       }))
     }
 
-    data.allGenres = genres
-    data.withGenres = Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null // TODO: this should be nicer
-
-    // TMDB offers no TV equivalent, which `filterRules` already reflects
-    if (media.certifications) {
-      data.allRatings = this.ratings
-      data.withRatings = Array.isArray(query?.wr) ? query.wr : query?.wr ? [query.wr] : null // TODO: this should be nicer
-    }
-
-    data.allSorting = sorts
-    data.sortBy = params.sort_by
-    data.streamingNow = query?.streaming
     // Clamped because TMDB rejects a page past this. Undefined rather than NaN when absent: NaN
     // caches as null, and the job would multiply that to a zero expectation and accept page one.
     data.totalPages = Number.isFinite(json.total_pages) ? Math.min(json.total_pages, this.pageMax) : undefined
     data.totalResults = json.total_results
 
     redis.setCache(cacheKey, data)
-    return data
+
+    return Object.assign(data, this.listShape(mediaType, query))
   }
 
   async getMovieDetail(id) {

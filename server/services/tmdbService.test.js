@@ -7,6 +7,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: tmdb } = await import('./tmdbService.js')
+const { default: redis } = await import('./redisService.js')
 
 const respond = (status, body = '') => { globalThis.fetch = async () => new Response(body, { status }) }
 
@@ -118,14 +119,17 @@ test('include_video and certification_country are movie-only', async () => {
   assert.doesNotMatch(seen[1], /certification(_country)?=/)
 })
 
-test('TV alone counts ad-supported as streaming', async () => {
+// Ad-supported is watchable now, which is what the filter asks, so both catalogues count it. Movies
+// excluding it also put the ranked path five titles ahead of discover, which had no way to exclude it.
+test('both catalogues count ad-supported as streaming', async () => {
   const seen = captureUrl()
 
   await tmdb.getMovies({ streaming: 'true' })
   await tmdb.getTvShows({ streaming: 'true' })
 
-  assert.match(decodeURIComponent(seen[0]), /with_watch_monetization_types=buy\|free\|flatrate\|rent$/)
-  assert.match(decodeURIComponent(seen[1]), /with_watch_monetization_types=buy\|free\|flatrate\|rent\|ads$/)
+  for (const url of seen) {
+    assert.match(decodeURIComponent(url), /with_watch_monetization_types=buy\|free\|flatrate\|rent\|ads$/)
+  }
 })
 
 test('a row takes its title, date and genre names from its own catalogue', async () => {
@@ -142,6 +146,63 @@ test('a row takes its title, date and genre names from its own catalogue', async
     [show.title, show.releaseDate, show.genres, show.detailPath],
     ['A Show', '2026-03-04', ['Action & Adventure'], '/shows/7']
   )
+})
+
+// A walk is many requests, so the window has to be the walk's rather than each page's — pages either
+// side of midnight would be bounded by different days and shift titles across page boundaries
+test('a supplied window is used instead of the clock', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies({ page: 2 }, { from: '2001-01-01', to: '2001-12-31' })
+
+  assert.match(decodeURIComponent(seen[0]), /primary_release_date\.gte=2001-01-01/)
+  assert.match(decodeURIComponent(seen[0]), /primary_release_date\.lte=2001-12-31/)
+})
+
+// Two clock reads either side of midnight gave a window a day narrow, so the instant is passed in
+// and used twice rather than read twice
+test('the window is a year back from one instant', () => {
+  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-02T23:59:59.999Z')), { from: '2025-09-02', to: '2026-09-02' })
+  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
+})
+
+// The window is formatted as UTC, so the arithmetic has to be UTC too: read through the local
+// calendar it shifted a day east of the line, which is the bug class the slug year check already hit
+test('the window does not depend on the host timezone', () => {
+  const real = process.env.TZ
+  const instants = ['2028-02-29T12:00:00Z', '2026-09-02T23:59:59.999Z', '2026-01-01T00:30:00Z']
+
+  try {
+    const windows = instants.map(at => {
+      return ['UTC', 'Pacific/Kiritimati', 'Pacific/Midway'].map(tz => {
+        process.env.TZ = tz
+        return JSON.stringify(tmdb.dateWindow(new Date(at)))
+      })
+    })
+
+    for (const [i, perZone] of windows.entries()) {
+      assert.equal(new Set(perZone).size, 1, `${instants[i]} gave ${perZone.join(' vs ')}`)
+    }
+  } finally {
+    // Deleted rather than reassigned when it was unset: assigning undefined stores the string
+    // "undefined", which is not a zone and would leave every later test running somewhere else
+    if (real === undefined) delete process.env.TZ
+    else process.env.TZ = real
+  }
+})
+
+// A leap day has no counterpart a year back, so the window starts the day after. One day, once in four
+// years, and pinned so the behaviour is known rather than discovered.
+test('a leap day falls forward to the first of March', () => {
+  assert.deepEqual(tmdb.dateWindow(new Date('2028-02-29T12:00:00.000Z')), { from: '2027-03-01', to: '2028-02-29' })
+})
+
+// The validator bounds a vote override by this, so losing the wiring rejects every override rather
+// than only the ones below the floor
+test('the filter rules carry the catalogue vote floor', () => {
+  for (const mediaType of ['movie', 'tv']) {
+    assert.equal(tmdb.filterRules(mediaType).minVotes, tmdb.minVotes, mediaType)
+  }
 })
 
 // `filterRules` reports no TV ratings, so the panel must not be offered them either
@@ -250,4 +311,25 @@ test('the vote floor reaches the query for both catalogues, and a caller can ove
   assert.match(seen[0], /vote_count\.gte=25(&|$)/)
   assert.match(seen[1], /vote_count\.gte=25(&|$)/)
   assert.match(seen[2], /vote_count\.gte=200(&|$)/)
+})
+
+// A list response used to be cached whole, including this service's own config, so adding a sort
+// option left it missing from every cached browse page until the entries expired a day later
+test('a cached list is reshaped on the way out, not served as it was stored', async () => {
+  const realGetCache = redis.getCache
+
+  tmdb.genres.movie = new Map([[28, 'Action']])
+  tmdb.ratings = ['R']
+  // Stored before Top Rated existed, and with the wrong query echoed back
+  redis.getCache = async () => ({ movies: [], allSorting: [{ name: 'Most Recent', value: 'stale' }], sortBy: 'stale' })
+
+  try {
+    const data = await tmdb.getMovies({ sort: 'score' })
+
+    assert.deepEqual(data.allSorting.map(option => option.value),
+      ['primary_release_date.desc', 'popularity.desc', 'score'])
+    assert.equal(data.sortBy, 'score')
+  } finally {
+    redis.getCache = realGetCache
+  }
 })
