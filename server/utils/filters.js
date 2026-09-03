@@ -16,6 +16,8 @@ const CHECKS = {
   // The catalogue is defined by this floor, so asking below it asks for titles outside it — and the
   // ranked path could not serve them anyway, since the index is built at the floor
   minVotes: (value, { minVotes }) => isDigits(value) && +value >= minVotes,
+  // A lookback outside the catalogue's own window is a mistake, not a request for a wider one
+  months: (value, { lookbackMax }) => isDigits(value) && +value >= 1 && +value <= lookbackMax,
   sort: (value, { sorts }) => sorts.some(option => option.value === value),
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',

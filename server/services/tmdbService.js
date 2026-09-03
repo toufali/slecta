@@ -69,6 +69,8 @@ const CATALOGUE = {
 class TmdbService {
   // TMDB votes a title needs to enter the catalogue, on the job and the list path alike
   minVotes = 25
+  // Widest lookback in months, and the catalogue's own window: unbounded would page the whole of TMDB
+  lookbackMax = 12
   pageMax = 500 // TMDB 400s on a higher page
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
@@ -206,6 +208,7 @@ class TmdbService {
     return {
       pageMax: this.pageMax,
       minVotes: this.minVotes,
+      lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
       ratings: media.certifications ? this.ratings : undefined
@@ -213,17 +216,31 @@ class TmdbService {
   }
 
   /**
-   * The catalogue's release-date bound, as discover is sent it. Not overridable by query.
+   * The release-date bound both list paths honour, narrowed to the lookback asked for.
    * One clock read, passed in: two reads either side of midnight gave a window a day narrow.
    */
-  dateWindow(now = new Date()) {
+  dateWindow(months, now = new Date()) {
     const from = new Date(now)
 
     // UTC accessors, since the window is formatted as UTC: the local calendar would make the bound
-    // depend on the host's offset, and a leap day would land a day earlier east of the line
-    from.setUTCFullYear(now.getUTCFullYear() - 1)
+    // depend on the host's offset, and a month end would land a day earlier east of the line
+    from.setUTCMonth(now.getUTCMonth() - this.lookback(months))
+
+    // Rolled back when the target month is too short to hold the day: month arithmetic overflows
+    // into the month after, which drops the oldest days of the window asked for
+    if (from.getUTCDate() !== now.getUTCDate()) from.setUTCDate(0)
 
     return { from: day(from), to: day(now) }
+  }
+
+  /**
+   * A lookback in whole months, absent or unusable meaning the widest. Clamped rather than trusted:
+   * a request may narrow the window, never widen it past the catalogue the nightly run scores.
+   */
+  lookback(months) {
+    const asked = Math.trunc(Number(months))
+
+    return asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
   }
 
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
@@ -243,7 +260,9 @@ class TmdbService {
       withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
-      streamingNow: query?.streaming
+      streamingNow: query?.streaming,
+      lookback: this.lookback(query?.months),
+      lookbackMax: this.lookbackMax
     }
 
     // TMDB offers no TV equivalent, which `filterRules` already reflects
@@ -267,10 +286,10 @@ class TmdbService {
   // pairs this replaces had already drifted once — TV read `release_date` where TMDB sends
   // `first_air_date` — and the drift was in the mapping, not in anything the two genuinely differ on.
   /**
-   * @param {object} [window] one window for a multi-page walk. Its own argument rather than a query
-   *   field, so nothing a request sends can widen the catalogue.
+   * @param {object} [window] one window for a whole walk, for a caller with many pages to bound
+   *   identically. Otherwise the request's own lookback, clamped so it can only narrow.
    */
-  async #getList(mediaType, query, window = this.dateWindow()) {
+  async #getList(mediaType, query, window = this.dateWindow(query?.months)) {
     const media = CATALOGUE[mediaType]
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]

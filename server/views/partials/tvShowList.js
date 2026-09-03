@@ -1,4 +1,5 @@
 import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
+import { monthsText } from '../../../client/src/scripts/utils/months.js'
 
 const sortingFields = data => data.allSorting.reduce((acc, cur) => {
   acc += `
@@ -34,7 +35,9 @@ function listDescription(data) {
   if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
 
-  return conjunctionFmt.format([streaming, sort, genres].filter(item => item))
+  const lookback = `<label>first aired in the last <output>${monthsText(data.lookback)}</output></label>`
+
+  return conjunctionFmt.format([streaming, sort, genres, lookback].filter(item => item))
 }
 
 export const tvShowList = data => `
@@ -57,6 +60,13 @@ export const tvShowList = data => `
     <fieldset>
       <h3>Include genres:</h3>
       ${genreFields(data)}
+    </fieldset>
+    <fieldset>
+      <h3 id='lookback-label'>First aired in the last:</h3>
+      <div class='lookback'>
+        <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label'>
+        <output>${monthsText(data.lookback)}</output>
+      </div>
     </fieldset>
     <fieldset>
       <h3>Availability:</h3>

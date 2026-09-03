@@ -79,3 +79,21 @@ fieldset:last-of-type > button{
   margin: var(--padding-lg) auto 0;
   display: block;
 }
+
+.lookback {
+  display: flex;
+  align-items: center;
+  gap: var(--padding-md);
+  accent-color: var(--blue-90);
+}
+
+.lookback input {
+  flex: 1;
+}
+
+.lookback output {
+  /* Wide enough for the longest reading, or the track resizes as the handle moves */
+  min-width: 9ch;
+  font-weight: bold;
+  color: var(--blue-90);
+}
