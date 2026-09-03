@@ -14,15 +14,6 @@ export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 // Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
 
-/**
- * A ranking needs a critic opinion in it, and that is the whole rule. An outlet count on top of it
- * only ever bit at three, which meant demanding Metacritic — our thinnest source — and rejecting
- * well-evidenced titles for its coverage rather than for their own. Numbers in `decisions.md`.
- */
-function rankable({ sources = [] }) {
-  return sources.includes('metacritic') || sources.includes('rtCritic')
-}
-
 // The panel sends one value or several, and a genre matches if any of them does
 const asList = value => value === undefined ? undefined : [].concat(value)
 
@@ -64,7 +55,9 @@ class IndexService {
       return
     }
 
-    const found = rows.filter(row => rankable(row) && matches(row, query, tmdb.dateWindow()))
+    // No rankability floor: a title disappearing when the sort changes reads as broken, and thin
+    // scores sink on their own — an IMDb-only row tops out well below the head of the list.
+    const found = rows.filter(row => matches(row, query, tmdb.dateWindow()))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE
 

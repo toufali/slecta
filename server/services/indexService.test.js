@@ -34,8 +34,9 @@ async function listing(rows, query = {}) {
   }
 }
 
-// Ungated, the head of the list is single-source audience scores — what the rule is for
-test('a title with no critic score is not rankable', async () => {
+// A title vanishing when the sort changes reads as broken, so nothing is withheld on how thin its
+// evidence is. Thin scores sink unaided: an IMDb-only row tops out well below the head of the list.
+test('every scored title ranks, however thin its evidence', async () => {
   const data = await listing([
     row({ id: 1, title: 'metacritic', sources: ['imdb', 'metacritic'] }),
     row({ id: 2, title: 'rt critic', sources: ['imdb', 'rtCritic'] }),
@@ -43,21 +44,19 @@ test('a title with no critic score is not rankable', async () => {
     row({ id: 4, title: 'imdb alone', sources: ['imdb'] })
   ])
 
-  assert.deepEqual(titles(data), ['metacritic', 'rt critic'])
+  assert.deepEqual(titles(data), ['metacritic', 'rt critic', 'audience only', 'imdb alone'])
 })
 
-// A source count would admit this: three of them, none a critic. Letterboxd lands here next.
-test('any number of audience scores is still not a critic score', async () => {
-  const data = await listing([row({ title: 'audiences only', sources: ['imdb', 'rtAudience', 'letterboxd'] })])
+// Each gate tried here rejected titles for a source's coverage rather than for their own: the
+// outlet count demanded Metacritic, and the critic clause hid 305 rows a reader expects to see.
+test('the order is the stored ranking, with nothing withheld from it', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'thin', sources: ['imdb'] }),
+    row({ id: 2, title: 'audiences', sources: ['imdb', 'rtAudience', 'letterboxd'] }),
+    row({ id: 3, title: 'full', sources: ALL })
+  ])
 
-  assert.deepEqual(titles(data), [])
-})
-
-// Metacritic is the thinnest source, so requiring it rejected titles for its coverage, not theirs
-test('a title RT reviewed but Metacritic did not is rankable', async () => {
-  const data = await listing([row({ title: 'rt only', sources: ['imdb', 'rtCritic', 'rtAudience'] })])
-
-  assert.deepEqual(titles(data), ['rt only'])
+  assert.deepEqual(titles(data), ['thin', 'audiences', 'full'], 'the job ranked them; this only slices')
 })
 
 // The row's score ranks and filters; the rendered one comes from the score record. Passing it
