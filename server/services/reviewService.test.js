@@ -80,7 +80,10 @@ test('the search window does not depend on the host timezone', async () => {
       assert.equal(new Set(perZone).size, 1, `${released}: ${perZone.join(' vs ')}`)
     }
   } finally {
-    process.env.TZ = real
+    // Deleted rather than reassigned when it was unset: assigning undefined stores the string
+    // "undefined", which is not a zone and would leave every later test running somewhere else
+    if (real === undefined) delete process.env.TZ
+    else process.env.TZ = real
   }
 })
 
