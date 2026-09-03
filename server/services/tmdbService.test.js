@@ -148,6 +148,14 @@ test('a row takes its title, date and genre names from its own catalogue', async
   )
 })
 
+// The validator bounds a vote override by this, so losing the wiring rejects every override rather
+// than only the ones below the floor
+test('the filter rules carry the catalogue vote floor', () => {
+  for (const mediaType of ['movie', 'tv']) {
+    assert.equal(tmdb.filterRules(mediaType).minVotes, tmdb.minVotes, mediaType)
+  }
+})
+
 // `filterRules` reports no TV ratings, so the panel must not be offered them either
 test('the ratings filter is offered for movies and withheld for TV', async () => {
   captureUrl()

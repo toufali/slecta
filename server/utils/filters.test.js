@@ -6,12 +6,14 @@ const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
 
 const MOVIE = {
   pageMax: 500,
+  minVotes: 25,
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
 }
 const SHOW = {
   pageMax: 500,
+  minVotes: 25,
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
@@ -117,4 +119,14 @@ test('certifications are checked only where the route sends them', () => {
 
 test('every offending param is named, not just the first', () => {
   assert.deepEqual(invalidFilters({ page: '0', sort: 'nonsense', wg: '5' }, MOVIE), ['page', 'sort', 'wg'])
+})
+
+// The catalogue is defined by its vote floor, so a request below it asks for titles outside the
+// catalogue — and the ranked path could not serve them, since the index is built at the floor
+test('a vote override may narrow the catalogue but not widen it', () => {
+  for (const minVotes of ['24', '0', '-1', 'abc', '1.5']) {
+    assert.deepEqual(invalidFilters({ minVotes }, MOVIE), ['minVotes'], minVotes)
+  }
+  assert.deepEqual(invalidFilters({ minVotes: '25' }, MOVIE), [])
+  assert.deepEqual(invalidFilters({ minVotes: '5000' }, MOVIE), [])
 })

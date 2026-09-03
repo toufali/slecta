@@ -203,6 +203,7 @@ class TmdbService {
 
     return {
       pageMax: this.pageMax,
+      minVotes: this.minVotes,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
       ratings: media.certifications ? this.ratings : undefined
