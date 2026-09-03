@@ -12,6 +12,7 @@ const { default: redis } = await import('./redisService.js')
 // `init` never runs here, so the presentation config a card is built from has to be supplied
 tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
 tmdb.genres.movie = new Map([[35, 'Comedy'], [18, 'Drama']])
+tmdb.genres.show = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.ratings = ['G', 'PG', 'PG-13', 'R']
 
 const ALL = ['imdb', 'metacritic', 'rtCritic', 'rtAudience']
@@ -20,15 +21,21 @@ const row = over => ({
   votes: 100, certification: 'R', providers: [8], score: 80, sources: ALL, ...over
 })
 
-const stubIndex = rows => { redis.getCache = async key => key === indexKey('movies') ? rows : null }
+const stubIndex = rows => {
+  redis.getCache = async key => {
+    if (key !== indexKey('movies') && key !== indexKey('shows')) return null
+    // As `getCache` marks it, so the carry-through can be asserted
+    return Object.defineProperty([...rows], 'cacheHit', { value: true })
+  }
+}
 const realGetCache = redis.getCache
 const titles = data => data.movies.map(movie => movie.title)
 
-async function listing(rows, query = {}) {
+async function listing(rows, query = {}, mediaType = 'movie') {
   stubIndex(rows)
 
   try {
-    return await index.getList('movie', query)
+    return await index.getList(mediaType, query)
   } finally {
     redis.getCache = realGetCache
   }
@@ -101,6 +108,23 @@ test('several genres match any of them', async () => {
   ], { wg: ['18', '35'] })
 
   assert.deepEqual(titles(data), ['comedy', 'drama'])
+})
+
+// TV has no certification filter on the discover path, so applying one here emptied the list on a
+// change of sort alone — the same request under Most Recent returns everything
+test('a certification filter is ignored for shows, as discover ignores it', async () => {
+  const rows = [row({ id: 1, title: 'ma', certification: 'TV-MA' }), row({ id: 2, title: 'pg', certification: 'TV-PG' })]
+  const data = await listing(rows, { wr: 'R' }, 'tv')
+
+  assert.deepEqual(data.shows.map(show => show.title), ['ma', 'pg'])
+})
+
+// The controller turns this into `x-server-cache-hit`, and every ranked response comes from Redis
+test('the cache marker carries through without reaching the body', async () => {
+  const data = await listing([row()])
+
+  assert.equal(data.cacheHit, true)
+  assert.equal('cacheHit' in JSON.parse(JSON.stringify(data)), false)
 })
 
 test('a certification filter keeps its own rating', async () => {

@@ -17,11 +17,12 @@ const PAGE_SIZE = 20
 // The panel sends one value or several, and a genre matches if any of them does
 const asList = value => value === undefined ? undefined : [].concat(value)
 
-// Every filter discover is sent has to hold here too, or changing the sort changes the results
-function matches(row, query, window) {
+// Every filter discover is sent has to hold here too, and none that it does not: TV has no
+// certification filter there, so applying one here empties the list on a change of sort alone
+function matches(row, query, { window, certifications }) {
   const genres = asList(query.wg)?.map(Number)
   const without = asList(query.wog)?.map(Number)
-  const ratings = asList(query.wr)
+  const ratings = certifications ? asList(query.wr) : undefined
   const minVotes = Number(query.minVotes)
 
   if (genres && !row.genreIds?.some(id => genres.includes(id))) return false
@@ -47,7 +48,7 @@ class IndexService {
    *   tell from an empty page: the first is our failure, the second is the filter's answer.
    */
   async getList(mediaType, query) {
-    const { segment, genreKey } = tmdb.catalogue(mediaType)
+    const { segment, genreKey, certifications } = tmdb.catalogue(mediaType)
     const rows = await redis.getCache(indexKey(segment))
 
     if (!rows) {
@@ -57,17 +58,26 @@ class IndexService {
 
     // No rankability floor: a title disappearing when the sort changes reads as broken, and thin
     // scores sink on their own — an IMDb-only row tops out well below the head of the list.
-    const found = rows.filter(row => matches(row, query, tmdb.dateWindow()))
+    // Once, not per row: the bound is the request's, and a scan crossing midnight would otherwise
+    // filter the head of one response against a different day than its tail
+    const rules = { window: tmdb.dateWindow(), certifications }
+    const found = rows.filter(row => matches(row, query, rules))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE
 
-    return {
+    const data = {
       // Already ranked at write time, so a request only filters and slices
       [segment]: found.slice(start, start + PAGE_SIZE).map(row => this.#card(segment, genreKey, row)),
       ...tmdb.listShape(mediaType, query),
       totalPages: Math.ceil(found.length / PAGE_SIZE),
       totalResults: found.length
     }
+
+    // Carried on, and non-enumerable as `getCache` sets it, so the header still reports the truth
+    // without the marker reaching the API body
+    if (rows.cacheHit) Object.defineProperty(data, 'cacheHit', { value: true })
+
+    return data
   }
 
   // Deliberately without `score`: the row's is a sort key, and `attachScores` fills the rendered one
