@@ -253,22 +253,25 @@ class TmdbService {
     return shape
   }
 
-  async getMovies(query) {
-    return this.#getList('movie', query)
+  async getMovies(query, window) {
+    return this.#getList('movie', query, window)
   }
 
-  async getTvShows(query) {
-    return this.#getList('tv', query)
+  async getTvShows(query, window) {
+    return this.#getList('tv', query, window)
   }
 
   // One skeleton for both catalogues: build params, prune, read cache, fetch, map, decorate. The
   // pairs this replaces had already drifted once — TV read `release_date` where TMDB sends
   // `first_air_date` — and the drift was in the mapping, not in anything the two genuinely differ on.
-  async #getList(mediaType, query) {
+  /**
+   * @param {object} [window] one window for a multi-page walk. Its own argument rather than a query
+   *   field, so nothing a request sends can widen the catalogue.
+   */
+  async #getList(mediaType, query, window = this.dateWindow()) {
     const media = CATALOGUE[mediaType]
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]
-    const window = this.dateWindow()
 
     // TMDB silently ignores `certification` without `certification_country`, and
     // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.

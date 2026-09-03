@@ -148,6 +148,17 @@ test('a row takes its title, date and genre names from its own catalogue', async
   )
 })
 
+// A walk is many requests, so the window has to be the walk's rather than each page's — pages either
+// side of midnight would be bounded by different days and shift titles across page boundaries
+test('a supplied window is used instead of the clock', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies({ page: 2 }, { from: '2001-01-01', to: '2001-12-31' })
+
+  assert.match(decodeURIComponent(seen[0]), /primary_release_date\.gte=2001-01-01/)
+  assert.match(decodeURIComponent(seen[0]), /primary_release_date\.lte=2001-12-31/)
+})
+
 // Two clock reads either side of midnight gave a window a day narrow, so the instant is passed in
 // and used twice rather than read twice
 test('the window is a year back from one instant', () => {

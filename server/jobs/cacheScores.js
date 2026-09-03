@@ -36,10 +36,14 @@ export async function cacheScores() {
     log.error('IMDb ratings refresh failed, continuing with the previous dataset', { error: e })
   }
 
+  // One window for the whole walk: a page fetched either side of midnight would be bounded by a
+  // different day, shifting titles across page boundaries
+  const window = tmdb.dateWindow()
+
   // An empty batch reports as "nothing processed", which the coverage check already fails
   const [movieList, showList] = await Promise.allSettled([
-    listAll(page => tmdb.getMovies({ page }), SEGMENT.movie),
-    listAll(page => tmdb.getTvShows({ page }), SEGMENT.tv)
+    listAll(page => tmdb.getMovies({ page }, window), SEGMENT.movie),
+    listAll(page => tmdb.getTvShows({ page }, window), SEGMENT.tv)
   ])
   const noTitles = { titles: [], complete: false }
 
