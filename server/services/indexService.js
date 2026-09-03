@@ -32,8 +32,8 @@ function matches(row, query, { window, certifications }) {
   // The index is built at the catalogue's own vote floor, so an override can only narrow from there
   if (minVotes && !(row.votes >= minVotes)) return false
 
-  // Close to discover's own filter but not identical — it reads monetization buckets this row has
-  // already flattened. Measured at a handful of titles either way; see `decisions.md`.
+  // Not quite discover's filter: it asks TMDB for named monetization buckets, and the row flattens
+  // them. Costs five movies TMDB counts as unavailable because ads-only; measured in `decisions.md`.
   if (query.streaming && !row.providers?.length) return false
 
   // An incomplete walk keeps rows it could not confirm, so one can outlast the window it was listed
