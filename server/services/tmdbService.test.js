@@ -148,6 +148,19 @@ test('a row takes its title, date and genre names from its own catalogue', async
   )
 })
 
+// Two clock reads either side of midnight gave a window a day narrow, so the instant is passed in
+// and used twice rather than read twice
+test('the window is a year back from one instant', () => {
+  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-02T23:59:59.999Z')), { from: '2025-09-02', to: '2026-09-02' })
+  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
+})
+
+// A leap day has no counterpart a year back, so the window starts the day after. One day, once in four
+// years, and pinned so the behaviour is known rather than discovered.
+test('a leap day falls forward to the first of March', () => {
+  assert.deepEqual(tmdb.dateWindow(new Date('2028-02-29T12:00:00.000Z')), { from: '2027-03-01', to: '2028-02-29' })
+})
+
 // The validator bounds a vote override by this, so losing the wiring rejects every override rather
 // than only the ones below the floor
 test('the filter rules carry the catalogue vote floor', () => {

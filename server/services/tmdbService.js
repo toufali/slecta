@@ -25,6 +25,8 @@ export const SCORE_SORT = 'score'
 // Everything the two catalogues disagree about. Keys rather than values for the genre map and sort
 // list, since both are built at init. `segment` covers the cache-key prefix, the list property and
 // the detail path — they are already the same word.
+const day = date => date.toISOString().substring(0, 10)
+
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -210,12 +212,16 @@ class TmdbService {
     }
   }
 
-  /** The catalogue's release-date bound, as discover is sent it. Not overridable by query. */
-  dateWindow() {
-    const to = new Date()
-    const from = new Date(new Date().setFullYear(to.getFullYear() - 1))
+  /**
+   * The catalogue's release-date bound, as discover is sent it. Not overridable by query.
+   * One clock read, passed in: two reads either side of midnight gave a window a day narrow.
+   */
+  dateWindow(now = new Date()) {
+    const from = new Date(now)
 
-    return { from: from.toISOString().substring(0, 10), to: to.toISOString().substring(0, 10) }
+    from.setFullYear(now.getFullYear() - 1)
+
+    return { from: day(from), to: day(now) }
   }
 
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
