@@ -16,9 +16,11 @@ export default function init() {
   renderScores()
 }
 
-// The funnel is mobile-first, so there is no hover to read a bare slider by
+// The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
+// the handle as well, or the value announced is a number with nothing saying what it counts.
 function handleLookback() {
   lookbackOutput.textContent = monthsText(+lookback.value)
+  lookback.ariaValueText = lookbackOutput.textContent
 }
 
 function handleMouseEvent(e) {

@@ -190,7 +190,9 @@ test('a lookback narrows the window discover is sent', async () => {
 // The window is mandatory, so a lookback that cannot be honoured falls back to the catalogue's own
 // rather than to none: unbounded means paging the whole of TMDB
 test('a lookback outside the range reads as the widest, not as itself', () => {
-  for (const months of [undefined, '', '0', '-6', '13', '99', 'abc', ['3', '5']]) {
+  // A fraction included: it is a request the panel cannot make, so it reads as unusable rather than
+  // as the whole month it truncates to
+  for (const months of [undefined, '', '0', '-6', '13', '99', 'abc', '1.9', 2.5, ['3', '5']]) {
     assert.equal(tmdb.lookback(months), tmdb.lookbackMax, JSON.stringify(months))
   }
 

@@ -80,8 +80,9 @@ export const movieList = data => `
     <fieldset>
       <h3 id='lookback-label'>Released in the last:</h3>
       <div class='lookback'>
-        <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label'>
-        <output>${monthsText(data.lookback)}</output>
+        <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label' aria-valuetext='${monthsText(data.lookback)}'>
+        <!-- Hidden because the value text now reads the same words: announced twice, once per handle move -->
+        <output aria-hidden='true'>${monthsText(data.lookback)}</output>
       </div>
     </fieldset>
     <fieldset>

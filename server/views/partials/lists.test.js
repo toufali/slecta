@@ -31,6 +31,14 @@ test('a one-month lookback reads as a month', () => {
   }
 })
 
+// The unit lived in the readout alone, so the handle announced a bare number
+test('the handle carries the unit, not only the readout beside it', () => {
+  for (const view of [movieList, tvShowList]) {
+    assert.match(view(data({ lookback: 4 })), /aria-valuetext='4 months'/)
+    assert.match(view(data({ lookback: 1 })), /aria-valuetext='month'/)
+  }
+})
+
 // Each catalogue is bounded by its own date field, and a show is not "released"
 test('each catalogue describes its own date field', () => {
   assert.match(movieList(data()), /released in the last/)

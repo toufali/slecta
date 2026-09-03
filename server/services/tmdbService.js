@@ -238,9 +238,9 @@ class TmdbService {
    * a request may narrow the window, never widen it past the catalogue the nightly run scores.
    */
   lookback(months) {
-    const asked = Math.trunc(Number(months))
+    const asked = Number(months)
 
-    return asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
+    return Number.isInteger(asked) && asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
   }
 
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
