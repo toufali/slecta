@@ -166,6 +166,28 @@ test('the window is a year back from one instant', () => {
   assert.deepEqual(tmdb.dateWindow(new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
 })
 
+// The window is formatted as UTC, so the arithmetic has to be UTC too: read through the local
+// calendar it shifted a day east of the line, which is the bug class the slug year check already hit
+test('the window does not depend on the host timezone', () => {
+  const real = process.env.TZ
+  const instants = ['2028-02-29T12:00:00Z', '2026-09-02T23:59:59.999Z', '2026-01-01T00:30:00Z']
+
+  try {
+    const windows = instants.map(at => {
+      return ['UTC', 'Pacific/Kiritimati', 'Pacific/Midway'].map(tz => {
+        process.env.TZ = tz
+        return JSON.stringify(tmdb.dateWindow(new Date(at)))
+      })
+    })
+
+    for (const [i, perZone] of windows.entries()) {
+      assert.equal(new Set(perZone).size, 1, `${instants[i]} gave ${perZone.join(' vs ')}`)
+    }
+  } finally {
+    process.env.TZ = real
+  }
+})
+
 // A leap day has no counterpart a year back, so the window starts the day after. One day, once in four
 // years, and pinned so the behaviour is known rather than discovered.
 test('a leap day falls forward to the first of March', () => {

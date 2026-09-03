@@ -14,8 +14,13 @@ export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 // Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
 
-// The panel sends one value or several, and a genre matches if any of them does
-const asList = value => value === undefined ? undefined : [].concat(value)
+// The panel sends one value, several, or an empty one meaning no filter — which the discover path
+// prunes, so an empty here has to read as absent rather than as a value nothing matches
+const asList = value => {
+  const list = [].concat(value ?? []).filter(each => each !== '')
+
+  return list.length ? list : undefined
+}
 
 // Every filter discover is sent has to hold here too, and none that it does not: TV has no
 // certification filter there, so applying one here empties the list on a change of sort alone

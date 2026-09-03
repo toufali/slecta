@@ -219,7 +219,9 @@ class TmdbService {
   dateWindow(now = new Date()) {
     const from = new Date(now)
 
-    from.setFullYear(now.getFullYear() - 1)
+    // UTC accessors, since the window is formatted as UTC: the local calendar would make the bound
+    // depend on the host's offset, and a leap day would land a day earlier east of the line
+    from.setUTCFullYear(now.getUTCFullYear() - 1)
 
     return { from: day(from), to: day(now) }
   }

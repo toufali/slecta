@@ -90,6 +90,16 @@ test('a card carries everything the card component renders', async () => {
   })
 })
 
+// The panel sends an empty value for "no filter" and discover prunes it, so an empty must not read
+// as a value nothing matches — `?sort=score&wg=` emptied the list while any other sort was unfiltered
+test('an empty filter value is no filter, not a filter nothing matches', async () => {
+  const rows = [row({ id: 1, title: 'comedy', genreIds: [35] }), row({ id: 2, title: 'unrated', certification: '' })]
+
+  for (const query of [{ wg: '' }, { wr: '' }, { wog: '' }, { wg: ['', ''] }]) {
+    assert.equal(titles(await listing(rows, query)).length, 2, JSON.stringify(query))
+  }
+})
+
 test('a genre filter keeps the titles carrying it', async () => {
   const data = await listing([
     row({ id: 1, title: 'comedy', genreIds: [35] }),
