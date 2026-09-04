@@ -10,27 +10,52 @@ import log from '../utils/logger.js'
 export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
 export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
+const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 
 // Bump when the record's shape changes. A source leaving the set does not need one: nothing
 // tonight can reach it, so nothing holds it against the write that drops it.
 const SCORE_CACHE_VERSION = 1
 
-/** `prefix` is the media segment, or a caller's own namespace. */
-export const scoreKey = (prefix, id) => `${prefix}/${id}/score/v${SCORE_CACHE_VERSION}`
-
 // Bump when the slug record shape changes. Slug source cannot be backfilled: a cached
 // record skips the Wikidata call and every run refreshes its TTL, so an unknown source would stay
 // "guessed" forever.
 const SLUG_CACHE_VERSION = 1
-const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
+
+/** `prefix` is the media segment, or a caller's own namespace. */
+export const scoreKey = (prefix, id) => `${prefix}/${id}/score/v${SCORE_CACHE_VERSION}`
+
+// How a source is asked, and what counts as it answering rather than us failing to ask
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run has a task timeout to finish inside
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
+// Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
+const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
+const HEADERS = { 'user-agent': USER_AGENT }
 
 // Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
 // that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
 const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
+
+// One row per source: which host answers for it, and where that host's page puts its numbers. A new
+// source is a row here plus a weighting constant above, not an edit in four parallel literals.
+// `floor` is a banded lower bound, kept out of `count` because a bound is a weaker claim.
+const SOURCES = {
+  imdb: { host: 'imdb', value: 'value', count: 'count' },
+  metacritic: { host: 'mc', value: 'value', count: 'count' },
+  rtCritic: { host: 'rt', value: 'critic', count: 'criticCount' },
+  rtAudience: { host: 'rt', value: 'audience', count: 'audienceCount', floor: 'audienceFloor' }
+}
+
+// Not a host below: Wikidata names the slugs the other two are read by and carries no score itself
+const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
+
+// One row per host: where its pages live, the Wikidata property naming its slug, and its own path
+// prefix per media type. Not the source table — RT answers for two sources through one page.
+const HOSTS = {
+  rt: { url: 'https://www.rottentomatoes.com/', wikiProp: 'P1258', path: { movie: 'm/', tv: 'tv/' } },
+  mc: { url: 'https://www.metacritic.com/', wikiProp: 'P1712', path: { movie: 'movie/', tv: 'tv/' } }
+}
 
 /**
  * Aggregate a stored record's components, weighting each by how well sampled it is.
@@ -104,22 +129,6 @@ function pageYear(html) {
   }
 }
 
-// Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
-const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
-const HEADERS = { 'user-agent': USER_AGENT }
-
-const RT_BASE_URL = 'https://www.rottentomatoes.com/'
-const MC_BASE_URL = 'https://www.metacritic.com/'
-const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
-const WIKI_RT_PROP = 'P1258'
-const WIKI_MC_PROP = 'P1712'
-
-// RT and Metacritic use different path prefixes and different slug separators per media type
-const PATHS = {
-  movie: { rt: 'm/', mc: 'movie/' },
-  tv: { rt: 'tv/', mc: 'tv/' }
-}
-
 class ScoreService {
   // ms between requests to one host, set by the nightly job. A visitor's single title has nothing
   // to be spaced against.
@@ -145,33 +154,23 @@ class ScoreService {
         this.#resolveSources({ wikiId, title, releaseDate, mediaType })
       ])
 
-      const scores = defined({
-        imdb: imdbRating?.value,
-        metacritic: resolved.mc?.page?.value,
-        rtCritic: resolved.rt?.page?.critic,
-        rtAudience: resolved.rt?.page?.audience
-      })
-
-      // Absent where a source publishes none — RT gives no number for a TV audience score
-      const counts = defined({
-        imdb: imdbRating?.count,
-        metacritic: resolved.mc?.page?.count,
-        rtCritic: resolved.rt?.page?.criticCount,
-        rtAudience: resolved.rt?.page?.audienceCount
-      })
-
-      // The dataset is IMDb's page: unreadable is a failure to ask, a dataset without the title is
-      // an answer. Same rule as the fetched sources, so a blip cannot discard a stored score.
-      const outcomes = {
-        imdb: sourceOutcome({ answered: imdbRating !== undefined, page: imdbRating ?? null }, scores.imdb),
-        metacritic: sourceOutcome(resolved.mc, scores.metacritic),
-        rtCritic: sourceOutcome(resolved.rt, scores.rtCritic),
-        rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
+      const hosts = {
+        // The dataset shaped like a fetched host, so one rule covers every source: unreadable is a
+        // failure to ask, a dataset holding no rating is an answer, and a blip cannot discard a score
+        imdb: { answered: imdbRating !== undefined, page: imdbRating ?? null },
+        mc: resolved.mc,
+        rt: resolved.rt
       }
+      const perSource = read => Object.fromEntries(
+        Object.entries(SOURCES).map(([source, at]) => [source, read({ host: hosts[at.host], at, source })])
+      )
 
-      // RT bands a cross-season audience count rather than publishing one, so a floor is all there
-      // is for half the TV catalogue. Kept apart from `counts`: a lower bound is a weaker claim.
-      const floors = defined({ rtAudience: resolved.rt?.page?.audienceFloor })
+      // Dropped where a source publishes none — RT gives no number for a TV audience score
+      const scores = defined(perSource(({ host, at }) => host?.page?.[at.value]))
+      const counts = defined(perSource(({ host, at }) => host?.page?.[at.count]))
+      const floors = defined(perSource(({ host, at }) => at.floor && host?.page?.[at.floor]))
+      // Every source, scored or not: this is what the coverage check divides by
+      const outcomes = perSource(({ host, source }) => sourceOutcome(host, scores[source]))
       const score = { scores, counts, floors }
       const mean = aggregate(score)
 
@@ -188,41 +187,50 @@ class ScoreService {
       // Cache it anyway, or every visitor re-runs the chain against a host that is already blocking
       if (!answered) log.warn('Score is missing a source it could not read', { key, title })
 
-      // Read here, not before the fetches above: in that window the record can expire, or a request
-      // can store a richer one that an unconditional write would then clobber
-      const stored = await this.getScoreFromCache(key)
-      const lost = Object.keys(stored?.scores ?? {}).filter(source => scores[source] === undefined)
-      // A thinner result is a bad night only while a source we lost could not be read. Once one
-      // answers, it is the world that changed and the record has to follow.
-      const guarded = lost.some(source => outcomes[source] === UNREACHABLE)
-      const candidate = { ...score, fetchedAt: Date.now() }
-
-      // Conditional when guarded, so a live record keeps its own clock while a record that vanished
-      // is rebuilt rather than left absent
-      // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
-      // that writer to reach a source this run could not, at the same instant; the cost if it
-      // happens is one title thinner until it rebuilds.
-      const outcome = await redis.setCache(key, candidate, answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
-      // Re-read what declined this write, since `stored` predates it
-      const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
-      const result = outcome === WRITTEN ? candidate : score
-
-      if (kept) {
-        log.warn('Score not stored, it lost a source that could not be read', { key, title, lost })
-      }
-
-      // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing
-      Object.defineProperty(result, 'cached', { value: outcome !== FAILED })
-      // What Redis holds, for a caller that must not publish tonight's thinner numbers
-      Object.defineProperty(result, 'kept', { value: kept })
-      // Tonight's attempt per source, for the coverage check. Not stored: it describes the run.
-      Object.defineProperty(result, 'outcomes', { value: outcomes })
-
-      // Return tonight's result, never the stored one, or the nightly check passes while a source is down
-      return result
+      // Tonight's numbers, never the stored ones, or the nightly check passes while a source is down
+      return await this.#store(key, score, { outcomes, answered, title })
     } catch (e) {
       log.error('Error getting average score', { key, title, error: e })
     }
+  }
+
+  /**
+   * Write tonight's score, keeping a richer stored record over a thinner one. Its own function
+   * because every never-degrade defect has landed in these lines.
+   * @return {object} tonight's score, carrying what storage did with it on non-enumerable fields
+   */
+  async #store(key, score, { outcomes, answered, title }) {
+    // Read here, not before the fetches: in that window the record can expire, or a request can
+    // store a richer one that an unconditional write would then clobber
+    const stored = await this.getScoreFromCache(key)
+    const lost = Object.keys(stored?.scores ?? {}).filter(source => score.scores[source] === undefined)
+    // A thinner result is a bad night only while a source we lost could not be read. Once one
+    // answers, it is the world that changed and the record has to follow.
+    const guarded = lost.some(source => outcomes[source] === UNREACHABLE)
+    const candidate = { ...score, fetchedAt: Date.now() }
+
+    // Conditional when guarded, so a live record keeps its own clock while a record that vanished
+    // is rebuilt rather than left absent
+    // Read and write are not atomic, so a writer landing between them can be overwritten. It needs
+    // that writer to reach a source this run could not, at the same instant; the cost if it
+    // happens is one title thinner until it rebuilds.
+    const outcome = await redis.setCache(key, candidate, answered ? SCORE_TTL : SCORE_RETRY_TTL, guarded)
+    // Re-read what declined this write, since `stored` predates it
+    const kept = outcome === DECLINED ? await this.getScoreFromCache(key) ?? stored : undefined
+    const result = outcome === WRITTEN ? candidate : score
+
+    if (kept) {
+      log.warn('Score not stored, it lost a source that could not be read', { key, title, lost })
+    }
+
+    // Redis holds a record when this write landed or when a live one declined it; a failure holds nothing
+    Object.defineProperty(result, 'cached', { value: outcome !== FAILED })
+    // What Redis holds, for a caller that must not publish tonight's thinner numbers
+    Object.defineProperty(result, 'kept', { value: kept })
+    // Tonight's attempt per source, for the coverage check. Not stored: it describes the run.
+    Object.defineProperty(result, 'outcomes', { value: outcomes })
+
+    return result
   }
 
   // Answered or not, like the fetched sources: the dataset distinguishes holding no rating for the
@@ -241,7 +249,7 @@ class ScoreService {
   // The year comes back alongside the scores, so one GET both verifies a guess and reads it.
   async #readRT(path) {
     try {
-      const { answered, body } = await this.#fetchText(RT_BASE_URL + path)
+      const { answered, body } = await this.#fetchText(HOSTS.rt.url + path)
 
       // No body either way; `answered` is what says whether that was the title's answer or ours
       if (!body) return { answered, page: null }
@@ -271,7 +279,7 @@ class ScoreService {
   // returns its year, so a wrong-film guess is rejected whether or not it carries a rating.
   async #readMC(path) {
     try {
-      const { answered, body } = await this.#fetchText(`${MC_BASE_URL}${path}/`)
+      const { answered, body } = await this.#fetchText(`${HOSTS.mc.url}${path}/`)
 
       if (!body) return { answered, page: null }
 
@@ -282,7 +290,7 @@ class ScoreService {
       // No whole-title block means this is not the page we think it is, however it answered — a
       // challenge or an interstitial, which is our problem rather than the title's. A block with no
       // rating is different: that is Metacritic saying it has no Metascore yet, which is an answer.
-      if (!titles.length) return unanswered(`${MC_BASE_URL}${path}/`, { reason: 'no whole-title block' })
+      if (!titles.length) return unanswered(`${HOSTS.mc.url}${path}/`, { reason: 'no whole-title block' })
 
       const rating = titles.find(item => item.aggregateRating?.ratingValue != null)?.aggregateRating
 
@@ -301,7 +309,8 @@ class ScoreService {
   async #resolveSources({ wikiId, title, releaseDate, mediaType }) {
     const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
-    const prefixes = PATHS[mediaType] ?? PATHS.movie
+    // Falls back to film paths for an unknown media type, as the readers' own defaults do
+    const prefix = host => HOSTS[host].path[mediaType] ?? HOSTS[host].path.movie
     const year = yearOf(releaseDate)
     const wiki = {}
     // True when no lookup was needed: a call never made cannot have gone unanswered
@@ -319,9 +328,9 @@ class ScoreService {
           const { answered, body } = await this.#fetchJson(`${WIKI_BASE_URL}${wikiId}/statements`)
 
           wikiAnswered = answered
-          wiki.rt = body?.[WIKI_RT_PROP]?.[0]?.value?.content
+          wiki.rt = body?.[HOSTS.rt.wikiProp]?.[0]?.value?.content
           // Trim it: the reader appends its own, and `movie/inception//` 404s where `movie/inception/` is a hit
-          wiki.mc = body?.[WIKI_MC_PROP]?.[0]?.value?.content?.replace(/\/$/, '')
+          wiki.mc = body?.[HOSTS.mc.wikiProp]?.[0]?.value?.content?.replace(/\/$/, '')
         } catch (e) {
           wikiAnswered = false
           log.warn('Error resolving slugs from Wikidata', { wikiId, error: e })
@@ -329,8 +338,8 @@ class ScoreService {
       }
 
       const [rt, mc] = await Promise.all([
-        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefixes.rt, title, year)), year, slug => this.#readRT(slug)),
-        this.#resolve(orderCandidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefixes.mc}${slugify(title, '-')}`]), year, slug => this.#readMC(slug))
+        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefix('rt'), title, year)), year, slug => this.#readRT(slug)),
+        this.#resolve(orderCandidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefix('mc')}${slugify(title, '-')}`]), year, slug => this.#readMC(slug))
       ])
 
       const record = { rt: rt.slug, mc: mc.slug, rtSource: rt.source, mcSource: mc.source }

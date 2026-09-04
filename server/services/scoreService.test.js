@@ -86,6 +86,24 @@ async function readMC(key, ...outcomes) {
   return { calls, metacritic: score.scores.metacritic }
 }
 
+// Each host puts its two catalogues on different path prefixes, and a TV title asked for under the
+// film prefix 404s on every candidate — so both catalogues are scored, not only films
+test('a title is asked for under its own media type\'s path', async () => {
+  const asked = []
+
+  globalThis.fetch = async url => { asked.push(new URL(url).pathname); return new Response('', { status: 404 }) }
+
+  for (const mediaType of ['movie', 'tv']) {
+    await scoreService.getScore(`test/paths/${mediaType}`, { title: 'Severance', releaseDate: '2022-02-18', mediaType }, false)
+  }
+
+  const under = prefix => asked.filter(path => path.startsWith(prefix)).length
+
+  assert.ok(under('/m/') > 0, `no film paths asked, got ${asked.join(' ')}`)
+  assert.ok(under('/tv/') >= 2, `both hosts should ask under tv/, got ${asked.join(' ')}`)
+  assert.equal(under('/movie/'), 1, 'metacritic files films under movie/')
+})
+
 test('a timeout is retried and the score survives', async () => {
   const { calls, metacritic } = await readMC('test/read/timeout', timeout(), ok(LD(74)))
 
@@ -185,12 +203,13 @@ test('a record no component can weight falls back to the plain mean', () => {
   assert.equal(aggregate({ scores: { imdb: 60, metacritic: 80 } }), 70)
 })
 
-// An unmapped source must not vanish from the aggregate the moment it is added. Paired with a
-// mapped one, since alone it would reach the same answer through the plain-mean fallback.
+// An unmapped source must not vanish from the aggregate the moment it is added. The mapped source
+// is thinly sampled on purpose: with a well-sampled one the weighted answer equals the plain mean,
+// so the fallback below satisfies this whatever the unmapped source weighs.
 test('a source with no constant carries full weight', () => {
-  const record = { scores: { imdb: 60, letterboxd: 90 }, counts: { imdb: 100000, letterboxd: 5 } }
+  const record = { scores: { imdb: 60, letterboxd: 90 }, counts: { imdb: 100, letterboxd: 5 } }
 
-  assert.equal(aggregate(record), 75)
+  assert.equal(aggregate(record), 88, 'the plain mean is 75 and no weight at all gives 60')
 })
 
 // Ordering is pure, so the rules can be read straight off the list with no host contacted
