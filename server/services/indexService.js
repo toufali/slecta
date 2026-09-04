@@ -64,7 +64,7 @@ class IndexService {
     // scores sink on their own — an IMDb-only row tops out well below the head of the list.
     // Once, not per row: the bound is the request's, and a scan crossing midnight would otherwise
     // filter the head of one response against a different day than its tail
-    const rules = { window: tmdb.dateWindow(), certifications }
+    const rules = { window: tmdb.dateWindow(query.months), certifications }
     const found = rows.filter(row => matches(row, query, rules))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE

@@ -1,15 +1,26 @@
 import { resetPageNav } from '../utils/pageNav.js'
+import { monthsText } from '../utils/months.js'
 
 const list = document.querySelector('[data-partial="tvShowList"] ul')
 const listDescription = document.querySelector('.list-description')
 const filterPanel = document.querySelector('.filter-panel')
 const filterForm = document.querySelector('form[name="movie-filter"]')
 const filterToggle = document.querySelector('.filter-toggle')
+const lookback = document.querySelector('.lookback input')
+const lookbackOutput = document.querySelector('.lookback output')
 
 export default function init() {
   filterToggle.addEventListener('mousedown', handleMouseEvent)
   filterForm.addEventListener('submit', handleSubmit)
+  lookback.addEventListener('input', handleLookback)
   renderScores()
+}
+
+// The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
+// the handle as well, or the value announced is a number with nothing saying what it counts.
+function handleLookback() {
+  lookbackOutput.textContent = monthsText(+lookback.value)
+  lookback.ariaValueText = lookbackOutput.textContent
 }
 
 function handleMouseEvent(e) {
@@ -90,7 +101,9 @@ function renderlistDescription(data) {
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
 
-  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming].filter(item => item))
+  const lookbackText = `<label>first aired in the last <output>${monthsText(data.lookback)}</output></label>`
+
+  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming, lookbackText].filter(item => item))
   window.scrollTo(0, 0)
 }
 

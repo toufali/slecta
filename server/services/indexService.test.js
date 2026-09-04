@@ -186,6 +186,21 @@ test('a title that has left the release window is dropped', async () => {
   assert.deepEqual(titles(data), ['in window'])
 })
 
+// A lookback has to mean the same under either sort, or changing the sort changes what is listed
+test('a lookback narrows the ranked list too', async () => {
+  const daysAgo = days => {
+    const date = new Date()
+
+    date.setUTCDate(date.getUTCDate() - days)
+
+    return date.toISOString().substring(0, 10)
+  }
+  const rows = [row({ id: 1, title: 'this week' }), row({ id: 2, title: 'two months ago', releaseDate: daysAgo(60) })]
+
+  assert.deepEqual(titles(await listing(rows)), ['this week', 'two months ago'])
+  assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week'])
+})
+
 test('a page is twenty titles, and the count follows the filter', async () => {
   const rows = Array.from({ length: 45 }, (_, i) => row({ id: i, title: `t${i}` }))
   const first = await listing(rows)

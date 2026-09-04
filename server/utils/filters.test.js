@@ -7,6 +7,7 @@ const MOVIE_RATINGS = [{ certification: 'R' }, { certification: 'PG-13' }]
 const MOVIE = {
   pageMax: 500,
   minVotes: 25,
+  lookbackMax: 12,
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
@@ -14,12 +15,13 @@ const MOVIE = {
 const SHOW = {
   pageMax: 500,
   minVotes: 25,
+  lookbackMax: 12,
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
 
 test('a request from the filter panel passes', () => {
-  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50' }
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50', months: '6' }
 
   assert.deepEqual(invalidFilters(query, MOVIE), [])
 })
@@ -29,6 +31,15 @@ test('page must be within the range TMDB serves', () => {
     assert.deepEqual(invalidFilters({ page }, MOVIE), ['page'], page)
   }
   assert.deepEqual(invalidFilters({ page: '500' }, MOVIE), [])
+})
+
+test('a lookback is whole months inside the catalogue window', () => {
+  for (const months of ['0', '-1', '13', 'abc', '1.5']) {
+    assert.deepEqual(invalidFilters({ months }, MOVIE), ['months'], months)
+  }
+  for (const months of ['1', '6', '12', '']) {
+    assert.deepEqual(invalidFilters({ months }, SHOW), [], months)
+  }
 })
 
 test('a sort key belonging to the other media type is rejected', () => {

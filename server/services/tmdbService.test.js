@@ -153,7 +153,7 @@ test('a row takes its title, date and genre names from its own catalogue', async
 test('a supplied window is used instead of the clock', async () => {
   const seen = captureUrl()
 
-  await tmdb.getMovies({ page: 2 }, { from: '2001-01-01', to: '2001-12-31' })
+  await tmdb.getMovies({ page: 2, months: '1' }, { from: '2001-01-01', to: '2001-12-31' })
 
   assert.match(decodeURIComponent(seen[0]), /primary_release_date\.gte=2001-01-01/)
   assert.match(decodeURIComponent(seen[0]), /primary_release_date\.lte=2001-12-31/)
@@ -161,27 +161,64 @@ test('a supplied window is used instead of the clock', async () => {
 
 // Two clock reads either side of midnight gave a window a day narrow, so the instant is passed in
 // and used twice rather than read twice
-test('the window is a year back from one instant', () => {
-  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-02T23:59:59.999Z')), { from: '2025-09-02', to: '2026-09-02' })
-  assert.deepEqual(tmdb.dateWindow(new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
+test('the window is twelve months back from one instant', () => {
+  assert.deepEqual(tmdb.dateWindow(undefined, new Date('2026-09-02T23:59:59.999Z')), { from: '2025-09-02', to: '2026-09-02' })
+  assert.deepEqual(tmdb.dateWindow(undefined, new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
+})
+
+// One reading of the window, whichever sort is asked for, so the lookback cannot mean two things
+test('a lookback narrows the window discover is sent', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies({ months: '3' })
+  await tmdb.getTvShows({ months: '3' })
+  await tmdb.getMovies()
+
+  // Read as the span between the bounds sent, since which day they land on is tested on its own
+  const monthsBack = url => {
+    const bound = name => decodeURIComponent(url).match(new RegExp(`date\\.${name}=(\\d+)-(\\d+)`)).slice(1).map(Number)
+    const [[fromYear, fromMonth], [toYear, toMonth]] = [bound('gte'), bound('lte')]
+
+    return (toYear - fromYear) * 12 + toMonth - fromMonth
+  }
+
+  assert.equal(monthsBack(seen[0]), 3)
+  assert.equal(monthsBack(seen[1]), 3, 'both catalogues, or a sort change moves the window')
+  assert.equal(monthsBack(seen[2]), 12, 'absent means the whole catalogue')
+})
+
+// The window is mandatory, so a lookback that cannot be honoured falls back to the catalogue's own
+// rather than to none: unbounded means paging the whole of TMDB
+test('a lookback outside the range reads as the widest, not as itself', () => {
+  // A fraction included: it is a request the panel cannot make, so it reads as unusable rather than
+  // as the whole month it truncates to
+  for (const months of [undefined, '', '0', '-6', '13', '99', 'abc', '1.9', 2.5, ['3', '5']]) {
+    assert.equal(tmdb.lookback(months), tmdb.lookbackMax, JSON.stringify(months))
+  }
+
+  assert.equal(tmdb.lookback('1'), 1)
+  assert.equal(tmdb.lookback('12'), 12)
+  assert.equal(tmdb.lookback(5), 5)
 })
 
 // The window is formatted as UTC, so the arithmetic has to be UTC too: read through the local
 // calendar it shifted a day east of the line, which is the bug class the slug year check already hit
 test('the window does not depend on the host timezone', () => {
   const real = process.env.TZ
-  const instants = ['2028-02-29T12:00:00Z', '2026-09-02T23:59:59.999Z', '2026-01-01T00:30:00Z']
+  // Paired with a lookback where one is what makes the instant interesting: a month end rolls back
+  const instants = [['2028-02-29T12:00:00Z'], ['2026-09-02T23:59:59.999Z'], ['2026-01-01T00:30:00Z'],
+    ['2026-08-31T12:00:00Z', 6], ['2026-03-31T00:30:00Z', 1]]
 
   try {
-    const windows = instants.map(at => {
+    const windows = instants.map(([at, months]) => {
       return ['UTC', 'Pacific/Kiritimati', 'Pacific/Midway'].map(tz => {
         process.env.TZ = tz
-        return JSON.stringify(tmdb.dateWindow(new Date(at)))
+        return JSON.stringify(tmdb.dateWindow(months, new Date(at)))
       })
     })
 
     for (const [i, perZone] of windows.entries()) {
-      assert.equal(new Set(perZone).size, 1, `${instants[i]} gave ${perZone.join(' vs ')}`)
+      assert.equal(new Set(perZone).size, 1, `${instants[i][0]} gave ${perZone.join(' vs ')}`)
     }
   } finally {
     // Deleted rather than reassigned when it was unset: assigning undefined stores the string
@@ -191,18 +228,33 @@ test('the window does not depend on the host timezone', () => {
   }
 })
 
-// A leap day has no counterpart a year back, so the window starts the day after. One day, once in four
-// years, and pinned so the behaviour is known rather than discovered.
-test('a leap day falls forward to the first of March', () => {
-  assert.deepEqual(tmdb.dateWindow(new Date('2028-02-29T12:00:00.000Z')), { from: '2027-03-01', to: '2028-02-29' })
+// Month arithmetic overflows a target month too short to hold the day, landing inside the month after
+// and dropping the oldest days of the window asked for
+test('a lookback from a month end lands on a month end', () => {
+  assert.deepEqual(tmdb.dateWindow(6, new Date('2026-08-31T12:00:00.000Z')), { from: '2026-02-28', to: '2026-08-31' })
+  assert.deepEqual(tmdb.dateWindow(1, new Date('2026-03-31T12:00:00.000Z')), { from: '2026-02-28', to: '2026-03-31' })
+  // A leap day has no counterpart twelve months back either
+  assert.deepEqual(tmdb.dateWindow(undefined, new Date('2028-02-29T12:00:00.000Z')), { from: '2027-02-28', to: '2028-02-29' })
 })
 
-// The validator bounds a vote override by this, so losing the wiring rejects every override rather
-// than only the ones below the floor
-test('the filter rules carry the catalogue vote floor', () => {
+// The validator bounds both by these, so losing a wiring rejects every value rather than only the
+// out-of-range ones — an unwired lookback 400s every submit the panel makes
+test('the filter rules carry the catalogue vote floor and lookback', () => {
   for (const mediaType of ['movie', 'tv']) {
     assert.equal(tmdb.filterRules(mediaType).minVotes, tmdb.minVotes, mediaType)
+    assert.equal(tmdb.filterRules(mediaType).lookbackMax, tmdb.lookbackMax, mediaType)
   }
+})
+
+// The view cannot tell the two list paths apart, so the slider's own state has to come from both
+test('a list page carries the lookback the panel renders', async () => {
+  captureUrl()
+
+  const narrowed = await tmdb.getMovies({ months: '3' })
+
+  assert.equal(narrowed.lookback, 3)
+  assert.equal(narrowed.lookbackMax, tmdb.lookbackMax)
+  assert.equal((await tmdb.getTvShows()).lookback, tmdb.lookbackMax, 'absent means the widest')
 })
 
 // `filterRules` reports no TV ratings, so the panel must not be offered them either
@@ -324,11 +376,12 @@ test('a cached list is reshaped on the way out, not served as it was stored', as
   redis.getCache = async () => ({ movies: [], allSorting: [{ name: 'Most Recent', value: 'stale' }], sortBy: 'stale' })
 
   try {
-    const data = await tmdb.getMovies({ sort: 'score' })
+    const data = await tmdb.getMovies({ sort: 'score', months: '2' })
 
     assert.deepEqual(data.allSorting.map(option => option.value),
       ['primary_release_date.desc', 'popularity.desc', 'score'])
     assert.equal(data.sortBy, 'score')
+    assert.equal(data.lookback, 2, 'the slider reads the request, not the stored page')
   } finally {
     redis.getCache = realGetCache
   }
