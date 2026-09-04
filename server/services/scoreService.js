@@ -38,8 +38,7 @@ const HEADERS = { 'user-agent': USER_AGENT }
 const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
 
 // One row per source: which host answers for it, and where that host's page puts its numbers. A new
-// source is a row here plus a weighting constant above, rather than an edit in four parallel
-// literals — missing one of those is how IMDb came to sit outside the outcome model twice.
+// source is a row here plus a weighting constant above, not an edit in four parallel literals.
 // `floor` is a banded lower bound, kept out of `count` because a bound is a weaker claim.
 const SOURCES = {
   imdb: { host: 'imdb', value: 'value', count: 'count' },
@@ -48,6 +47,7 @@ const SOURCES = {
   rtAudience: { host: 'rt', value: 'audience', count: 'audienceCount', floor: 'audienceFloor' }
 }
 
+// Not a host below: Wikidata names the slugs the other two are read by and carries no score itself
 const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
 
 // One row per host: where its pages live, the Wikidata property naming its slug, and its own path
@@ -154,19 +154,23 @@ class ScoreService {
         this.#resolveSources({ wikiId, title, releaseDate, mediaType })
       ])
 
-      // The dataset shaped like a fetched host, so one rule covers every source: unreadable is a
-      // failure to ask, a dataset holding no rating is an answer, and a blip cannot discard a score
-      const hosts = { imdb: { answered: imdbRating !== undefined, page: imdbRating ?? null }, mc: resolved.mc, rt: resolved.rt }
+      const hosts = {
+        // The dataset shaped like a fetched host, so one rule covers every source: unreadable is a
+        // failure to ask, a dataset holding no rating is an answer, and a blip cannot discard a score
+        imdb: { answered: imdbRating !== undefined, page: imdbRating ?? null },
+        mc: resolved.mc,
+        rt: resolved.rt
+      }
       const perSource = read => Object.fromEntries(
-        Object.entries(SOURCES).map(([source, at]) => [source, read(hosts[at.host], at, source)])
+        Object.entries(SOURCES).map(([source, at]) => [source, read({ host: hosts[at.host], at, source })])
       )
 
       // Dropped where a source publishes none — RT gives no number for a TV audience score
-      const scores = defined(perSource((host, at) => host?.page?.[at.value]))
-      const counts = defined(perSource((host, at) => host?.page?.[at.count]))
-      const floors = defined(perSource((host, at) => at.floor && host?.page?.[at.floor]))
-      // Never dropped: no outcome for a source is a different claim from no score for one
-      const outcomes = perSource((host, at, source) => sourceOutcome(host, scores[source]))
+      const scores = defined(perSource(({ host, at }) => host?.page?.[at.value]))
+      const counts = defined(perSource(({ host, at }) => host?.page?.[at.count]))
+      const floors = defined(perSource(({ host, at }) => at.floor && host?.page?.[at.floor]))
+      // Every source, scored or not: this is what the coverage check divides by
+      const outcomes = perSource(({ host, source }) => sourceOutcome(host, scores[source]))
       const score = { scores, counts, floors }
       const mean = aggregate(score)
 
@@ -191,9 +195,8 @@ class ScoreService {
   }
 
   /**
-   * Write tonight's score, keeping a richer stored record over a thinner one. Every never-degrade
-   * defect has landed in here, which is why it is one function and not a phase of the scoring.
-   * @param {object} run - `outcomes` per source, whether every source `answered`, and the `title` to log
+   * Write tonight's score, keeping a richer stored record over a thinner one. Its own function
+   * because every never-degrade defect has landed in these lines.
    * @return {object} tonight's score, carrying what storage did with it on non-enumerable fields
    */
   async #store(key, score, { outcomes, answered, title }) {
