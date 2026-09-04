@@ -32,6 +32,17 @@ const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the tit
 // that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
 const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
 
+// One row per source: which host answers for it, and where that host's page puts its numbers. A new
+// source is a row here plus a weighting constant above, rather than an edit in four parallel
+// literals — missing one of those is how IMDb came to sit outside the outcome model twice.
+// `floor` is a banded lower bound, kept out of `count` because a bound is a weaker claim.
+const SOURCES = {
+  imdb: { host: 'imdb', value: 'value', count: 'count' },
+  metacritic: { host: 'mc', value: 'value', count: 'count' },
+  rtCritic: { host: 'rt', value: 'critic', count: 'criticCount' },
+  rtAudience: { host: 'rt', value: 'audience', count: 'audienceCount', floor: 'audienceFloor' }
+}
+
 /**
  * Aggregate a stored record's components, weighting each by how well sampled it is.
  * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
@@ -145,33 +156,19 @@ class ScoreService {
         this.#resolveSources({ wikiId, title, releaseDate, mediaType })
       ])
 
-      const scores = defined({
-        imdb: imdbRating?.value,
-        metacritic: resolved.mc?.page?.value,
-        rtCritic: resolved.rt?.page?.critic,
-        rtAudience: resolved.rt?.page?.audience
-      })
+      // The dataset shaped like a fetched host, so one rule covers every source: unreadable is a
+      // failure to ask, a dataset holding no rating is an answer, and a blip cannot discard a score
+      const hosts = { imdb: { answered: imdbRating !== undefined, page: imdbRating ?? null }, mc: resolved.mc, rt: resolved.rt }
+      const perSource = read => Object.fromEntries(
+        Object.entries(SOURCES).map(([source, at]) => [source, read(hosts[at.host], at, source)])
+      )
 
-      // Absent where a source publishes none — RT gives no number for a TV audience score
-      const counts = defined({
-        imdb: imdbRating?.count,
-        metacritic: resolved.mc?.page?.count,
-        rtCritic: resolved.rt?.page?.criticCount,
-        rtAudience: resolved.rt?.page?.audienceCount
-      })
-
-      // The dataset is IMDb's page: unreadable is a failure to ask, a dataset without the title is
-      // an answer. Same rule as the fetched sources, so a blip cannot discard a stored score.
-      const outcomes = {
-        imdb: sourceOutcome({ answered: imdbRating !== undefined, page: imdbRating ?? null }, scores.imdb),
-        metacritic: sourceOutcome(resolved.mc, scores.metacritic),
-        rtCritic: sourceOutcome(resolved.rt, scores.rtCritic),
-        rtAudience: sourceOutcome(resolved.rt, scores.rtAudience)
-      }
-
-      // RT bands a cross-season audience count rather than publishing one, so a floor is all there
-      // is for half the TV catalogue. Kept apart from `counts`: a lower bound is a weaker claim.
-      const floors = defined({ rtAudience: resolved.rt?.page?.audienceFloor })
+      // Dropped where a source publishes none — RT gives no number for a TV audience score
+      const scores = defined(perSource((host, at) => host?.page?.[at.value]))
+      const counts = defined(perSource((host, at) => host?.page?.[at.count]))
+      const floors = defined(perSource((host, at) => at.floor && host?.page?.[at.floor]))
+      // Never dropped: no outcome for a source is a different claim from no score for one
+      const outcomes = perSource((host, at, source) => sourceOutcome(host, scores[source]))
       const score = { scores, counts, floors }
       const mean = aggregate(score)
 
