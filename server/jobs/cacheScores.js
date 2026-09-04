@@ -5,6 +5,7 @@ import scoreService, { aggregate, scoreKey, SCORE_TTL } from '../services/scoreS
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import { indexKey } from '../services/indexService.js'
+import { writeSnapshot } from './snapshots.js'
 import log from '../utils/logger.js'
 import { checkReferenceTitles, checkRunCoverage } from './checks.js'
 
@@ -52,8 +53,8 @@ export async function cacheScores() {
 
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
   const scored = await Promise.allSettled([
-    cacheScoresFor('movie', movieList.value ?? noTitles),
-    cacheScoresFor('tv', showList.value ?? noTitles)
+    cacheScoresFor('movie', movieList.value ?? noTitles, window.to),
+    cacheScoresFor('tv', showList.value ?? noTitles, window.to)
   ])
 
   for (const result of scored) {
@@ -146,11 +147,13 @@ async function carryRows(mediaType, previous, carry) {
   return rows.filter(Boolean)
 }
 
-async function cacheScoresFor(mediaType, { titles, complete }) {
+// `date` is the walk's own, so a run crossing midnight files both catalogues under one night
+async function cacheScoresFor(mediaType, { titles, complete }, date) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
-  // Ids whose stored record was read, whatever it held. Anything else is a title we cannot speak for
-  const confirmed = new Set()
+  // What each title's stored record held, whatever that was. A title absent from this is one we
+  // cannot speak for, and it is the same read the night is filed from.
+  const confirmed = new Map()
 
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
   await pool(titles, TITLES_IN_FLIGHT, async title => {
@@ -165,9 +168,16 @@ async function cacheScoresFor(mediaType, { titles, complete }) {
   })
 
   stats.indexFailed = !await publishIndex(mediaType, rows, titles, complete, confirmed)
+  stats.snapshotFailed = !await writeSnapshot(SEGMENT[mediaType], date, snapshotRows(confirmed))
 
   return stats
 }
+
+// The record as stored, which is what the badge is computed from, and `fetchedAt` with it: a
+// guarded write keeps the previous record, which would otherwise read as a score that has settled
+const snapshotRows = confirmed => [...confirmed]
+  .filter(([, record]) => record)
+  .map(([id, record]) => ({ id, ...record }))
 
 async function scoreTitle(mediaType, title, stats, confirmed) {
   const key = scoreKey(SEGMENT[mediaType], title.id)
@@ -216,7 +226,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
   // undefined is Redis unreadable, null is no record. Only the second says anything about the title
   if (row === undefined) return
 
-  confirmed.add(title.id)
+  confirmed.set(title.id, row)
 
   const avgScore = aggregate(row)
 

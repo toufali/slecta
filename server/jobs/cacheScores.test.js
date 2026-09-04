@@ -699,3 +699,104 @@ test('every page of a walk is bounded by the same window', async () => {
     restore()
   }
 })
+
+// The record and not the index row: the row drops the counts, which is what movement is measured in
+test('every readable record is snapshotted, under one night for both catalogues', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
+  const shows = [{ page: 1, id: 3, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, shows })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const stored = { scores: { imdb: 70 }, counts: { imdb: 900 }, fetchedAt: 5 }
+
+  scoreService.getScoreFromCache = async () => stored
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+
+  try {
+    const { stats } = await cacheScores()
+    const nights = [...written.keys()].filter(key => key.startsWith('snapshot/'))
+    const dates = new Set(nights.map(key => key.split('/')[2]))
+
+    assert.deepEqual(nights.map(key => key.split('/')[1]), ['movies', 'shows'])
+    assert.equal(dates.size, 1, `one night for the run, got ${[...dates].join(' and ')}`)
+    assert.match([...dates][0], /^\d{4}-\d{2}-\d{2}$/)
+
+    const [night] = nights
+
+    assert.deepEqual(written.get(night).map(record => record.id), [1, 2])
+    assert.deepEqual(written.get(night)[0], { id: 1, ...stored }, 'stored as read, with the id it was read by')
+    assert.deepEqual(stats.map(stat => stat.snapshotFailed), [false, false])
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Redis unreadable and Redis holding nothing are both "no numbers to file", and neither is a zero
+test('a title with no readable record is left out of the night', async () => {
+  const movies = [1, 2, 3].map(id => ({ page: 1, id, releaseDate: '2026-01-01' }))
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  scoreService.getScoreFromCache = async key =>
+    key.includes('/2/') ? undefined : key.includes('/3/') ? null : { scores: { imdb: 70 } }
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual([...written.keys()].filter(key => key.startsWith('snapshot/movies/'))
+      .flatMap(key => written.get(key)).map(record => record.id), [1])
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// The catalogue was still scored, ranked and served, so a lost night is not something to alert on
+test('a failed snapshot is reported in the run stats without failing the run', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const realSetCache = redis.setCache
+
+  redis.setCache = async key => key.startsWith('snapshot/') ? FAILED : WRITTEN
+
+  try {
+    const { stats: [stats], coverage } = await cacheScores()
+
+    assert.equal(stats.snapshotFailed, true)
+    assert.ok(!coverage.problems.some(problem => JSON.stringify(problem).includes('snapshot')),
+      `expected no alert for a lost night, got ${JSON.stringify(coverage.problems)}`)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// A run crossing midnight would file its two catalogues under different nights, so the date has to
+// be the walk's own rather than a second look at the clock
+test("the night is the walk's own date, not a fresh clock read", async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const shows = [{ page: 1, id: 2, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, shows })
+  const written = new Map()
+  const realSetCache = redis.setCache
+  const realDateWindow = tmdb.dateWindow
+  let reads = 0
+
+  // Each read answers a different day, so a second one cannot pass for the first
+  tmdb.dateWindow = () => ({ from: '2025-09-01', to: `2026-09-0${++reads}` })
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+
+  try {
+    await cacheScores()
+
+    assert.deepEqual([...written.keys()].filter(key => key.startsWith('snapshot/')),
+      ['snapshot/movies/2026-09-01', 'snapshot/shows/2026-09-01'])
+  } finally {
+    tmdb.dateWindow = realDateWindow
+    redis.setCache = realSetCache
+    restore()
+  }
+})
