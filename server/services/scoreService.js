@@ -10,23 +10,28 @@ import log from '../utils/logger.js'
 export const SCORE_TTL = 60 * 60 * 24 * 10 // 10 days
 export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, but a bot block can last a day
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
+const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 
 // Bump when the record's shape changes. A source leaving the set does not need one: nothing
 // tonight can reach it, so nothing holds it against the write that drops it.
 const SCORE_CACHE_VERSION = 1
 
-/** `prefix` is the media segment, or a caller's own namespace. */
-export const scoreKey = (prefix, id) => `${prefix}/${id}/score/v${SCORE_CACHE_VERSION}`
-
 // Bump when the slug record shape changes. Slug source cannot be backfilled: a cached
 // record skips the Wikidata call and every run refreshes its TTL, so an unknown source would stay
 // "guessed" forever.
 const SLUG_CACHE_VERSION = 1
-const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
+
+/** `prefix` is the media segment, or a caller's own namespace. */
+export const scoreKey = (prefix, id) => `${prefix}/${id}/score/v${SCORE_CACHE_VERSION}`
+
+// How a source is asked, and what counts as it answering rather than us failing to ask
 const FETCH_TIMEOUT = 8000
 const RETRY_AFTER_MAX = 5 // seconds; a host may ask for minutes, and the run has a task timeout to finish inside
 const RETRY_DELAY = 500 // ms, before a single retry of a transient failure
 const PAGE_NOT_FOUND = new Set([404, 410]) // the source answering about the title; any other failure is ours
+// Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
+const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
+const HEADERS = { 'user-agent': USER_AGENT }
 
 // Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
 // that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
@@ -41,6 +46,15 @@ const SOURCES = {
   metacritic: { host: 'mc', value: 'value', count: 'count' },
   rtCritic: { host: 'rt', value: 'critic', count: 'criticCount' },
   rtAudience: { host: 'rt', value: 'audience', count: 'audienceCount', floor: 'audienceFloor' }
+}
+
+const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
+
+// One row per host: where its pages live, the Wikidata property naming its slug, and its own path
+// prefix per media type. Not the source table — RT answers for two sources through one page.
+const HOSTS = {
+  rt: { url: 'https://www.rottentomatoes.com/', wikiProp: 'P1258', path: { movie: 'm/', tv: 'tv/' } },
+  mc: { url: 'https://www.metacritic.com/', wikiProp: 'P1712', path: { movie: 'movie/', tv: 'tv/' } }
 }
 
 /**
@@ -113,19 +127,6 @@ function pageYear(html) {
 
     if (MC_TYPES.includes(item?.['@type'])) return yearOf(item.dateCreated)
   }
-}
-
-// Wikidata rate-limits generic clients; its policy requires a descriptive User-Agent.
-const USER_AGENT = 'Slecta/2.0 (https://slecta.com)'
-const HEADERS = { 'user-agent': USER_AGENT }
-
-const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/items/'
-
-// One row per host: where its pages live, the Wikidata property naming its slug, and its own path
-// prefix per media type. Not the source table — RT answers for two sources through one page.
-const HOSTS = {
-  rt: { url: 'https://www.rottentomatoes.com/', wikiProp: 'P1258', path: { movie: 'm/', tv: 'tv/' } },
-  mc: { url: 'https://www.metacritic.com/', wikiProp: 'P1712', path: { movie: 'movie/', tv: 'tv/' } }
 }
 
 class ScoreService {
