@@ -23,9 +23,11 @@ function recordCalls() {
   tmdb.getMovies = async () => { calls.push(['list:movie']); return rows('movies') }
   tmdb.getTvShows = async () => { calls.push(['list:tv']); return rows('shows') }
   tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7 } }
-  tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7 } }
+  tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7, seasons: 1 } }
   scoreService.getScoreFromCache = async key => { calls.push(['scoreCache', key]); return null }
-  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache]); return { scores: { imdb: 70 } } }
+  // `seasons` recorded too: it decides which RT page is read, so a detail field that stops here
+  // silently reverts TV to the banded series page
+  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache, data.seasons]); return { scores: { imdb: 70 } } }
   // Defaulted as the service defaults it, so the assertion is on the effective type rather than
   // on whether the argument was passed explicitly
   reviewService.getQuotes = async (id, name, date, mediaType = 'movie') => { calls.push(['quotes', id, mediaType]); return [] }
@@ -40,10 +42,10 @@ const context = () => ({
 
 const MEDIA = [
   { mediaType: 'movie', segment: 'movies' },
-  { mediaType: 'tv', segment: 'shows' }
+  { mediaType: 'tv', segment: 'shows', seasons: 1 }
 ]
 
-for (const { mediaType, segment } of MEDIA) {
+for (const { mediaType, segment, seasons } of MEDIA) {
   test(`the ${mediaType} list reads its own catalogue and keys badges to its own segment`, async () => {
     const calls = recordCalls()
     const ctx = context()
@@ -76,7 +78,7 @@ for (const { mediaType, segment } of MEDIA) {
       [`detail:${mediaType}`, 7],
       // Undefined, not false: the detail fetch above gives another request time to fill the cache,
       // so the score lookup has to check it again before paying for the sources
-      ['score', scoreKey(segment, 7), mediaType, undefined]
+      ['score', scoreKey(segment, 7), mediaType, undefined, seasons]
     ])
   })
 

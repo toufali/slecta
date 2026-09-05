@@ -187,8 +187,8 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
     return
   }
 
-  const { imdbId, wikiId, title: name, releaseDate } = detail
-  const score = await scoreService.getScore(key, { imdbId, wikiId, title: name, releaseDate, mediaType }, false)
+  const { imdbId, wikiId, title: name, releaseDate, seasons } = detail
+  const score = await scoreService.getScore(key, { imdbId, wikiId, title: name, releaseDate, mediaType, seasons }, false)
 
   if (!score) {
     stats.failed++
