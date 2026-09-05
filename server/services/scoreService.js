@@ -12,9 +12,9 @@ export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, 
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 
-// Bump when the record's shape changes, and when a field keeps its name but changes what it counts:
-// a stale value read as the new quantity is weighted on the wrong scale. A source leaving the set
-// does not need one — nothing tonight can reach it, so nothing holds it against the write that drops it.
+// Bump when the record's shape changes, or when a field keeps its name and changes what it counts —
+// a stale value is then weighted on the wrong scale. A source leaving the set needs no bump: nothing
+// tonight can reach it, so nothing holds it against the write that drops it.
 const SCORE_CACHE_VERSION = 2
 
 // Bump when the slug record shape changes. Slug source cannot be backfilled: a cached
@@ -260,9 +260,8 @@ class ScoreService {
       if (!json) throw new Error('media-scorecard-json not found')
 
       const { criticsScore, audienceScore } = JSON.parse(json[1])
-      // The audience score's own denominator, which reproduces the published percentage exactly.
-      // `reviewCount` counts written reviews instead and runs about a third of it. Both halves
-      // required: one missing would read as a smaller but perfectly plausible total.
+      // The audience score's own denominator, and not `reviewCount`, which counts only the ratings
+      // that came with a written review. Both halves required: one missing reads as a plausible total.
       const ratings = [audienceScore?.likedCount, audienceScore?.notLikedCount]
       const page = {
         critic: toScore(criticsScore?.score),

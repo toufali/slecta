@@ -179,14 +179,15 @@ test('a healthy response is not retried', async () => {
 
 
 // A thin component is noisy in both directions, so it is shrunk toward the better-sampled ones
-// rather than penalised. Bracketed rather than pinned to exact badges, since retuning a threshold
-// is expected to move them and should not need this edited.
-test('a thin component pulls less than a well-sampled one', () => {
-  const badge = rtAudience => aggregate({ scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100_000, rtAudience } })
+// rather than discarded. Bracketed rather than pinned to exact badges, since retuning a threshold
+// is meant to move those, and the bounds sit far enough out that rounding cannot hide a real change.
+test('a thin component still pulls, but less than a well-sampled one', () => {
+  // Components at opposite extremes, so any weight at all shows after rounding
+  const badge = rtAudience => aggregate({ scores: { imdb: 0, rtAudience: 100 }, counts: { imdb: 100_000, rtAudience } })
 
-  assert.ok(badge(12) - 70 < 5, `a 12-sample component moved the badge to ${badge(12)}`)
-  assert.ok(badge(50_000) > 80, `a 50,000-sample component only reached ${badge(50_000)}`)
-  assert.ok(badge(50_000) > badge(12), 'the thick component pulls further')
+  assert.ok(badge(12) > badge(0), `12 ratings contributed nothing: ${badge(12)} against ${badge(0)} for none`)
+  assert.ok(badge(12) < 20, `12 ratings pulled the badge to ${badge(12)}`)
+  assert.ok(badge(50_000) > 40, `50,000 ratings only reached ${badge(50_000)}`)
 })
 
 // Nothing is known to be better, so discounting them equally leaves the plain mean
@@ -310,6 +311,33 @@ test('the audience count is the number the published score was computed from', a
 
   assert.equal(score.counts.rtAudience, 36_474)
   assert.equal(Math.round(100 * 35019 / score.counts.rtAudience), score.scores.rtAudience)
+})
+
+// A half arriving as a string concatenates instead of adding: 100 and `'200'` store 100,200 ratings.
+// RT sends numbers today and formats `bandedRatingCount` as a string, so it is one change away.
+test('a rating half that is not a whole number yields no count', async () => {
+  const cases = [
+    { likedCount: 100, notLikedCount: '200' },
+    { likedCount: '100', notLikedCount: '200' },
+    { likedCount: 100 },
+    { notLikedCount: 200 }
+  ]
+
+  for (const audience of cases) {
+    stubHosts({
+      'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+      'www.rottentomatoes.com': () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+        audienceScore: { score: '91', ...audience }
+      })}</script>`),
+      'www.metacritic.com': () => new Response('', { status: 404 })
+    })
+
+    const score = await scoreService.getScore('test/movie/halves', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.counts.rtAudience, undefined, JSON.stringify(audience))
+  }
 })
 
 // RT reports 0 where nobody has rated, and a zero sample would read as a real one a weighting could divide by
