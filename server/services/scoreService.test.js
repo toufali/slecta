@@ -313,11 +313,12 @@ test('the audience count is the number the published score was computed from', a
   assert.equal(Math.round(100 * 35019 / score.counts.rtAudience), score.scores.rtAudience)
 })
 
-// A half arriving as a string concatenates instead of adding: 100 and `'200'` store 100,200 ratings.
-// RT sends numbers today and formats `bandedRatingCount` as a string, so it is one change away.
-test('a rating half that is not a whole number yields no count', async () => {
+// Every malformed half sums to something plausible: `'200'` concatenates to 100,200, -100 leaves 100.
+// RT sends whole numbers today and formats `bandedRatingCount` as a string, so either is one change away.
+test('a rating half that is not a real count yields no count', async () => {
   const cases = [
     { likedCount: 100, notLikedCount: '200' },
+    { likedCount: -100, notLikedCount: 200 },
     { likedCount: '100', notLikedCount: '200' },
     { likedCount: 100 },
     { notLikedCount: 200 }

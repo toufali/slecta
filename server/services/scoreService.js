@@ -260,15 +260,15 @@ class ScoreService {
       if (!json) throw new Error('media-scorecard-json not found')
 
       const { criticsScore, audienceScore } = JSON.parse(json[1])
-      // The audience score's own denominator, and not `reviewCount`, which counts only the ratings
-      // that came with a written review. Both halves required: one missing reads as a plausible total.
+      // The score's own denominator, not `reviewCount` — the written-review subset. Both halves have
+      // to be real counts: missing, negative or sent as a string all sum to a plausible total.
       const ratings = [audienceScore?.likedCount, audienceScore?.notLikedCount]
       const page = {
         critic: toScore(criticsScore?.score),
         audience: toScore(audienceScore?.score),
         // Critics rate and review in one act, so RT reports one number for both
         criticCount: toCount(criticsScore?.reviewCount),
-        audienceRatings: ratings.every(Number.isInteger) ? toCount(ratings[0] + ratings[1]) : undefined,
+        audienceRatings: ratings.every(half => Number.isInteger(half) && half >= 0) ? toCount(ratings[0] + ratings[1]) : undefined,
         audienceFloor: toFloor(audienceScore?.bandedRatingCount),
         year: pageYear(body)
       }
