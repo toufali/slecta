@@ -59,9 +59,15 @@ function stubHosts(routes) {
 
 const wikidata = (rt, mc) => () => ok(JSON.stringify({ P1258: [{ value: { content: rt } }], P1712: [{ value: { content: mc } }] }))
 // The year matches the fixtures' usual release date, since a guessed slug is only accepted when it does
-const rtScorecard = (critic, audience, year = 2010, criticCount, audienceCount, band) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+// `audienceRatings` is split into the liked and not-liked halves RT publishes, which is what the
+// reader sums — a fixture handing it one total would not exercise the sum at all
+const rtScorecard = (critic, audience, year = 2010, criticCount, audienceRatings, band) => () => ok(`<script id="media-scorecard-json">${JSON.stringify({
   criticsScore: { score: critic, reviewCount: criticCount },
-  audienceScore: { score: audience, reviewCount: audienceCount, bandedRatingCount: band }
+  audienceScore: {
+    score: audience,
+    ...Number.isInteger(audienceRatings) ? { likedCount: audienceRatings - (audienceRatings >> 2), notLikedCount: audienceRatings >> 2 } : {},
+    bandedRatingCount: band
+  }
 })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-07-16` })}</script>`)
 
 const timeout = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
@@ -173,13 +179,15 @@ test('a healthy response is not retried', async () => {
 
 
 // A thin component is noisy in both directions, so it is shrunk toward the better-sampled ones
-// rather than penalised.
-test('a thin component pulls less than a well-sampled one', () => {
-  const thin = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 12 } }
-  const thick = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000, rtAudience: 50000 } }
+// rather than discarded. Bracketed rather than pinned to exact badges, since retuning a threshold
+// is meant to move those, and the bounds sit far enough out that rounding cannot hide a real change.
+test('a thin component still pulls, but less than a well-sampled one', () => {
+  // Components at opposite extremes, so any weight at all shows after rounding
+  const badge = rtAudience => aggregate({ scores: { imdb: 0, rtAudience: 100 }, counts: { imdb: 100_000, rtAudience } })
 
-  assert.equal(aggregate(thin), 72)
-  assert.equal(aggregate(thick), 83)
+  assert.ok(badge(12) > badge(0), `12 ratings contributed nothing: ${badge(12)} against ${badge(0)} for none`)
+  assert.ok(badge(12) < 20, `12 ratings pulled the badge to ${badge(12)}`)
+  assert.ok(badge(50_000) > 40, `50,000 ratings only reached ${badge(50_000)}`)
 })
 
 // Nothing is known to be better, so discounting them equally leaves the plain mean
@@ -283,8 +291,58 @@ test('each score is stored beside the sample size it came from', async () => {
   assert.deepEqual(score.counts, { imdb: 912_000, metacritic: 68, rtCritic: 526, rtAudience: 9065 })
 })
 
-// RT reports 0 where it has no reviews, and a zero sample would read as a real one a weighting could divide by
-test('a source with no reviews has no count rather than a zero', async () => {
+// The count has to be the score's own denominator: liked over liked-plus-not-liked reproduces the
+// published percentage, where `reviewCount` — the written-review subset, about a third of it — does not
+test('the audience count is the number the published score was computed from', async () => {
+  // Sinners, read from the live page 2026-09-04
+  stubHosts({
+    'www.wikidata.org': wikidata('m/sinners', 'movie/sinners'),
+    'www.rottentomatoes.com': () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+      audienceScore: {
+        score: '96', likedCount: 35019, notLikedCount: 1455, reviewCount: 9547, bandedRatingCount: '25,000+ Verified Ratings'
+      }
+    })}</script>`),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/denominator', {
+    wikiId: 'Q1', title: 'Sinners', releaseDate: '2025-04-18', mediaType: 'movie'
+  }, false)
+
+  assert.equal(score.counts.rtAudience, 36_474)
+  assert.equal(Math.round(100 * 35019 / score.counts.rtAudience), score.scores.rtAudience)
+})
+
+// Every malformed half sums to something plausible: `'200'` concatenates to 100,200, -100 leaves 100.
+// RT sends whole numbers today and formats `bandedRatingCount` as a string, so either is one change away.
+test('a rating half that is not a real count yields no count', async () => {
+  const cases = [
+    { likedCount: 100, notLikedCount: '200' },
+    { likedCount: -100, notLikedCount: 200 },
+    { likedCount: '100', notLikedCount: '200' },
+    { likedCount: 100 },
+    { notLikedCount: 200 }
+  ]
+
+  for (const audience of cases) {
+    stubHosts({
+      'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
+      'www.rottentomatoes.com': () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+        audienceScore: { score: '91', ...audience }
+      })}</script>`),
+      'www.metacritic.com': () => new Response('', { status: 404 })
+    })
+
+    const score = await scoreService.getScore('test/movie/halves', {
+      wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+    }, false)
+
+    assert.equal(score.counts.rtAudience, undefined, JSON.stringify(audience))
+  }
+})
+
+// RT reports 0 where nobody has rated, and a zero sample would read as a real one a weighting could divide by
+test('a source with nothing rated has no count rather than a zero', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),
     'www.rottentomatoes.com': rtScorecard(87, undefined, 2010, 526, 0),
@@ -298,7 +356,8 @@ test('a source with no reviews has no count rather than a zero', async () => {
   assert.deepEqual(score.counts, { rtCritic: 526 })
 })
 
-// RT bands a cross-season audience count instead of publishing it, which is half the TV catalogue
+// A TV series page publishes the band alone, which is half the TV catalogue. The band counts ratings,
+// as the stored count now does, so the two are finally the same quantity — one exact, one a bound.
 test('a banded audience count is stored as a floor, apart from the counts', async () => {
   stubHosts({
     'www.wikidata.org': wikidata('m/inception', 'movie/inception'),

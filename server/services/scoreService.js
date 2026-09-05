@@ -12,9 +12,10 @@ export const SCORE_RETRY_TTL = 60 * 60 // 1 hour; rate limits clear in minutes, 
 const SLUG_TTL = 60 * 60 * 24 * 30 // 30 days
 const SLUG_MISS_TTL = 60 * 60 * 24 // 1 day
 
-// Bump when the record's shape changes. A source leaving the set does not need one: nothing
+// Bump when the record's shape changes, or when a field keeps its name and changes what it counts —
+// a stale value is then weighted on the wrong scale. A source leaving the set needs no bump: nothing
 // tonight can reach it, so nothing holds it against the write that drops it.
-const SCORE_CACHE_VERSION = 1
+const SCORE_CACHE_VERSION = 2
 
 // Bump when the slug record shape changes. Slug source cannot be backfilled: a cached
 // record skips the Wikidata call and every run refreshes its TTL, so an unknown source would stay
@@ -35,7 +36,8 @@ const HEADERS = { 'user-agent': USER_AGENT }
 
 // Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
 // that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
-const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 100, rtCritic: 8, metacritic: 3 }
+// rtAudience counts the ratings the score was computed from, so its knee is in ratings too.
+const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 291, rtCritic: 8, metacritic: 3 }
 
 // One row per source: which host answers for it, and where that host's page puts its numbers. A new
 // source is a row here plus a weighting constant above, not an edit in four parallel literals.
@@ -44,7 +46,7 @@ const SOURCES = {
   imdb: { host: 'imdb', value: 'value', count: 'count' },
   metacritic: { host: 'mc', value: 'value', count: 'count' },
   rtCritic: { host: 'rt', value: 'critic', count: 'criticCount' },
-  rtAudience: { host: 'rt', value: 'audience', count: 'audienceCount', floor: 'audienceFloor' }
+  rtAudience: { host: 'rt', value: 'audience', count: 'audienceRatings', floor: 'audienceFloor' }
 }
 
 // Not a host below: Wikidata names the slugs the other two are read by and carries no score itself
@@ -258,11 +260,15 @@ class ScoreService {
       if (!json) throw new Error('media-scorecard-json not found')
 
       const { criticsScore, audienceScore } = JSON.parse(json[1])
+      // The score's own denominator, not `reviewCount` — the written-review subset. Both halves have
+      // to be real counts: missing, negative or sent as a string all sum to a plausible total.
+      const ratings = [audienceScore?.likedCount, audienceScore?.notLikedCount]
       const page = {
         critic: toScore(criticsScore?.score),
         audience: toScore(audienceScore?.score),
+        // Critics rate and review in one act, so RT reports one number for both
         criticCount: toCount(criticsScore?.reviewCount),
-        audienceCount: toCount(audienceScore?.reviewCount),
+        audienceRatings: ratings.every(half => Number.isInteger(half) && half >= 0) ? toCount(ratings[0] + ratings[1]) : undefined,
         audienceFloor: toFloor(audienceScore?.bandedRatingCount),
         year: pageYear(body)
       }
