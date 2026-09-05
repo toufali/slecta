@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, aggregate, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL } = await import('./scoreService.js')
+const { default: scoreService, aggregate, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL, UNREACHABLE } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -339,6 +339,136 @@ test('a rating half that is not a real count yields no count', async () => {
 
     assert.equal(score.counts.rtAudience, undefined, JSON.stringify(audience))
   }
+})
+
+// A show with one season carries the same scores on its season page, where the audience rating count
+// is exact rather than banded. Multi-season shows genuinely differ there, so they keep the series page.
+test('a single-season show is read from its season page, and a multi-season show is not', async () => {
+  const asked = []
+  const seasonPage = `<script id="media-scorecard-json">${JSON.stringify({
+    audienceScore: { score: '86', likedCount: 3973, notLikedCount: 633 }
+  })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'TVSeason', dateCreated: '2022-02-18' })}</script>`
+
+  for (const seasons of [1, 3]) {
+    stubHosts({
+      'www.wikidata.org': wikidata('tv/severance', 'tv/severance'),
+      'www.rottentomatoes.com': url => { asked.push(new URL(url).pathname); return ok(seasonPage) },
+      'www.metacritic.com': () => new Response('', { status: 404 })
+    })
+
+    await scoreService.getScore(`test/tv/seasons-${seasons}`, {
+      wikiId: 'Q1', title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons
+    }, false)
+  }
+
+  assert.deepEqual(asked, ['/tv/severance/s01', '/tv/severance'])
+})
+
+// One show in the sample had no season page at all. The series page still carries the score, banded,
+// so a missing season page must not cost the component.
+test('a missing season page falls back to the series page', async () => {
+  const asked = []
+
+  stubHosts({
+    'www.wikidata.org': wikidata('tv/severance', 'tv/severance'),
+    'www.rottentomatoes.com': url => {
+      const path = new URL(url).pathname
+
+      asked.push(path)
+
+      return path.endsWith('/s01')
+        ? new Response('', { status: 404 })
+        : ok(`<script id="media-scorecard-json">${JSON.stringify({
+          audienceScore: { score: '86', bandedRatingCount: '250+ Ratings' }
+        })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'TVSeries', dateCreated: '2022-02-18' })}</script>`)
+    },
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/tv/noseason', {
+    wikiId: 'Q1', title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons: 1
+  }, false)
+
+  assert.deepEqual(asked, ['/tv/severance/s01', '/tv/severance'])
+  assert.equal(score.scores.rtAudience, 86)
+  assert.equal(score.floors.rtAudience, 250, 'the series page bands its count')
+})
+
+// A host that could not be read is not a missing season page, and a second request would be spent on
+// a host already refusing the first
+test('an unreadable season page is not retried as a series page', async () => {
+  const asked = []
+
+  stubHosts({
+    'www.rottentomatoes.com': url => { asked.push(new URL(url).pathname); return new Response('', { status: 429 }) },
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/tv/blocked', {
+    title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons: 1
+  }, false)
+
+  // Every attempt on the season page, none on the series page. Not a count: a transient failure is
+  // retried once by policy, which is not this test's business.
+  assert.ok(asked.every(path => path.endsWith('/s01')), `asked ${asked.join(' ')}`)
+  assert.equal(score.outcomes.rtAudience, UNREACHABLE)
+})
+
+// The suffix is a read-time decision, so a show gaining a second season changes URL without a slug
+// rewrite — and the stored slug stays the one Wikidata gave
+test('the season suffix is not stored with the slug', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata('tv/severance', 'tv/severance'),
+    'www.rottentomatoes.com': () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+      audienceScore: { score: '86', likedCount: 3973, notLikedCount: 633 }
+    })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'TVSeason', dateCreated: '2022-02-18' })}</script>`),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  await scoreService.getScore('test/tv/slugstore', {
+    wikiId: 'Q1', title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons: 1
+  }, false)
+
+  // The last slug write is this test's; earlier tests in the file have left their own
+  const record = [...writes].filter(([key]) => key.startsWith('slugs/') && key.includes('/tv/')).at(-1)[1].value
+
+  assert.equal(record.rt, 'tv/severance')
+})
+
+// A guessed slug is only accepted when the page's year matches, so an unread year rejects it. Season
+// pages declare `TVSeason`, which the year read has to accept or every guessed TV slug fails.
+test('a season page year is read, so a guessed slug still verifies', async () => {
+  stubHosts({
+    'www.rottentomatoes.com': () => ok(`<script id="media-scorecard-json">${JSON.stringify({
+      audienceScore: { score: '86', likedCount: 3973, notLikedCount: 633 }
+    })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'TVSeason', dateCreated: '2022-02-18' })}</script>`),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/tv/seasonyear', {
+    title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons: 1
+  }, false)
+
+  assert.equal(score.scores.rtAudience, 86, 'the guessed slug was rejected for an unread year')
+  assert.equal(score.counts.rtAudience, 4606)
+})
+
+// Metacritic scores TV per season too, and refuses the type for that reason — accepting it there
+// would let a season Metascore pass as the series score
+test('Metacritic still refuses a season block', async () => {
+  stubHosts({
+    'www.rottentomatoes.com': () => new Response('', { status: 404 }),
+    'www.metacritic.com': () => ok(`<script type="application/ld+json">${JSON.stringify({
+      '@type': 'TVSeason', aggregateRating: { ratingValue: 74, reviewCount: 30 }, dateCreated: '2022-02-18'
+    })}</script>`)
+  })
+
+  const score = await scoreService.getScore('test/tv/mcseason', {
+    title: 'Severance', releaseDate: '2022-02-18', mediaType: 'tv', seasons: 1
+  }, false)
+
+  assert.equal(score.scores.metacritic, undefined)
+  assert.equal(score.outcomes.metacritic, UNREACHABLE, 'a page we cannot read is not the title answering')
 })
 
 // RT reports 0 where nobody has rated, and a zero sample would read as a real one a weighting could divide by

@@ -54,10 +54,26 @@ const WIKI_BASE_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1/entities/
 
 // One row per host: where its pages live, the Wikidata property naming its slug, and its own path
 // prefix per media type. Not the source table — RT answers for two sources through one page.
+// `types` is what each host's own year block may be. RT's season pages declare `TVSeason` and are
+// read deliberately; Metacritic refuses it so a season Metascore can never pass as the series score.
 const HOSTS = {
-  rt: { url: 'https://www.rottentomatoes.com/', wikiProp: 'P1258', path: { movie: 'm/', tv: 'tv/' } },
-  mc: { url: 'https://www.metacritic.com/', wikiProp: 'P1712', path: { movie: 'movie/', tv: 'tv/' } }
+  rt: {
+    url: 'https://www.rottentomatoes.com/',
+    wikiProp: 'P1258',
+    path: { movie: 'm/', tv: 'tv/' },
+    types: ['Movie', 'TVSeries', 'TVSeason']
+  },
+  mc: {
+    url: 'https://www.metacritic.com/',
+    wikiProp: 'P1712',
+    path: { movie: 'movie/', tv: 'tv/' },
+    types: ['Movie', 'TVSeries']
+  }
 }
+
+// A show with one season carries the same scores on its season page, where the rating count is exact
+// rather than banded. Appended at read time, so gaining a season changes the URL and not the slug.
+const FIRST_SEASON = '/s01'
 
 /**
  * Aggregate a stored record's components, weighting each by how well sampled it is.
@@ -112,9 +128,6 @@ function sourceOutcome(host, value) {
   return value === undefined ? UNSCORED : SCORED
 }
 
-// Metacritic scores TV per season too; only whole-title types, so a season page can never pass as the series score.
-const MC_TYPES = ['Movie', 'TVSeries']
-
 const LD_JSON = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g
 
 // Both hosts carry the release year in schema.org JSON-LD, which is what tells a guessed slug from
@@ -123,11 +136,11 @@ const LD_JSON = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/scri
 // offset, which would reject a correct slug anywhere TZ is set
 const yearOf = date => Number(String(date).slice(0, 4)) || undefined
 
-function pageYear(html) {
+function pageYear(html, types) {
   for (const [, block] of html.matchAll(LD_JSON)) {
     const item = parseJson(block)
 
-    if (MC_TYPES.includes(item?.['@type'])) return yearOf(item.dateCreated)
+    if (types.includes(item?.['@type'])) return yearOf(item.dateCreated)
   }
 }
 
@@ -148,12 +161,12 @@ class ScoreService {
 
     if (!data) return log.warn('Score lookup data undefined', { key })
 
-    const { imdbId, wikiId, title, releaseDate, mediaType = 'movie' } = data
+    const { imdbId, wikiId, title, releaseDate, mediaType = 'movie', seasons } = data
 
     try {
       const [imdbRating, resolved] = await Promise.all([
         this.#readIMDB(imdbId),
-        this.#resolveSources({ wikiId, title, releaseDate, mediaType })
+        this.#resolveSources({ wikiId, title, releaseDate, mediaType, seasons })
       ])
 
       const hosts = {
@@ -246,10 +259,21 @@ class ScoreService {
     return { value: Math.round(rating.rating * 10), count: toCount(rating.votes) } // adjusted to 100 scale
   }
 
+  // A bare `tv/<slug>` returns RT's cross-season average, so which page is asked for decides what
+  // the score means
+  async #readRT(slug, seasons) {
+    if (seasons !== 1) return this.#readRTPage(slug)
+
+    const season = await this.#readRTPage(slug + FIRST_SEASON)
+
+    // A missing season page falls back rather than costing the component. Not when the host went
+    // unread — that would spend a request on one already refusing.
+    return season.page || !season.answered ? season : this.#readRTPage(slug)
+  }
+
   // Embedded JSON the page needs to render, so steadier than the markup the old scraper read.
-  // A `tv/<slug>` path with no season suffix returns RT's cross-season average, not one season's.
   // The year comes back alongside the scores, so one GET both verifies a guess and reads it.
-  async #readRT(path) {
+  async #readRTPage(path) {
     try {
       const { answered, body } = await this.#fetchText(HOSTS.rt.url + path)
 
@@ -270,7 +294,7 @@ class ScoreService {
         criticCount: toCount(criticsScore?.reviewCount),
         audienceRatings: ratings.every(half => Number.isInteger(half) && half >= 0) ? toCount(ratings[0] + ratings[1]) : undefined,
         audienceFloor: toFloor(audienceScore?.bandedRatingCount),
-        year: pageYear(body)
+        year: pageYear(body, HOSTS.rt.types)
       }
 
       return { answered: true, page }
@@ -291,7 +315,7 @@ class ScoreService {
 
       // Parsed leniently: an unrelated malformed block should not discard a rating we did find
       const titles = [...body.matchAll(LD_JSON)].map(([, block]) => parseJson(block))
-        .filter(item => MC_TYPES.includes(item?.['@type']))
+        .filter(item => HOSTS.mc.types.includes(item?.['@type']))
 
       // No whole-title block means this is not the page we think it is, however it answered — a
       // challenge or an interstitial, which is our problem rather than the title's. A block with no
@@ -300,7 +324,7 @@ class ScoreService {
 
       const rating = titles.find(item => item.aggregateRating?.ratingValue != null)?.aggregateRating
 
-      return { answered: true, page: { value: toScore(rating?.ratingValue), count: toCount(rating?.reviewCount), year: pageYear(body) } }
+      return { answered: true, page: { value: toScore(rating?.ratingValue), count: toCount(rating?.reviewCount), year: pageYear(body, HOSTS.mc.types) } }
     } catch (e) {
       log.warn('Error getting Metacritic score', { path, error: e })
 
@@ -312,7 +336,7 @@ class ScoreService {
   // page that carries its scores. A cached slug is re-verified rather than trusted, which costs
   // nothing — the run fetches both pages for their scores anyway — and writing the record back on
   // every run keeps an in-use slug warm, so they stop expiring together.
-  async #resolveSources({ wikiId, title, releaseDate, mediaType }) {
+  async #resolveSources({ wikiId, title, releaseDate, mediaType, seasons }) {
     const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
     // Falls back to film paths for an unknown media type, as the readers' own defaults do
@@ -344,7 +368,8 @@ class ScoreService {
       }
 
       const [rt, mc] = await Promise.all([
-        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefix('rt'), title, year)), year, slug => this.#readRT(slug)),
+        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefix('rt'), title, year)), year,
+          slug => this.#readRT(slug, seasons)),
         this.#resolve(orderCandidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefix('mc')}${slugify(title, '-')}`]), year, slug => this.#readMC(slug))
       ])
 
