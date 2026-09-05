@@ -17,6 +17,7 @@ const { scoreKey, SCORE_TTL } = await import('../services/scoreService.js')
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   const scored = []
+  const passed = []
   const windows = []
   const originals = [[imdb, 'refresh'], [tmdb, 'getMovies'], [tmdb, 'getTvShows'], [tmdb, 'getMovieDetail'],
     [tmdb, 'getTvShowDetail'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
@@ -27,16 +28,17 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
   tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }] })
-  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', providers: [{ provider_id: 8 }] })
-  scoreService.getScore = async key => {
+  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', seasons: 1, providers: [{ provider_id: 8 }] })
+  scoreService.getScore = async (key, data) => {
     scored.push(key)
+    passed.push(data)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
     return Object.defineProperty({ scores: { imdb: 70, rtCritic: 70 } }, 'cached', { value: true })
   }
   // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
   scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, rtCritic: 70 } })
 
-  return { scored, windows, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
+  return { scored, passed, windows, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
 
 const movieKeys = scored => scored.filter(key => key.startsWith('movies/')).sort()
@@ -695,6 +697,22 @@ test('every page of a walk is bounded by the same window', async () => {
     assert.equal(windows.length, 3, 'one call per page')
     assert.ok(windows[0], 'a window was supplied rather than left to the clock')
     assert.equal(new Set(windows.map(w => JSON.stringify(w))).size, 1)
+  } finally {
+    restore()
+  }
+})
+
+// The season count decides which RT page a show is read from, so a detail field that stops at the
+// job silently reverts every show to the banded series page
+test('a show carries its season count to the score lookup', async () => {
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
+  const { passed, restore } = stub({ shows })
+
+  try {
+    await cacheScores()
+
+    // By title, since the reference-title check scores a show of its own after the walk
+    assert.deepEqual(passed.filter(data => data.title === 'show 9').map(data => data.seasons), [1])
   } finally {
     restore()
   }
