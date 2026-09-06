@@ -8,6 +8,7 @@ const MOVIE = {
   pageMax: 500,
   minVotes: 25,
   lookbackMax: 12,
+  langs: ['english', 'not-english'],
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
@@ -16,6 +17,7 @@ const SHOW = {
   pageMax: 500,
   minVotes: 25,
   lookbackMax: 12,
+  langs: ['english', 'not-english'],
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
@@ -39,6 +41,15 @@ test('a lookback is whole months inside the catalogue window', () => {
   }
   for (const months of ['1', '6', '12', '']) {
     assert.deepEqual(invalidFilters({ months }, SHOW), [], months)
+  }
+})
+
+test('a language choice is one of the two states or nothing', () => {
+  for (const lang of ['bogus', 'en', 'english ', 'ENGLISH', 'fr']) {
+    assert.deepEqual(invalidFilters({ lang }, MOVIE), ['lang'], lang)
+  }
+  for (const lang of ['english', 'not-english', '']) {
+    assert.deepEqual(invalidFilters({ lang }, SHOW), [], lang)
   }
 })
 

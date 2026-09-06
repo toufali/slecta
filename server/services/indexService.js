@@ -2,12 +2,12 @@
 // score it does not hold, so "Top Rated" is served from here instead of from discover.
 
 import redis from './redisService.js'
-import tmdb from './tmdbService.js'
+import tmdb, { ENGLISH, IN_ENGLISH, NOT_IN_ENGLISH } from './tmdbService.js'
 import log from '../utils/logger.js'
 
-// Bump when the row shape changes. The deploy runs the checks only, so a shape change is not
-// rewritten until the nightly run — without this the first serving deploy reads the old generation.
-export const INDEX_VERSION = 1
+// Bump when the row shape changes, then run the job by hand: the deploy runs the checks only, so
+// until the nightly run this key is absent and the ranked list fails outright.
+export const INDEX_VERSION = 2
 
 export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 
@@ -39,6 +39,10 @@ function matches(row, query, { window, certifications }) {
 
   // Agrees with discover title for title, now that both catalogues count ad-supported as available
   if (query.streaming && !row.providers?.length) return false
+
+  // Discover is asked for one code or for every other one; here the same two states read off the row
+  if (query.lang === IN_ENGLISH && row.originalLanguage !== ENGLISH) return false
+  if (query.lang === NOT_IN_ENGLISH && row.originalLanguage === ENGLISH) return false
 
   // An incomplete walk keeps rows it could not confirm, so one can outlast the window it was listed
   // from. Discover applies this bound on its own; here it has to be applied on the way out.

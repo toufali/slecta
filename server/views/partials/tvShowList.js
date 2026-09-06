@@ -24,20 +24,29 @@ const genreFields = data => {
   return html
 }
 
+const languageFields = data => [['', 'Any'], ['english', 'In English'], ['not-english', 'Not in English']]
+  .map(([value, name]) => `
+  <label class='pill'>
+    <input type='radio' name='lang' value='${value}' ${data.lang === value ? 'checked' : ''}>
+    <span>${name}</span>
+  </label>
+  `).join('')
+
 function listDescription(data) {
   // TODO: this is almost the same function as `client/scripts/movieList.js` – any way to DRY?
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, streaming
+  let sort, genres, streaming, language
 
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
+  if (data.lang) language = `<output>${data.lang === 'english' ? 'in English' : 'not in English'}</output>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
 
   const lookback = `<label>first aired in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  return conjunctionFmt.format([streaming, sort, genres, lookback].filter(item => item))
+  return conjunctionFmt.format([streaming, language, sort, genres, lookback].filter(item => item))
 }
 
 export const tvShowList = data => `
@@ -68,6 +77,10 @@ export const tvShowList = data => `
         <!-- Hidden because the value text now reads the same words: announced twice, once per handle move -->
         <output aria-hidden='true'>${monthsText(data.lookback)}</output>
       </div>
+    </fieldset>
+    <fieldset>
+      <h3>Language:</h3>
+      ${languageFields(data)}
     </fieldset>
     <fieldset>
       <h3>Availability:</h3>

@@ -140,7 +140,7 @@ async function carryRows(mediaType, previous, carry) {
 
     const score = aggregate(stored)
 
-    return score === undefined ? null : { ...row, score, sources: Object.keys(stored.scores) }
+    return score === undefined ? null : { ...row, score }
   }))
 
   return rows.filter(Boolean)
@@ -223,9 +223,8 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
   // Unscorable titles would sort as NaN
   if (avgScore === undefined) return
 
-  // `score` and `sources` rank and filter; the badge is read from the record, never from the row.
-  // Ids over names and paths over URLs, since imgConfig and the genre map rebuild those. Source
-  // names, not a count: RT contributes two keys, so a count hides outlets and critic presence.
+  // `score` ranks and the rest filter; the badge is read from the record, never from the row. Ids
+  // over names and paths over URLs, since imgConfig and the genre map rebuild those.
   return {
     id: title.id,
     title: title.title,
@@ -235,8 +234,8 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
     votes: title.tmdbScoreCount,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
-    score: avgScore,
-    sources: Object.keys(row.scores)
+    originalLanguage: title.originalLanguage,
+    score: avgScore
   }
 }
 

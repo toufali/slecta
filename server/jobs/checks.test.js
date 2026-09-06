@@ -142,7 +142,7 @@ test('an upstream lookup failure fails the title, not the run', async () => {
 test('a detail field TMDB stops populating fails the title', async () => {
   const [movie, tv] = [tmdb.getMovieDetail, tmdb.getTvShowDetail]
   const detail = extra => async () => ({
-    title: 't', overview: 'o', cast: 'c', rating: 'R', languages: 'l', genres: 'g', ...extra
+    title: 't', overview: 'o', cast: 'c', rating: 'R', language: 'l', genres: 'g', ...extra
   })
   tmdb.getMovieDetail = detail({ director: '', runtime: 120 })
   tmdb.getTvShowDetail = detail({ creator: '', seasons: 2 })

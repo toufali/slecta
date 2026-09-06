@@ -237,6 +237,51 @@ test('a lookback from a month end lands on a month end', () => {
   assert.deepEqual(tmdb.dateWindow(undefined, new Date('2028-02-29T12:00:00.000Z')), { from: '2027-02-28', to: '2028-02-29' })
 })
 
+// Discover cannot exclude a language, so "not in English" is every other code
+test('a language choice reaches discover as one code or as every other one', async () => {
+  const seen = captureUrl()
+
+  tmdb.languages = new Map([['en', 'English'], ['fr', 'French'], ['ja', 'Japanese']])
+  tmdb.notEnglish = 'fr|ja'
+
+  await tmdb.getMovies({ lang: 'english' })
+  await tmdb.getMovies({ lang: 'not-english' })
+  await tmdb.getMovies()
+
+  assert.match(decodeURIComponent(seen[0]), /with_original_language=en(&|$)/)
+  assert.match(decodeURIComponent(seen[1]), /with_original_language=fr\|ja(&|$)/)
+  assert.doesNotMatch(seen[2], /with_original_language/, 'no choice is no filter, not an empty one')
+})
+
+// The panel needs its own state back, or the chosen pill renders unchecked on the next page
+test('a list page carries the language choice the panel renders', async () => {
+  captureUrl()
+
+  assert.equal((await tmdb.getMovies({ lang: 'not-english' })).lang, 'not-english')
+  assert.equal((await tmdb.getMovies()).lang, '')
+})
+
+// The validator's vocabulary has to be the service's, or a value the panel sends is rejected
+test('the filter rules carry the language states the panel offers', () => {
+  for (const mediaType of ['movie', 'tv']) {
+    assert.deepEqual(tmdb.filterRules(mediaType).langs, ['english', 'not-english'], mediaType)
+  }
+})
+
+// An empty expansion is pruned from the query, which discover answers with everything — so the state
+// that needs the vocabulary is withheld rather than offered and silently ignored
+test('a missing language vocabulary withholds the state that needs it', () => {
+  const real = tmdb.notEnglish
+
+  try {
+    tmdb.notEnglish = ''
+
+    assert.deepEqual(tmdb.filterRules('movie').langs, ['english'])
+  } finally {
+    tmdb.notEnglish = real
+  }
+})
+
 // The validator bounds both by these, so losing a wiring rejects every value rather than only the
 // out-of-range ones — an unwired lookback 400s every submit the panel makes
 test('the filter rules carry the catalogue vote floor and lookback', () => {
@@ -275,7 +320,7 @@ const DETAIL = {
   external_ids: { imdb_id: 'tt1', wikidata_id: 'Q1' },
   'watch/providers': { results: {} },
   videos: { results: [] },
-  spoken_languages: [{ english_name: 'English' }],
+  original_language: 'en',
   genres: [{ name: 'Action' }],
   // movie-side
   title: 'A Movie', release_date: '2026-01-02', runtime: 100,
@@ -335,6 +380,20 @@ test('a movie carries a director and a runtime, a show a creator and a season co
   assert.equal('seasons' in movie, false)
 })
 
+// The nightly check fails a settled title missing any of these, so a field renamed in one place and
+// not the other passes every test and fails against TMDB
+test('every field the nightly check requires is one the detail record carries', async () => {
+  const { REQUIRED_DETAIL } = await import('../jobs/checks.js')
+
+  captureDetail()
+
+  for (const [mediaType, detail] of [['movie', await tmdb.getMovieDetail(7)], ['tv', await tmdb.getTvShowDetail(7)]]) {
+    for (const field of REQUIRED_DETAIL[mediaType]) {
+      assert.ok(field in detail, `${mediaType} detail has no ${field}`)
+    }
+  }
+})
+
 // The cached object is stored and served as JSON, so its key order is part of the shape
 test('the stored field order is unchanged for both catalogues', async () => {
   captureDetail()
@@ -342,12 +401,12 @@ test('the stored field order is unchanged for both catalogues', async () => {
   assert.deepEqual(Object.keys(await tmdb.getMovieDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'rating', 'cast', 'director', 'runtime',
-    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
   ])
   assert.deepEqual(Object.keys(await tmdb.getTvShowDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'cast', 'creator', 'rating', 'seasons',
-    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
   ])
 })
 
