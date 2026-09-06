@@ -52,3 +52,13 @@ test('a card passes the mark to its badge', () => {
   assert.match(tag(card({ lowConfidence: true })), /low-confidence/)
   assert.doesNotMatch(tag(card({ lowConfidence: false })), /low-confidence/)
 })
+
+// The ring is invisible to a screen reader, and a card carries no sentence beside it — so the badge
+// says it in words of its own, hidden from view and out of the tree entirely when settled
+test('the badge qualifies a thin score in words a screen reader can reach', () => {
+  const rendered = scoreBadge(83, true)
+
+  assert.match(rendered, /<figcaption>Few ratings so far<\/figcaption>/)
+  assert.match(rendered, /:host\(:not\(\[low-confidence\]\)\) figcaption\{\s*display: none/,
+    'a settled badge must drop the caption from the accessibility tree, not just hide it')
+})

@@ -84,6 +84,21 @@ const html = `
     stroke-dasharray: 5cqw 4cqw;
   }
 
+  /* Read aloud, never seen: the dashed ring carries this for a sighted reader, and a card has no
+     room for the sentence the detail page shows. Element content, not a label attribute. */
+  figcaption{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* Out of the accessibility tree entirely when the score is settled, not merely invisible */
+  :host(:not([low-confidence])) figcaption{
+    display: none;
+  }
+
   svg text{
     font-size: 38cqw;
     font-weight: bold;
@@ -113,6 +128,7 @@ const html = `
     <circle class="ring" cx="50%" cy="50%" r="46%"></circle>
     <text x="50%" y="50%"></text>
   </svg>
+  <figcaption>Few ratings so far</figcaption>
 </figure>
 `
 
