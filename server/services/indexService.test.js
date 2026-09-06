@@ -187,15 +187,14 @@ test('a lookback narrows the ranked list too', async () => {
   assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week'])
 })
 
-// The same two states as discover, read off the row: a change of sort must not change the list
-test('a language choice narrows the ranked list the same way', async () => {
+// The same filter as discover, read off the row: a change of sort must not change the list
+test('the language filter narrows the ranked list the same way', async () => {
   const rows = [
     row({ id: 1, title: 'english', originalLanguage: 'en' }),
     row({ id: 2, title: 'japanese', originalLanguage: 'ja' })
   ]
 
-  assert.deepEqual(titles(await listing(rows, { lang: 'english' })), ['english'])
-  assert.deepEqual(titles(await listing(rows, { lang: 'not-english' })), ['japanese'])
+  assert.deepEqual(titles(await listing(rows, { english: 'on' })), ['english'])
   assert.deepEqual(titles(await listing(rows)), ['english', 'japanese'])
 })
 

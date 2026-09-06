@@ -27,14 +27,11 @@ export const SCORE_SORT = 'score'
 // the detail path — they are already the same word.
 const day = date => date.toISOString().substring(0, 10)
 
-// The one language the filter names. Its two states are "this code" and "every other code", since
-// discover cannot be asked to exclude one.
 export const ENGLISH = 'en'
 
-// Query values, and what each sends to discover. `IN_ENGLISH` is one code; `NOT_IN_ENGLISH` expands
-// to every other, which is exact: the two totals sum to the unfiltered one.
-export const IN_ENGLISH = 'english'
-export const NOT_IN_ENGLISH = 'not-english'
+// TMDB uses `cn` for Cantonese, which is not an ISO 639-1 code, so `Intl` has no name for it
+const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
+const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
 const CATALOGUE = {
   movie: {
@@ -118,51 +115,18 @@ class TmdbService {
   imgConfig
   genres = {}
   ratings
-  // Code to English name, for the detail page, plus every code but English, which is the only way
-  // to ask discover for "not in English" — it has no negation, and an invented param it ignores
-  languages = new Map()
-  notEnglish = ''
 
   async init() {
-    const [imgConfig, genres, ratings, languages] = await Promise.all([
-      this.#getImgConfig(), this.#getGenres(), this.#getRatings(), this.#getLanguages()
-    ])
+    const [imgConfig, genres, ratings] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings()])
     this.imgConfig = imgConfig
     this.genres.all = genres.all
     this.genres.movie = genres.movie
     this.genres.show = genres.show
     this.ratings = ratings
-    this.languages = languages
-    this.notEnglish = [...languages.keys()].filter(code => code !== ENGLISH).join('|')
     console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
   }
 
-  // Every language TMDB knows, so the detail page can name a code and the list can ask for anything
-  // but English. Cached like the other vocabularies; it changes about never.
-  async #getLanguages() {
-    const url = `${TMDB_API_URL}/configuration/languages`
-
-    const cached = await redis.getCache(url)
-    if (cached) return cached
-
-    let languages = new Map([[ENGLISH, 'English']])
-
-    try {
-      const res = await fetch(url, { headers })
-
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-
-      // Codes only, so a language with no name still counts towards "not in English"
-      languages = new Map((await res.json()).filter(item => item.iso_639_1).map(item => [item.iso_639_1, item.english_name]))
-
-      redis.setCache(url, languages)
-    } catch (e) {
-      console.error('Error getting TMDB languages:', e)
-    }
-
-    return languages
-  }
 
   async #getImgConfig() {
     const url = `${TMDB_API_URL}/configuration`
@@ -252,7 +216,6 @@ class TmdbService {
       pageMax: this.pageMax,
       minVotes: this.minVotes,
       lookbackMax: this.lookbackMax,
-      langs: this.langStates(),
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
       ratings: media.certifications ? this.ratings : undefined
@@ -287,25 +250,6 @@ class TmdbService {
     return Number.isInteger(asked) && asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
   }
 
-  /**
-   * The language states that can be honoured. With no vocabulary the "not in English" expansion is
-   * empty, which discover reads as no filter and answers with the whole catalogue — so it is withheld
-   * from the validator and from the panel together.
-   */
-  langStates() {
-    return this.notEnglish ? [IN_ENGLISH, NOT_IN_ENGLISH] : [IN_ENGLISH]
-  }
-
-  /**
-   * What discover is asked for a reader's language choice: one code, every other code, or nothing.
-   * @return {(string|undefined)} undefined for no filter, which the param pruning then drops
-   */
-  originalLanguage(lang) {
-    if (lang === IN_ENGLISH) return ENGLISH
-    if (lang === NOT_IN_ENGLISH) return this.notEnglish
-
-    return undefined
-  }
 
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
   catalogue(mediaType) {
@@ -327,8 +271,7 @@ class TmdbService {
       streamingNow: query?.streaming,
       lookback: this.lookback(query?.months),
       lookbackMax: this.lookbackMax,
-      lang: query?.lang || '',
-      allLangs: this.langStates()
+      inEnglish: query?.english
     }
 
     // TMDB offers no TV equivalent, which `filterRules` already reflects
@@ -372,7 +315,7 @@ class TmdbService {
       [`${media.dateParam}.lte`]: window.to,
       [`${media.dateParam}.gte`]: window.from,
       'vote_count.gte': query?.minVotes || this.minVotes,
-      with_original_language: this.originalLanguage(query?.lang),
+      with_original_language: query?.english ? ENGLISH : undefined,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
@@ -497,7 +440,7 @@ class TmdbService {
       ...media.detail(json, this.region),
       // The original, not the spoken list: a substantially English film often lists several spoken
       // languages, which reads as needing subtitles when it does not
-      language: this.languages.get(json.original_language) ?? json.original_language,
+      language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
       backdropUrl,

@@ -35,17 +35,6 @@ const ratingFields = data => data.allRatings.reduce((acc, cur) => {
   return acc
 }, ``)
 
-const LANGUAGE_NAMES = { english: 'In English', 'not-english': 'Not in English' }
-
-// Built from the states the service says it can honour, or the panel offers one the route 400s
-const languageFields = data => [['', 'Any'], ...data.allLangs.map(value => [value, LANGUAGE_NAMES[value]])]
-  .map(([value, name]) => `
-  <label class='pill'>
-    <input type='radio' name='lang' value='${value}' ${data.lang === value ? 'checked' : ''}>
-    <span>${name}</span>
-  </label>
-  `).join('')
-
 function listDescription(data) {
   // TODO: this is almost the same function as `client/scripts/movieList.js` – any way to DRY?
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
@@ -55,7 +44,7 @@ function listDescription(data) {
 
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
-  if (data.lang) language = `<output>${data.lang === 'english' ? 'in English' : 'not in English'}</output>`
+  if (data.inEnglish) language = `<output>in English</output>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
 
@@ -99,7 +88,10 @@ export const movieList = data => `
     </fieldset>
     <fieldset>
       <h3>Language:</h3>
-      ${languageFields(data)}
+      <label class='pill'>
+        <input type='checkbox' name='english' ${data.inEnglish ? 'checked' : ''}>
+        <span>In English</span>
+      </label>
     </fieldset>
     <fieldset>
       <h3>Availability:</h3>

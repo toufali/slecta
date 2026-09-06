@@ -11,7 +11,6 @@ const data = over => ({
   sortBy: 'primary_release_date.desc',
   lookback: 12,
   lookbackMax: 12,
-  allLangs: ['english', 'not-english'],
   ...over
 })
 
@@ -40,21 +39,17 @@ test('the handle carries the unit, not only the readout beside it', () => {
   }
 })
 
+// The panel renders the request's own state back, or an applied filter shows as unticked
+test('the language checkbox reflects the request', () => {
+  for (const view of [movieList, tvShowList]) {
+    assert.match(view(data({ inEnglish: 'on' })), /name='english' checked/)
+    assert.doesNotMatch(view(data()), /name='english' checked/)
+  }
+})
+
 // Each catalogue is bounded by its own date field, and a show is not "released"
 test('each catalogue describes its own date field', () => {
   assert.match(movieList(data()), /released in the last/)
   assert.match(tvShowList(data()), /first aired in the last/)
 })
 
-// The route rejects a state the service cannot honour, so the panel must not offer it — a visible
-// option that 400s on submit is worse than an absent one
-test('the panel offers only the language states it was given', () => {
-  for (const view of [movieList, tvShowList]) {
-    const offered = view(data({ allLangs: ['english'] }))
-
-    assert.match(offered, /name='lang' value='english'/)
-    assert.doesNotMatch(offered, /value='not-english'/)
-    assert.match(offered, /name='lang' value=''/, 'any is always offered')
-    assert.match(view(data()), /value='not-english'/)
-  }
-})

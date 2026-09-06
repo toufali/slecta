@@ -8,7 +8,6 @@ const MOVIE = {
   pageMax: 500,
   minVotes: 25,
   lookbackMax: 12,
-  langs: ['english', 'not-english'],
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
   ratings: MOVIE_RATINGS
@@ -17,13 +16,12 @@ const SHOW = {
   pageMax: 500,
   minVotes: 25,
   lookbackMax: 12,
-  langs: ['english', 'not-english'],
   sorts: [{ name: 'Most Recent', value: 'first_air_date.desc' }],
   genres: new Map([[18, 'Drama'], [10765, 'Sci-Fi & Fantasy']])
 }
 
 test('a request from the filter panel passes', () => {
-  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50', months: '6' }
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50', months: '6', english: 'on' }
 
   assert.deepEqual(invalidFilters(query, MOVIE), [])
 })
@@ -44,12 +42,13 @@ test('a lookback is whole months inside the catalogue window', () => {
   }
 })
 
-test('a language choice is one of the two states or nothing', () => {
-  for (const lang of ['bogus', 'en', 'english ', 'ENGLISH', 'fr']) {
-    assert.deepEqual(invalidFilters({ lang }, MOVIE), ['lang'], lang)
+// Discover ignores an original-language value it does not know and answers with everything
+test('the language filter takes only the value the checkbox sends', () => {
+  for (const english of ['true', 'en', 'yes', 'On']) {
+    assert.deepEqual(invalidFilters({ english }, MOVIE), ['english'], english)
   }
-  for (const lang of ['english', 'not-english', '']) {
-    assert.deepEqual(invalidFilters({ lang }, SHOW), [], lang)
+  for (const english of ['on', '']) {
+    assert.deepEqual(invalidFilters({ english }, SHOW), [], english)
   }
 })
 

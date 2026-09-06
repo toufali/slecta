@@ -247,49 +247,26 @@ test('each catalogue maps the original language onto its rows', async () => {
   assert.equal((await tmdb.getTvShows()).shows[0].originalLanguage, 'ja')
 })
 
-// Discover cannot exclude a language, so "not in English" is every other code
-test('a language choice reaches discover as one code or as every other one', async () => {
+// TMDB uses `cn` for Cantonese, which is not an ISO 639-1 code, so `Intl` answers with the code
+test('the detail page names a language, including the code Intl does not know', async () => {
+  captureDetail({ original_language: 'cn' })
+
+  assert.equal((await tmdb.getMovieDetail(11)).language, 'Cantonese')
+
+  captureDetail({ original_language: 'ja' })
+
+  assert.equal((await tmdb.getMovieDetail(12)).language, 'Japanese')
+})
+
+// The panel needs its own state back, or the checkbox renders unticked on the next page
+test('a list page carries the language choice and sends the code', async () => {
   const seen = captureUrl()
 
-  tmdb.languages = new Map([['en', 'English'], ['fr', 'French'], ['ja', 'Japanese']])
-  tmdb.notEnglish = 'fr|ja'
-
-  await tmdb.getMovies({ lang: 'english' })
-  await tmdb.getMovies({ lang: 'not-english' })
-  await tmdb.getMovies()
+  assert.equal((await tmdb.getMovies({ english: 'on' })).inEnglish, 'on')
+  assert.equal((await tmdb.getMovies()).inEnglish, undefined)
 
   assert.match(decodeURIComponent(seen[0]), /with_original_language=en(&|$)/)
-  assert.match(decodeURIComponent(seen[1]), /with_original_language=fr\|ja(&|$)/)
-  assert.doesNotMatch(seen[2], /with_original_language/, 'no choice is no filter, not an empty one')
-})
-
-// The panel needs its own state back, or the chosen pill renders unchecked on the next page
-test('a list page carries the language choice the panel renders', async () => {
-  captureUrl()
-
-  assert.equal((await tmdb.getMovies({ lang: 'not-english' })).lang, 'not-english')
-  assert.equal((await tmdb.getMovies()).lang, '')
-})
-
-// The validator's vocabulary has to be the service's, or a value the panel sends is rejected
-test('the filter rules carry the language states the panel offers', () => {
-  for (const mediaType of ['movie', 'tv']) {
-    assert.deepEqual(tmdb.filterRules(mediaType).langs, ['english', 'not-english'], mediaType)
-  }
-})
-
-// An empty expansion is pruned from the query, which discover answers with everything — so the state
-// that needs the vocabulary is withheld rather than offered and silently ignored
-test('a missing language vocabulary withholds the state that needs it', () => {
-  const real = tmdb.notEnglish
-
-  try {
-    tmdb.notEnglish = ''
-
-    assert.deepEqual(tmdb.filterRules('movie').langs, ['english'])
-  } finally {
-    tmdb.notEnglish = real
-  }
+  assert.doesNotMatch(seen[1], /with_original_language/, 'unticked is no filter, not an empty one')
 })
 
 // The validator bounds both by these, so losing a wiring rejects every value rather than only the
@@ -343,12 +320,12 @@ const DETAIL = {
   created_by: [{ name: 'A Creator' }]
 }
 
-function captureDetail() {
+function captureDetail(over) {
   const seen = []
 
   globalThis.fetch = async url => {
     seen.push(String(url))
-    return new Response(JSON.stringify(DETAIL), { status: 200 })
+    return new Response(JSON.stringify({ ...DETAIL, ...over }), { status: 200 })
   }
 
   return seen
