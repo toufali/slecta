@@ -57,11 +57,11 @@ const html = `
     mask: url(../../images/badge.svg) no-repeat 50% / 80%;
     }
 
-  /* A plain disc instead of the medallion, spanning the same 80% so the number stays as legible.
-     The medallion is an award shape, so an unsettled score is not given one rather than marked. */
+  /* The band colour is a claim about the title, and a score this thinly evidenced has not earned one.
+     The medallion stays, so withholding the colour cannot read as a failed render. Set here rather
+     than by script, which would leave it unstyled until the element upgrades. */
   :host([low-confidence]) .badge{
-    -webkit-mask: radial-gradient(circle closest-side, #000 99%, transparent 100%) no-repeat 50% / 80% 80%;
-    mask: radial-gradient(circle closest-side, #000 99%, transparent 100%) no-repeat 50% / 80% 80%;
+    background-color: var(--gray-50);
   }
 
   :host(.loading) .badge{
@@ -157,7 +157,8 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
-    // Its own property rather than part of the score, so the two can be set in either order
+    // Its own property rather than part of the score, so the two can be set in either order. No
+    // render: the attribute is what the stylesheet keys the colour off.
     set lowConfidence(value) {
       this.toggleAttribute('low-confidence', Boolean(value))
     }

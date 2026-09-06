@@ -61,8 +61,8 @@ test('the badge qualifies a thin score in words a screen reader can reach', () =
   const rendered = scoreBadge(83, true)
 
   assert.match(rendered, /<figcaption>Few ratings so far<\/figcaption>/)
-  assert.match(rendered, /:host\(\[low-confidence\]\) \.badge\{[\s\S]*?radial-gradient/,
-    'the shape is what carries the mark: a plain disc rather than the medallion')
+  assert.match(rendered, /:host\(\[low-confidence\]\) \.badge\{\s*background-color: var\(--gray-50\)/,
+    'the band colour is withheld, which has to hold before the element upgrades too')
   assert.match(rendered, /:host\(:not\(\[low-confidence\]\)\) figcaption\{\s*display: none/,
     'a settled badge must drop the caption from the accessibility tree, not just hide it')
 })
