@@ -11,8 +11,7 @@ const data = over => ({
   seasons: 1, languages: 'English', providers: [], quotes: [], score: 83, ...over
 })
 
-// The mark is an attribute on the badge, so it reaches the browser through Declarative Shadow DOM
-// without the client recomputing anything
+// Carry the mark as an attribute, so Declarative Shadow DOM delivers it with nothing recomputed
 test('the badge carries the mark only when the score is thin', () => {
   // The opening tag alone: the style block names the attribute in a selector either way
   const tag = rendered => rendered.match(/<score-badge[^>]*>/)[0]
@@ -23,7 +22,7 @@ test('the badge carries the mark only when the score is thin', () => {
   assert.equal(tag(scoreBadge(0, true)), '<score-badge score="0" low-confidence>')
 })
 
-// A dashed ring is not self-evident, so on the detail page it is accompanied by something visible
+// Grey alone is not self-evident, so back it with something visible where there is room
 test('a thin score is explained in words, and a settled one is not', () => {
   for (const view of [movieDetail, tvShowDetail]) {
     assert.match(view(data({ lowConfidence: true })), /<p class='unsettled'>Few ratings so far/)
@@ -31,7 +30,7 @@ test('a thin score is explained in words, and a settled one is not', () => {
   }
 })
 
-// The badge is filled in by script on a cache miss, so the line has to be in the markup either way
+// Ship the line either way, since a cache miss fills the badge in by script
 test('the line ships hidden rather than absent', () => {
   assert.match(movieDetail(data({ lowConfidence: false })), /class='unsettled' hidden/)
 })
@@ -46,7 +45,7 @@ test('no source is named beside the badge', () => {
   }
 })
 
-// A card is the other place a badge is rendered, and a list is where most readers meet one
+// Cover the card too: a list is where most readers meet a badge
 test('a card passes the mark to its badge', () => {
   const card = over => movieCard({ id: 1, title: 'A Film', genres: [], releaseDate: '2026-01-01', posterThumb: '', detailPath: '/movies/1', score: 83, ...over })
   const tag = rendered => rendered.match(/<score-badge[^>]*>/)[0]
@@ -55,8 +54,7 @@ test('a card passes the mark to its badge', () => {
   assert.doesNotMatch(tag(card({ lowConfidence: false })), /low-confidence/)
 })
 
-// The ring is invisible to a screen reader, and a card carries no sentence beside it — so the badge
-// says it in words of its own, hidden from view and out of the tree entirely when settled
+// Colour is invisible to a screen reader and a card has no sentence, so say it in the badge itself
 test('the badge qualifies a thin score in words a screen reader can reach', () => {
   const rendered = scoreBadge(83, true)
 

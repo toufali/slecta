@@ -152,13 +152,13 @@ test('any other sort still goes to discover', async () => {
   assert.deepEqual(calls.filter(call => call[0].startsWith('index:') || call[0].startsWith('list:')), [['list:movie']])
 })
 
-// The mark is derived here from the stored record, not carried on the detail data, so a detail page
-// rendering a settled badge for a thin score is a failure only this reaches
+// Derive the mark here from the stored record: a detail page rendering a settled badge for a thin
+// score fails nowhere else
 test('the detail page marks a thin score and leaves a settled one alone', async () => {
   const thin = { scores: { imdb: 81 }, counts: { imdb: 200 } }
   const settled = { scores: { imdb: 81 }, counts: { imdb: 900_000 } }
 
-  // The scoreless case included: a badge showing a dash has no number for the ring to qualify
+  // Include the scoreless case: a badge showing a dash has no number to qualify
   const scoreless = { scores: {}, counts: {} }
 
   for (const [record, marked] of [[thin, true], [settled, false], [scoreless, false]]) {
@@ -171,11 +171,11 @@ test('the detail page marks a thin score and leaves a settled one alone', async 
     await showDetail('movie')(ctx)
 
     assert.equal(/low-confidence>/.test(ctx.body), marked, JSON.stringify(record))
-    assert.equal(/<p class='unsettled'>/.test(ctx.body), marked, 'the line in words follows the ring')
+    assert.equal(/<p class='unsettled'>/.test(ctx.body), marked, 'the line follows the colour')
   }
 })
 
-// A record no source could score has no number for a mark to qualify
+// Leave a record nothing scored unmarked: there is no number to qualify
 test('a record with no score is not marked', async () => {
   recordCalls()
   scoreService.getScoreFromCache = async () => ({ scores: {}, counts: {} })

@@ -57,9 +57,8 @@ const html = `
     mask: url(../../images/badge.svg) no-repeat 50% / 80%;
     }
 
-  /* The band colour is a claim about the title, and a score this thinly evidenced has not earned one.
-     The medallion stays, so withholding the colour cannot read as a failed render. Set here rather
-     than by script, which would leave it unstyled until the element upgrades. */
+  /* Withhold the band colour, which is a claim this evidence has not earned. Keep the medallion, or
+     it reads as a failed render. In CSS, not script, which would leave it unstyled until upgrade. */
   :host([low-confidence]) .badge{
     background-color: var(--gray-50);
   }
@@ -78,8 +77,8 @@ const html = `
     transform: rotate(5deg);
   }
 
-  /* Read aloud, never seen: the dashed ring carries this for a sighted reader, and a card has no
-     room for the sentence the detail page shows. Element content, not a label attribute. */
+  /* Say in words what the colour says in grey, for a reader who cannot see it. A card has no room
+     for the detail page's sentence. Element content, not a label attribute. */
   figcaption{
     position: absolute;
     width: 1px;
@@ -88,7 +87,7 @@ const html = `
     clip-path: inset(50%);
   }
 
-  /* Out of the accessibility tree entirely when the score is settled, not merely invisible */
+  /* Drop it from the accessibility tree when settled, rather than only hiding it */
   :host(:not([low-confidence])) figcaption{
     display: none;
   }
@@ -141,7 +140,7 @@ if (typeof HTMLElement !== 'undefined') {
 
       const parsed = parseFloat(this.getAttribute('score'))
 
-      // Not `|| undefined`: a score of 0 is a real score, and RT publishes 0% critic ratings
+      // Not `|| undefined`: 0 is a real score, and RT publishes 0% critic ratings
       this.#score = Number.isFinite(parsed) ? parsed : undefined
       this.#outputEl = this.shadowRoot.querySelector('svg text')
       this.render()
@@ -157,8 +156,8 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
-    // Its own property rather than part of the score, so the two can be set in either order. No
-    // render: the attribute is what the stylesheet keys the colour off.
+    // Its own property, so the two can be set in either order. No render: the stylesheet keys off
+    // the attribute.
     set lowConfidence(value) {
       this.toggleAttribute('low-confidence', Boolean(value))
     }
