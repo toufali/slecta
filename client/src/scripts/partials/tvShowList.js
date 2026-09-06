@@ -80,7 +80,7 @@ async function renderScores() {
 
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
-    if (!scoreBadge.score) {
+    if (scoreBadge.score === undefined) {
       scoreBadge.classList.add('loading')
 
       const score = await fetch(`/api/v1/shows/${card.id}/score`).then(res => res.json())

@@ -9,7 +9,7 @@ const quotes = article.querySelector('.quotes')
 
 export default async function init() {
   if (trailer) playBtn.addEventListener('click', playTrailer)
-  if (!scoreBadge.score) getScore()
+  if (scoreBadge.score === undefined) getScore()
   if (!quotes.childElementCount) getQuotes()
 }
 

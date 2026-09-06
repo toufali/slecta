@@ -140,7 +140,10 @@ if (typeof HTMLElement !== 'undefined') {
         this.shadowRoot.innerHTML = html
       }
 
-      this.#score = parseFloat(this.getAttribute('score')) || undefined
+      const parsed = parseFloat(this.getAttribute('score'))
+
+      // Not `|| undefined`: a score of 0 is a real score, and RT publishes 0% critic ratings
+      this.#score = Number.isFinite(parsed) ? parsed : undefined
       this.#outputEl = this.shadowRoot.querySelector('svg text')
       this.render()
     }
@@ -161,7 +164,7 @@ if (typeof HTMLElement !== 'undefined') {
     }
 
     render() {
-      this.#outputEl.textContent = Math.round(this.#score) || ''
+      this.#outputEl.textContent = Number.isFinite(this.#score) ? Math.round(this.#score) : ''
 
       switch (true) {
         case this.#score >= 75:

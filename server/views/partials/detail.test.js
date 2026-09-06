@@ -19,6 +19,8 @@ test('the badge carries the mark only when the score is thin', () => {
 
   assert.equal(tag(scoreBadge(83, true)), '<score-badge score="83" low-confidence>')
   assert.equal(tag(scoreBadge(83, false)), '<score-badge score="83">')
+  // A title scored by RT alone can aggregate to 0, which every falsy check here used to read as absent
+  assert.equal(tag(scoreBadge(0, true)), '<score-badge score="0" low-confidence>')
 })
 
 // A dashed ring is not self-evident, so on the detail page it is accompanied by something visible
