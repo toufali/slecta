@@ -59,6 +59,8 @@ test('the badge qualifies a thin score in words a screen reader can reach', () =
   const rendered = scoreBadge(83, true)
 
   assert.match(rendered, /<figcaption>Few ratings so far<\/figcaption>/)
+  assert.match(rendered, /:host\(\[low-confidence\]\) svg text\{\s*fill: none/,
+    'the number itself is what carries the mark')
   assert.match(rendered, /:host\(:not\(\[low-confidence\]\)\) figcaption\{\s*display: none/,
     'a settled badge must drop the caption from the accessibility tree, not just hide it')
 })

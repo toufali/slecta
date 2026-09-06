@@ -71,19 +71,6 @@ const html = `
     transform: rotate(5deg);
   }
 
-  /* Drawn clear of the medallion, which is a starburst masked to 80% and so reaches 40% radius.
-     A dashed line rather than a colour, since colour already carries the score band. */
-  .ring{
-    fill: none;
-    stroke: none;
-  }
-
-  :host([low-confidence]) .ring{
-    stroke: white;
-    stroke-width: 3cqw;
-    stroke-dasharray: 5cqw 4cqw;
-  }
-
   /* Read aloud, never seen: the dashed ring carries this for a sighted reader, and a card has no
      room for the sentence the detail page shows. Element content, not a label attribute. */
   figcaption{
@@ -108,6 +95,14 @@ const html = `
     dominant-baseline: central;
   }
 
+  /* An unfilled number reads as not filled in yet. Line style rather than colour, which already
+     carries the score band, and the bold weight keeps the outline wide enough to read on a card. */
+  :host([low-confidence]) svg text{
+    fill: none;
+    stroke: white;
+    stroke-width: 1.5cqw;
+  }
+
   @keyframes rotate-loading{
     to{
       transform: rotate(180deg);
@@ -125,7 +120,6 @@ const html = `
 <figure>
   <div class="badge"></div>
   <svg xmlns="http://www.w3.org/2000/svg">
-    <circle class="ring" cx="50%" cy="50%" r="46%"></circle>
     <text x="50%" y="50%"></text>
   </svg>
   <figcaption>Few ratings so far</figcaption>
