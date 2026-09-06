@@ -252,9 +252,7 @@ class TmdbService {
       pageMax: this.pageMax,
       minVotes: this.minVotes,
       lookbackMax: this.lookbackMax,
-      // Only what can be honoured: with no language vocabulary the "not in English" expansion is
-      // empty, which discover reads as no filter and would answer with the whole catalogue
-      langs: this.notEnglish ? [IN_ENGLISH, NOT_IN_ENGLISH] : [IN_ENGLISH],
+      langs: this.langStates(),
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
       ratings: media.certifications ? this.ratings : undefined
@@ -290,6 +288,15 @@ class TmdbService {
   }
 
   /**
+   * The language states that can be honoured. With no vocabulary the "not in English" expansion is
+   * empty, which discover reads as no filter and answers with the whole catalogue — so it is withheld
+   * from the validator and from the panel together.
+   */
+  langStates() {
+    return this.notEnglish ? [IN_ENGLISH, NOT_IN_ENGLISH] : [IN_ENGLISH]
+  }
+
+  /**
    * What discover is asked for a reader's language choice: one code, every other code, or nothing.
    * @return {(string|undefined)} undefined for no filter, which the param pruning then drops
    */
@@ -320,7 +327,8 @@ class TmdbService {
       streamingNow: query?.streaming,
       lookback: this.lookback(query?.months),
       lookbackMax: this.lookbackMax,
-      lang: query?.lang || ''
+      lang: query?.lang || '',
+      allLangs: this.langStates()
     }
 
     // TMDB offers no TV equivalent, which `filterRules` already reflects

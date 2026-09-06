@@ -24,7 +24,10 @@ const genreFields = data => {
   return html
 }
 
-const languageFields = data => [['', 'Any'], ['english', 'In English'], ['not-english', 'Not in English']]
+const LANGUAGE_NAMES = { english: 'In English', 'not-english': 'Not in English' }
+
+// Built from the states the service says it can honour, or the panel offers one the route 400s
+const languageFields = data => [['', 'Any'], ...data.allLangs.map(value => [value, LANGUAGE_NAMES[value]])]
   .map(([value, name]) => `
   <label class='pill'>
     <input type='radio' name='lang' value='${value}' ${data.lang === value ? 'checked' : ''}>

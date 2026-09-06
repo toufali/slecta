@@ -74,7 +74,8 @@ for (const method of ['getMovies', 'getTvShows']) {
 const ROW = {
   id: 7, title: 'A Movie', name: 'A Show', genre_ids: [28],
   release_date: '2026-01-02', first_air_date: '2026-03-04',
-  poster_path: '/p.jpg', vote_average: 7.5, vote_count: 99, popularity: 12
+  poster_path: '/p.jpg', vote_average: 7.5, vote_count: 99, popularity: 12,
+  original_language: 'ja'
 }
 
 // init is not run in this file, so supply only the fields the row mapping reads. Set once: the
@@ -235,6 +236,15 @@ test('a lookback from a month end lands on a month end', () => {
   assert.deepEqual(tmdb.dateWindow(1, new Date('2026-03-31T12:00:00.000Z')), { from: '2026-02-28', to: '2026-03-31' })
   // A leap day has no counterpart twelve months back either
   assert.deepEqual(tmdb.dateWindow(undefined, new Date('2028-02-29T12:00:00.000Z')), { from: '2027-02-28', to: '2028-02-29' })
+})
+
+// The ranked filter reads this off the row, so a typo here fails every ranked language request while
+// leaving the discover path correct
+test('each catalogue maps the original language onto its rows', async () => {
+  captureUrl()
+
+  assert.equal((await tmdb.getMovies()).movies[0].originalLanguage, 'ja')
+  assert.equal((await tmdb.getTvShows()).shows[0].originalLanguage, 'ja')
 })
 
 // Discover cannot exclude a language, so "not in English" is every other code
