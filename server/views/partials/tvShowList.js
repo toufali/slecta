@@ -74,7 +74,7 @@ export const tvShowList = data => `
       <h3>Language:</h3>
       <label class='pill'>
         <input type='checkbox' name='english' ${data.inEnglish ? 'checked' : ''}>
-        <span>In English</span>
+        <span>English</span>
       </label>
     </fieldset>
     <fieldset>
