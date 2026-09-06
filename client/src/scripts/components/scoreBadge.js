@@ -57,6 +57,13 @@ const html = `
     mask: url(../../images/badge.svg) no-repeat 50% / 80%;
     }
 
+  /* A plain disc instead of the medallion, spanning the same 80% so the number stays as legible.
+     The medallion is an award shape, so an unsettled score is not given one rather than marked. */
+  :host([low-confidence]) .badge{
+    -webkit-mask: radial-gradient(circle closest-side, #000 99%, transparent 100%) no-repeat 50% / 80% 80%;
+    mask: radial-gradient(circle closest-side, #000 99%, transparent 100%) no-repeat 50% / 80% 80%;
+  }
+
   :host(.loading) .badge{
     animation-duration: 1.5s;
     animation-delay: 0s;
@@ -93,14 +100,6 @@ const html = `
     fill: white;
     text-anchor: middle;
     dominant-baseline: central;
-  }
-
-  /* An unfilled number reads as not filled in yet. Line style rather than colour, which already
-     carries the score band, and the bold weight keeps the outline wide enough to read on a card. */
-  :host([low-confidence]) svg text{
-    fill: none;
-    stroke: white;
-    stroke-width: 1.5cqw;
   }
 
   @keyframes rotate-loading{
