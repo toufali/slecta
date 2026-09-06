@@ -71,6 +71,19 @@ const html = `
     transform: rotate(5deg);
   }
 
+  /* Drawn clear of the medallion, which is a starburst masked to 80% and so reaches 40% radius.
+     A dashed line rather than a colour, since colour already carries the score band. */
+  .ring{
+    fill: none;
+    stroke: none;
+  }
+
+  :host([low-confidence]) .ring{
+    stroke: white;
+    stroke-width: 3cqw;
+    stroke-dasharray: 5cqw 4cqw;
+  }
+
   svg text{
     font-size: 38cqw;
     font-weight: bold;
@@ -97,6 +110,7 @@ const html = `
 <figure>
   <div class="badge"></div>
   <svg xmlns="http://www.w3.org/2000/svg">
+    <circle class="ring" cx="50%" cy="50%" r="46%"></circle>
     <text x="50%" y="50%"></text>
   </svg>
 </figure>
@@ -131,6 +145,11 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
+    // Its own property rather than part of the score, so the two can be set in either order
+    set lowConfidence(value) {
+      this.toggleAttribute('low-confidence', Boolean(value))
+    }
+
     render() {
       this.#outputEl.textContent = Math.round(this.#score) || ''
 
@@ -152,8 +171,8 @@ if (typeof HTMLElement !== 'undefined') {
 }
 
 // Export Declarative Shadow DOM for server-side render
-export const scoreBadge = score => `
-<score-badge score="${score}">
+export const scoreBadge = (score, lowConfidence) => `
+<score-badge score="${score}"${lowConfidence ? ' low-confidence' : ''}>
   <template shadowrootmode="open">${html}</template>
 </score-badge>
 `

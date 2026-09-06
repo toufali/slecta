@@ -87,6 +87,14 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
+/* Cleared of the badge like the h1 above it, since the badge is positioned over this corner */
+.unsettled {
+  padding-right: 100px;
+  margin: 0 0 var(--padding-sm);
+  font: var(--small-font);
+  color: var(--gray-70);
+}
+
 label {
   color: var(--blue-90);
   margin-right: var(--padding-sm);

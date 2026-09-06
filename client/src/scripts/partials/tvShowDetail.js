@@ -22,9 +22,13 @@ function playTrailer(e) {
 
 async function getScore() {
   scoreBadge.classList.add('loading')
-  scoreBadge.score = await fetch(`/api/v1/shows/${article.id}/score`)
-    .then(res => res.json())
-    .then(json => json.avgScore)
+
+  const score = await fetch(`/api/v1/shows/${article.id}/score`).then(res => res.json())
+
+  // The line ships hidden rather than absent, so a badge filled in here can explain itself too
+  document.querySelector('.unsettled').hidden = !score.lowConfidence
+  scoreBadge.lowConfidence = score.lowConfidence
+  scoreBadge.score = score.avgScore
   scoreBadge.classList.remove('loading')
 }
 

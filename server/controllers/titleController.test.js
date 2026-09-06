@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
+const { showDetail, getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
 const { scoreKey } = await import('../services/scoreService.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
@@ -103,7 +103,9 @@ test('a cached score is served without touching TMDB', async () => {
   await getScore('movie')(ctx)
 
   assert.deepEqual(calls, [])
-  assert.deepEqual(ctx.body, { scores: { imdb: 81 }, avgScore: 81 }, 'the aggregate is derived into the response the browser reads')
+  // Both derived here: the browser would need the weighting thresholds to work either out
+  assert.deepEqual(ctx.body, { scores: { imdb: 81 }, avgScore: 81, lowConfidence: true },
+    'the aggregate is derived into the response the browser reads')
   assert.equal(ctx.headers['x-server-cache-hit'], 'true')
 })
 
@@ -148,4 +150,40 @@ test('any other sort still goes to discover', async () => {
   await getList('movie')(ctx)
 
   assert.deepEqual(calls.filter(call => call[0].startsWith('index:') || call[0].startsWith('list:')), [['list:movie']])
+})
+
+// The mark is derived here from the stored record, not carried on the detail data, so a detail page
+// rendering a settled badge for a thin score is a failure only this reaches
+test('the detail page marks a thin score and leaves a settled one alone', async () => {
+  const thin = { scores: { imdb: 81 }, counts: { imdb: 200 } }
+  const settled = { scores: { imdb: 81 }, counts: { imdb: 900_000 } }
+
+  // The scoreless case included: a badge showing a dash has no number for the ring to qualify
+  const scoreless = { scores: {}, counts: {} }
+
+  for (const [record, marked] of [[thin, true], [settled, false], [scoreless, false]]) {
+    recordCalls()
+    scoreService.getScoreFromCache = async () => record
+    reviewService.getQuotesFromCache = async () => []
+
+    const ctx = context()
+
+    await showDetail('movie')(ctx)
+
+    assert.equal(/low-confidence>/.test(ctx.body), marked, JSON.stringify(record))
+    assert.equal(/<p class='unsettled'>/.test(ctx.body), marked, 'the line in words follows the ring')
+  }
+})
+
+// A record no source could score has no number for a mark to qualify
+test('a record with no score is not marked', async () => {
+  recordCalls()
+  scoreService.getScoreFromCache = async () => ({ scores: {}, counts: {} })
+
+  const ctx = context()
+
+  await getScore('movie')(ctx)
+
+  assert.equal(ctx.body.avgScore, undefined)
+  assert.equal(ctx.body.lowConfidence, false)
 })

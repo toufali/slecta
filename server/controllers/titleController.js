@@ -1,6 +1,6 @@
 import tmdb, { SCORE_SORT } from '../services/tmdbService.js'
 import index from '../services/indexService.js'
-import scoreService, { aggregate, scoreKey } from '../services/scoreService.js'
+import scoreService, { aggregate, lowConfidence, scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { pageLinks } from '../utils/pagination.js'
@@ -75,6 +75,7 @@ export const showDetail = mediaType => async ctx => {
   const quotes = await reviewService.getQuotesFromCache(ctx.params.id, mediaType)
 
   data.score = aggregate(score)
+  data.lowConfidence = lowConfidence(score)
   data.quotes = quotes
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')
@@ -134,7 +135,8 @@ export const getScore = mediaType => async ctx => {
 }
 
 // The aggregate is derived, and the browser reads it off this response rather than recomputing
-const served = record => record && { ...record, avgScore: aggregate(record) }
+// Both derived here, since the browser would need the weighting thresholds to work either out
+const served = record => record && { ...record, avgScore: aggregate(record), lowConfidence: lowConfidence(record) }
 
 export const getQuotes = mediaType => async ctx => {
   const data = await reviewService.getQuotes(ctx.params.id, ctx.query.title, ctx.query.releaseDate, mediaType)

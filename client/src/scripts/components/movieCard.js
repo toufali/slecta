@@ -65,7 +65,7 @@ const html = data => `
         <time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}</time>
       </dd>
     </dl>
-    ${scoreBadge(data.score)}
+    ${scoreBadge(data.score, data.lowConfidence)}
   </article>
 </a>
 `

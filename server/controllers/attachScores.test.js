@@ -32,7 +32,8 @@ test('each row gets its own cached badge, keyed by media segment', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1, score: 81 }, { id: 2, score: 64 }])
+  // Marked, since neither fixture carries a sample size at all
+  assert.deepEqual(items, [{ id: 1, score: 81, lowConfidence: true }, { id: 2, score: 64, lowConfidence: true }])
   assert.deepEqual(asked, [scoreKey('movies', 1), scoreKey('movies', 2)])
 })
 
@@ -66,7 +67,17 @@ test('one failed read costs its own badge, not the list', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1 }, { id: 2, score: 64 }])
+  assert.deepEqual(items, [{ id: 1 }, { id: 2, score: 64, lowConfidence: true }])
+})
+
+// A mark on every badge would read as decoration, so the well-sampled case is what proves the flag
+test('a well-sampled row is not marked', async () => {
+  stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81, rtCritic: 90 }, counts: { imdb: 900_000, rtCritic: 300 } } })
+  const items = [{ id: 1 }]
+
+  await attachScores(items, 'movies')
+
+  assert.deepEqual(items, [{ id: 1, score: 85, lowConfidence: false }])
 })
 
 test('an empty list asks nothing', async () => {
