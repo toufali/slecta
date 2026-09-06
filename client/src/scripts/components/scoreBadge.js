@@ -57,6 +57,12 @@ const html = `
     mask: url(../../images/badge.svg) no-repeat 50% / 80%;
     }
 
+  /* Withhold the band colour, which is a claim this evidence has not earned. Keep the medallion, or
+     it reads as a failed render. In CSS, not script, which would leave it unstyled until upgrade. */
+  :host([low-confidence]) .badge{
+    background-color: var(--gray-50);
+  }
+
   :host(.loading) .badge{
     animation-duration: 1.5s;
     animation-delay: 0s;
@@ -69,6 +75,21 @@ const html = `
     height: 100%;
     filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
     transform: rotate(5deg);
+  }
+
+  /* Say in words what the colour says in grey, for a reader who cannot see it. A card has no room
+     for the detail page's sentence. Element content, not a label attribute. */
+  figcaption{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* Drop it from the accessibility tree when settled, rather than only hiding it */
+  :host(:not([low-confidence])) figcaption{
+    display: none;
   }
 
   svg text{
@@ -99,6 +120,7 @@ const html = `
   <svg xmlns="http://www.w3.org/2000/svg">
     <text x="50%" y="50%"></text>
   </svg>
+  <figcaption>Few ratings so far</figcaption>
 </figure>
 `
 
@@ -116,7 +138,10 @@ if (typeof HTMLElement !== 'undefined') {
         this.shadowRoot.innerHTML = html
       }
 
-      this.#score = parseFloat(this.getAttribute('score')) || undefined
+      const parsed = parseFloat(this.getAttribute('score'))
+
+      // Not `|| undefined`: 0 is a real score, and RT publishes 0% critic ratings
+      this.#score = Number.isFinite(parsed) ? parsed : undefined
       this.#outputEl = this.shadowRoot.querySelector('svg text')
       this.render()
     }
@@ -131,8 +156,14 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
+    // Its own property, so the two can be set in either order. No render: the stylesheet keys off
+    // the attribute.
+    set lowConfidence(value) {
+      this.toggleAttribute('low-confidence', Boolean(value))
+    }
+
     render() {
-      this.#outputEl.textContent = Math.round(this.#score) || ''
+      this.#outputEl.textContent = Number.isFinite(this.#score) ? Math.round(this.#score) : ''
 
       switch (true) {
         case this.#score >= 75:
@@ -152,8 +183,8 @@ if (typeof HTMLElement !== 'undefined') {
 }
 
 // Export Declarative Shadow DOM for server-side render
-export const scoreBadge = score => `
-<score-badge score="${score}">
+export const scoreBadge = (score, lowConfidence) => `
+<score-badge score="${score}"${lowConfidence ? ' low-confidence' : ''}>
   <template shadowrootmode="open">${html}</template>
 </score-badge>
 `

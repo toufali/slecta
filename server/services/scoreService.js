@@ -39,6 +39,10 @@ const HEADERS = { 'user-agent': USER_AGENT }
 // rtAudience counts the ratings the score was computed from, so its knee is in ratings too.
 const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 291, rtCritic: 8, metacritic: 3 }
 
+// Total component weight below which a score is shown but marked as not settled — half a component's
+// worth of evidence, which IMDb alone reaches at its own half-confidence sample
+const MIN_CONFIDENCE = 0.5
+
 // One row per source: which host answers for it, and where that host's page puts its numbers. A new
 // source is a row here plus a weighting constant above, not an edit in four parallel literals.
 // `floor` is a banded lower bound, kept out of `count` because a bound is a weaker claim.
@@ -75,11 +79,9 @@ const HOSTS = {
 // rather than banded. Appended at read time, so gaining a season changes the URL and not the slug.
 const FIRST_SEASON = '/s01'
 
-/**
- * Aggregate a stored record's components, weighting each by how well sampled it is.
- * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
- */
-export function aggregate(record) {
+// Weighted sum and total weight, which the score and its confidence are both read off. One loop, so
+// the two can never disagree about how well sampled a record is.
+function weigh(record) {
   const scores = record?.scores ?? {}
   let weighted = 0
   let total = 0
@@ -95,11 +97,32 @@ export function aggregate(record) {
     total += weight
   }
 
+  return { scores, weighted, total }
+}
+
+/**
+ * Aggregate a stored record's components, weighting each by how well sampled it is.
+ * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
+ */
+export function aggregate(record) {
+  const { scores, weighted, total } = weigh(record)
+
   // Nothing carries a usable sample, so nothing is known to be better and the plain mean returns
   const mean = total ? weighted / total : average(Object.values(scores))
 
   // Round here, so the number shown and the number sorted on are the same one
   return Number.isFinite(mean) ? Math.round(mean) : undefined
+}
+
+/**
+ * Whether a record's evidence is too thin to present its score as settled. The number is still
+ * shown: a few hundred votes is a real signal, and withholding it serves a reader worse than
+ * qualifying it. False for a record nothing scored, so no caller has to ask that first.
+ */
+export function lowConfidence(record) {
+  const { scores, total } = weigh(record)
+
+  return Object.keys(scores).length > 0 && total < MIN_CONFIDENCE
 }
 
 // Undici holds the connection until a body is read or cancelled, and every path here

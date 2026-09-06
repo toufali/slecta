@@ -80,11 +80,13 @@ async function renderScores() {
 
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
-    if (!scoreBadge.score) {
+    if (scoreBadge.score === undefined) {
       scoreBadge.classList.add('loading')
-      scoreBadge.score = await fetch(`/api/v1/movies/${card.id}/score`)
-        .then(res => res.json())
-        .then(json => json.avgScore)
+
+      const score = await fetch(`/api/v1/movies/${card.id}/score`).then(res => res.json())
+
+      scoreBadge.lowConfidence = score.lowConfidence
+      scoreBadge.score = score.avgScore
       scoreBadge.classList.remove('loading')
     }
   }

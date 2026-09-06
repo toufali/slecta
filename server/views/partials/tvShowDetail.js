@@ -35,7 +35,8 @@ export const tvShowDetail = data => `
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
     <h1>${data.title}</h1>
-    ${scoreBadge(data.score)}
+    ${scoreBadge(data.score, data.lowConfidence)}
+    <p class='unsettled'${data.lowConfidence ? '' : ' hidden'}>Few ratings so far, so this score may move.</p>
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
