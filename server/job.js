@@ -26,8 +26,7 @@ try {
   scoreService.throttleMs = HOST_INTERVAL
 
   if (checksOnly) {
-    // The ranked list too: a deploy that bumped the row shape leaves it unpublished, and the checks
-    // are the only thing that runs before traffic arrives
+    // The ranked list too: a bumped row shape leaves it unpublished, and this is what runs first
     const [reference, ranked] = [await checkReferenceTitles(), await checkRankedIndex()]
 
     process.exitCode = reference.ok && ranked.ok ? 0 : 1

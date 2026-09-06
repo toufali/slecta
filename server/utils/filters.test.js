@@ -42,7 +42,6 @@ test('a lookback is whole months inside the catalogue window', () => {
   }
 })
 
-// Discover ignores an original-language value it does not know and answers with everything
 test('the language filter takes only the value the checkbox sends', () => {
   for (const english of ['true', 'en', 'yes', 'On']) {
     assert.deepEqual(invalidFilters({ english }, MOVIE), ['english'], english)

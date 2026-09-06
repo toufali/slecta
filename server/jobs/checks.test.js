@@ -201,8 +201,7 @@ test('the richer rates of the smaller catalogue are tolerated too', () => {
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
 })
 
-// A row-shape bump leaves the ranked list unpublished until the job runs, and the deploy runs only
-// the checks — so the checks are what turns a quiet 503 into a red build
+// Turn a quiet 503 into a red build: only the checks run before traffic reaches a bumped deploy
 test('a missing ranked list fails the checks, and an unreadable Redis does not', async () => {
   const { checkRankedIndex } = await import('./checks.js')
   const { default: redis } = await import('../services/redisService.js')
@@ -219,7 +218,6 @@ test('a missing ranked list fails the checks, and an unreadable Redis does not',
     redis.getCache = async () => [{ id: 1 }]
     assert.equal((await checkRankedIndex()).ok, true)
 
-    // undefined is Redis unreadable, which says nothing about whether a generation exists
     redis.getCache = async () => undefined
     assert.equal((await checkRankedIndex()).ok, true, 'an outage is not an unpublished list')
   } finally {

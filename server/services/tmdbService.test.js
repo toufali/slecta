@@ -238,8 +238,7 @@ test('a lookback from a month end lands on a month end', () => {
   assert.deepEqual(tmdb.dateWindow(undefined, new Date('2028-02-29T12:00:00.000Z')), { from: '2027-02-28', to: '2028-02-29' })
 })
 
-// The ranked filter reads this off the row, so a typo here fails every ranked language request while
-// leaving the discover path correct
+// The ranked filter reads this off the row, so a typo here breaks it while discover stays correct
 test('each catalogue maps the original language onto its rows', async () => {
   captureUrl()
 
@@ -247,7 +246,7 @@ test('each catalogue maps the original language onto its rows', async () => {
   assert.equal((await tmdb.getTvShows()).shows[0].originalLanguage, 'ja')
 })
 
-// TMDB uses `cn` for Cantonese, which is not an ISO 639-1 code, so `Intl` answers with the code
+// `cn` is TMDB's own code and not an ISO one, so `Intl` answers with the code itself
 test('the detail page names a language, including the code Intl does not know', async () => {
   captureDetail({ original_language: 'cn' })
 
@@ -258,7 +257,7 @@ test('the detail page names a language, including the code Intl does not know', 
   assert.equal((await tmdb.getMovieDetail(12)).language, 'Japanese')
 })
 
-// The panel needs its own state back, or the checkbox renders unticked on the next page
+// Send the state back, or the checkbox renders unticked on the next page
 test('a list page carries the language choice and sends the code', async () => {
   const seen = captureUrl()
 

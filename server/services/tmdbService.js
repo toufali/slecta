@@ -438,8 +438,8 @@ class TmdbService {
       overview: json.overview,
       releaseDate: json[media.dateField],
       ...media.detail(json, this.region),
-      // The original, not the spoken list: a substantially English film often lists several spoken
-      // languages, which reads as needing subtitles when it does not
+      // Read the original, not the spoken list: a substantially English film lists several spoken
+      // languages and so reads as needing subtitles
       language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,

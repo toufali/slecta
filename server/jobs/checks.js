@@ -41,7 +41,6 @@ const MAX_FAILED_RATE = 0.1
 // A title no source could score at all, which is every source failing for it at once
 const MAX_UNSCORED_RATE = 0.1
 
-/** Score known titles and compare every source against its expected value. */
 /**
  * Whether a ranked list exists to serve. Run at deploy, so a row-shape bump fails the build rather
  * than leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
@@ -61,6 +60,7 @@ export async function checkRankedIndex() {
   return { ok: missing.length === 0, missing }
 }
 
+/** Score known titles and compare every source against its expected value. */
 export async function checkReferenceTitles() {
   const failures = []
 
