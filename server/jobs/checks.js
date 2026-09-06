@@ -4,6 +4,8 @@
 
 import tmdb from '../services/tmdbService.js'
 import scoreService, { scoreKey } from '../services/scoreService.js'
+import redis from '../services/redisService.js'
+import { indexKey, INDEX_VERSION } from '../services/indexService.js'
 import log from '../utils/logger.js'
 
 // Points of drift allowed. A dead source returns nothing at all, not a near-miss.
@@ -40,6 +42,25 @@ const MAX_FAILED_RATE = 0.1
 const MAX_UNSCORED_RATE = 0.1
 
 /** Score known titles and compare every source against its expected value. */
+/**
+ * Whether a ranked list exists to serve. Run at deploy, so a row-shape bump fails the build rather
+ * than leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
+ * @return {{ok: boolean, missing: string[]}}
+ */
+export async function checkRankedIndex() {
+  const missing = []
+
+  for (const segment of ['movies', 'shows']) {
+    // undefined is an unreadable Redis, which is not the same as a generation nobody has published
+    if (await redis.getCache(indexKey(segment)) === null) missing.push(segment)
+  }
+
+  if (missing.length) log.error('Ranked list missing, run the scoring job', { missing, version: INDEX_VERSION })
+  else log.info('Ranked list present', { version: INDEX_VERSION })
+
+  return { ok: missing.length === 0, missing }
+}
+
 export async function checkReferenceTitles() {
   const failures = []
 

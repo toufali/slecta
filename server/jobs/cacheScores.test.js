@@ -16,6 +16,7 @@ const { scoreKey, SCORE_TTL } = await import('../services/scoreService.js')
 // Derived, not spelled out: a version bump used to break a dozen of these
 const { indexKey } = await import('../services/indexService.js')
 const MOVIE_INDEX = indexKey('movies')
+const SHOW_INDEX = indexKey('shows')
 
 // Every seam the job leans on, so a test says which one it is exercising and the rest stay quiet.
 function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
@@ -343,7 +344,7 @@ test('a run with nothing to publish leaves the previous index alone', async () =
     await cacheScores()
 
     assert.equal(written.has(MOVIE_INDEX), false, 'no index should have been published')
-    assert.equal(written.has('index/shows/v1'), false)
+    assert.equal(written.has(SHOW_INDEX), false)
   } finally {
     redis.setCache = realSetCache
     restore()
