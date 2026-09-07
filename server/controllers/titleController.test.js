@@ -22,12 +22,11 @@ function recordCalls() {
   index.getList = async mediaType => { calls.push([`index:${mediaType}`]); return rows(mediaType === 'movie' ? 'movies' : 'shows') }
   tmdb.getMovies = async () => { calls.push(['list:movie']); return rows('movies') }
   tmdb.getTvShows = async () => { calls.push(['list:tv']); return rows('shows') }
-  tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7 } }
-  tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7, seasons: 1 } }
+  tmdb.getMovieDetail = async id => { calls.push(['detail:movie', id]); return { title: 'A Movie', tmdbScore: 7, cast: 'A Name' } }
+  tmdb.getTvShowDetail = async id => { calls.push(['detail:tv', id]); return { title: 'A Show', tmdbScore: 7, seasons: 1, cast: 'A Name' } }
   scoreService.getScoreFromCache = async key => { calls.push(['scoreCache', key]); return null }
-  // `seasons` recorded too: it decides which RT page is read, so a detail field that stops here
-  // silently reverts TV to the banded series page
-  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache, data.seasons]); return { scores: { imdb: 70 } } }
+  // `seasons` and `cast` too: a field that stops here degrades scoring quietly
+  scoreService.getScore = async (key, data, tryCache) => { calls.push(['score', key, data.mediaType, tryCache, data.seasons, data.cast]); return { scores: { imdb: 70 } } }
   // Defaulted as the service defaults it, so the assertion is on the effective type rather than
   // on whether the argument was passed explicitly
   reviewService.getQuotes = async (id, name, date, mediaType = 'movie') => { calls.push(['quotes', id, mediaType]); return [] }
@@ -78,7 +77,7 @@ for (const { mediaType, segment, seasons } of MEDIA) {
       [`detail:${mediaType}`, 7],
       // Undefined, not false: the detail fetch above gives another request time to fill the cache,
       // so the score lookup has to check it again before paying for the sources
-      ['score', scoreKey(segment, 7), mediaType, undefined, seasons]
+      ['score', scoreKey(segment, 7), mediaType, undefined, seasons, 'A Name']
     ])
   })
 

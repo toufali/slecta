@@ -159,12 +159,23 @@ const LD_JSON = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/scri
 // offset, which would reject a correct slug anywhere TZ is set
 const yearOf = date => Number(String(date).slice(0, 4)) || undefined
 
-function pageYear(html, types) {
+function pageItem(html, types) {
   for (const [, block] of html.matchAll(LD_JSON)) {
     const item = parseJson(block)
 
-    if (types.includes(item?.['@type'])) return yearOf(item.dateCreated)
+    if (types.includes(item?.['@type'])) return item
   }
+}
+
+// Letters alone, since the two sides punctuate a name differently. Any script: an ASCII-only key
+// collapses a name written in one to the empty string, and two of those would read as an overlap.
+const nameKey = name => String(name).toLowerCase().normalize('NFKD').replace(/[^\p{L}]/gu, '')
+const castOf = item => [].concat(item?.actor ?? []).map(actor => actor?.name ?? actor).map(nameKey).filter(Boolean)
+
+const pageFacts = (html, types) => {
+  const item = pageItem(html, types)
+
+  return { year: yearOf(item?.dateCreated), cast: castOf(item) }
 }
 
 class ScoreService {
@@ -184,12 +195,12 @@ class ScoreService {
 
     if (!data) return log.warn('Score lookup data undefined', { key })
 
-    const { imdbId, wikiId, title, releaseDate, mediaType = 'movie', seasons } = data
+    const { imdbId, wikiId, title, releaseDate, mediaType = 'movie', seasons, cast } = data
 
     try {
       const [imdbRating, resolved] = await Promise.all([
         this.#readIMDB(imdbId),
-        this.#resolveSources({ wikiId, title, releaseDate, mediaType, seasons })
+        this.#resolveSources({ wikiId, title, releaseDate, mediaType, seasons, cast })
       ])
 
       const hosts = {
@@ -317,7 +328,7 @@ class ScoreService {
         criticCount: toCount(criticsScore?.reviewCount),
         audienceRatings: ratings.every(half => Number.isInteger(half) && half >= 0) ? toCount(ratings[0] + ratings[1]) : undefined,
         audienceFloor: toFloor(audienceScore?.bandedRatingCount),
-        year: pageYear(body, HOSTS.rt.types)
+        ...pageFacts(body, HOSTS.rt.types)
       }
 
       return { answered: true, page }
@@ -347,7 +358,7 @@ class ScoreService {
 
       const rating = titles.find(item => item.aggregateRating?.ratingValue != null)?.aggregateRating
 
-      return { answered: true, page: { value: toScore(rating?.ratingValue), count: toCount(rating?.reviewCount), year: pageYear(body, HOSTS.mc.types) } }
+      return { answered: true, page: { value: toScore(rating?.ratingValue), count: toCount(rating?.reviewCount), ...pageFacts(body, HOSTS.mc.types) } }
     } catch (e) {
       log.warn('Error getting Metacritic score', { path, error: e })
 
@@ -359,12 +370,14 @@ class ScoreService {
   // page that carries its scores. A cached slug is re-verified rather than trusted, which costs
   // nothing — the run fetches both pages for their scores anyway — and writing the record back on
   // every run keeps an in-use slug warm, so they stop expiring together.
-  async #resolveSources({ wikiId, title, releaseDate, mediaType, seasons }) {
+  async #resolveSources({ wikiId, title, releaseDate, mediaType, seasons, cast }) {
     const key = `slugs/v${SLUG_CACHE_VERSION}/${mediaType}/${wikiId}/${title}/${releaseDate}`
     const cached = await redis.getCache(key)
     // Falls back to film paths for an unknown media type, as the readers' own defaults do
     const prefix = host => HOSTS[host].path[mediaType] ?? HOSTS[host].path.movie
     const year = yearOf(releaseDate)
+    // Already stored for both catalogues, so verifying against it costs no fetch
+    const ourCast = String(cast ?? '').split(', ').map(nameKey).filter(Boolean)
     const wiki = {}
     // True when no lookup was needed: a call never made cannot have gone unanswered
     let wikiAnswered = true
@@ -391,9 +404,9 @@ class ScoreService {
       }
 
       const [rt, mc] = await Promise.all([
-        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefix('rt'), title, year)), year,
+        this.#resolve(orderCandidates(cached?.rt, cached?.rtSource, wiki.rt, rtGuesses(prefix('rt'), title, year)), year, ourCast,
           slug => this.#readRT(slug, seasons)),
-        this.#resolve(orderCandidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefix('mc')}${slugify(title, '-')}`]), year, slug => this.#readMC(slug))
+        this.#resolve(orderCandidates(cached?.mc, cached?.mcSource, wiki.mc, [`${prefix('mc')}${slugify(title, '-')}`]), year, ourCast, slug => this.#readMC(slug))
       ])
 
       const record = { rt: rt.slug, mc: mc.slug, rtSource: rt.source, mcSource: mc.source }
@@ -427,7 +440,7 @@ class ScoreService {
 
   // The first candidate whose page verifies wins. Any 200 used to be accepted, and `m/breach`
   // answers 200 with a confident 2007 film for a 2026 title.
-  async #resolve(candidates, year, read) {
+  async #resolve(candidates, year, cast, read) {
     for (const { slug, source } of candidates) {
       const { answered, page } = await read(slug)
 
@@ -439,15 +452,19 @@ class ScoreService {
       // A 404 is this slug's own verdict, so the next candidate is worth trying
       if (!page) continue
 
+      // Only on positive disagreement: both sides naming people and sharing none. RT often omits the
+      // list, where absence is ordinary — unlike an absent year, which is itself the tell.
+      const disagrees = cast?.length && page.cast?.length && !page.cast.some(name => cast.includes(name))
+
       // Only Wikidata bypasses the check. A year we cannot read must not pass as a year that
       // matched: if a host drops the field, rejecting shows up as a coverage collapse, where
       // trusting would quietly go back to scoring the wrong films.
-      if (source === 'wikidata' || (Number.isFinite(year) && page.year === year)) {
+      if (source === 'wikidata' || (!disagrees && Number.isFinite(year) && page.year === year)) {
         return { answered: true, slug, source, page }
       }
 
       // An anomaly, not a per-title fact, so log it rather than counting it: the rate is a log query
-      log.warn('Slug rejected as a different title', { slug, pageYear: page.year, wantYear: year })
+      log.warn('Slug rejected as a different title', { slug, reason: disagrees ? 'cast' : 'year', pageYear: page.year, wantYear: year })
     }
 
     // Every candidate answered and none was this title: the host has no page for it
