@@ -48,7 +48,7 @@ export const tvShowDetail = data => `
   <p><label>Synopsis:</label><span>${data.overview}</span></p>
   <p><label>Cast:</label><span>${data.cast}</span></p>
   <p><label>Creator:</label><span>${data.creator}</span></p>
-  <p><label>Spoken languages:</label><span>${data.languages}</span></p>
+  <p><label>Language:</label><span>${data.language}</span></p>
   <div class='providers'>
     <p><label>Available on:</label></p>
     <ul>${providers(data.providers)}</ul>

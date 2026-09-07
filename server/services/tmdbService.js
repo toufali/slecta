@@ -10,12 +10,12 @@ const headers = {
 // Bump when the cached detail shape changes, so a deploy cannot serve objects the views no
 // longer understand. Scoped to detail deliberately: a global version would also discard the
 // IMDb dataset and every score record, which are expensive to rebuild.
-const DETAIL_CACHE_VERSION = 3
+const DETAIL_CACHE_VERSION = 4
 
 // Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
 // silently limit the nightly run to page one. Only the rows and those counts are cached — the
 // panel's own options are shaped after the read, so adding a sort option needs no bump.
-const LIST_CACHE_VERSION = 3
+const LIST_CACHE_VERSION = 4
 
 // Every other sort value is a discover parameter. This one is not: it names the local ranked index,
 // which is why the controller has to branch on it rather than pass it through.
@@ -26,6 +26,13 @@ export const SCORE_SORT = 'score'
 // list, since both are built at init. `segment` covers the cache-key prefix, the list property and
 // the detail path — they are already the same word.
 const day = date => date.toISOString().substring(0, 10)
+
+export const ENGLISH = 'en'
+
+// The detail page names a language rather than showing its code. `cn` is TMDB's own code for
+// Cantonese, not an ISO one, so `Intl` hands back the code and the page would read "cn".
+const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
+const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
 const CATALOGUE = {
   movie: {
@@ -120,6 +127,7 @@ class TmdbService {
     console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
   }
+
 
   async #getImgConfig() {
     const url = `${TMDB_API_URL}/configuration`
@@ -243,6 +251,7 @@ class TmdbService {
     return Number.isInteger(asked) && asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
   }
 
+
   /** The per-media-type constants, for a caller building the same shapes this service builds. */
   catalogue(mediaType) {
     return CATALOGUE[mediaType]
@@ -262,7 +271,8 @@ class TmdbService {
       sortBy: query?.sort || sorts[0].value,
       streamingNow: query?.streaming,
       lookback: this.lookback(query?.months),
-      lookbackMax: this.lookbackMax
+      lookbackMax: this.lookbackMax,
+      inEnglish: query?.english
     }
 
     // TMDB offers no TV equivalent, which `filterRules` already reflects
@@ -306,6 +316,7 @@ class TmdbService {
       [`${media.dateParam}.lte`]: window.to,
       [`${media.dateParam}.gte`]: window.from,
       'vote_count.gte': query?.minVotes || this.minVotes,
+      with_original_language: query?.english ? ENGLISH : undefined,
       with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
       without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
@@ -346,6 +357,7 @@ class TmdbService {
         posterThumb: `${this.imgConfig.secure_base_url}${this.imgConfig.poster_sizes[0]}${item.poster_path}`,
         posterPath: item.poster_path,
         tmdbScoreCount: item.vote_count,
+        originalLanguage: item.original_language,
         popularity: item.popularity,
         detailPath: `/${media.segment}/${item.id}`
       }))
@@ -427,7 +439,7 @@ class TmdbService {
       overview: json.overview,
       releaseDate: json[media.dateField],
       ...media.detail(json, this.region),
-      languages: json.spoken_languages.map(lang => lang.english_name).join(', '),
+      language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
       backdropUrl,

@@ -40,16 +40,17 @@ function listDescription(data) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, ratings, streaming
+  let sort, genres, ratings, streaming, language
 
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
+  if (data.inEnglish) language = `<output>in English</output>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
 
   const lookback = `<label>released in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  return conjunctionFmt.format([streaming, sort, genres, ratings, lookback].filter(item => item))
+  return conjunctionFmt.format([streaming, language, sort, genres, ratings, lookback].filter(item => item))
 }
 
 export const movieList = data => `
@@ -84,6 +85,13 @@ export const movieList = data => `
         <!-- Hidden because the value text now reads the same words: announced twice, once per handle move -->
         <output aria-hidden='true'>${monthsText(data.lookback)}</output>
       </div>
+    </fieldset>
+    <fieldset>
+      <h3>Language:</h3>
+      <label class='pill'>
+        <input type='checkbox' name='english' ${data.inEnglish ? 'checked' : ''}>
+        <span>English</span>
+      </label>
     </fieldset>
     <fieldset>
       <h3>Availability:</h3>

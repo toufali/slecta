@@ -15,10 +15,9 @@ tmdb.genres.movie = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.genres.show = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.ratings = ['G', 'PG', 'PG-13', 'R']
 
-const ALL = ['imdb', 'metacritic', 'rtCritic', 'rtAudience']
 const row = over => ({
   id: 1, title: 'A Film', posterPath: '/a.jpg', releaseDate: new Date().toISOString().substring(0, 10), genreIds: [35],
-  votes: 100, certification: 'R', providers: [8], score: 80, sources: ALL, ...over
+  votes: 100, certification: 'R', providers: [8], score: 80, originalLanguage: 'en', ...over
 })
 
 const stubIndex = rows => {
@@ -41,26 +40,13 @@ async function listing(rows, query = {}, mediaType = 'movie') {
   }
 }
 
-// A title vanishing when the sort changes reads as broken, so nothing is withheld on how thin its
-// evidence is. Thin scores sink unaided: an IMDb-only row tops out well below the head of the list.
-test('every scored title ranks, however thin its evidence', async () => {
-  const data = await listing([
-    row({ id: 1, title: 'metacritic', sources: ['imdb', 'metacritic'] }),
-    row({ id: 2, title: 'rt critic', sources: ['imdb', 'rtCritic'] }),
-    row({ id: 3, title: 'audience only', sources: ['imdb', 'rtAudience'] }),
-    row({ id: 4, title: 'imdb alone', sources: ['imdb'] })
-  ])
-
-  assert.deepEqual(titles(data), ['metacritic', 'rt critic', 'audience only', 'imdb alone'])
-})
-
-// Each gate tried here rejected titles for a source's coverage rather than for their own: the
-// outlet count demanded Metacritic, and the critic clause hid 305 rows a reader expects to see.
+// Rank every scored title, however thin: one vanishing on a change of sort reads as broken. Both
+// gates tried here rejected titles for a source's coverage rather than for their own.
 test('the order is the stored ranking, with nothing withheld from it', async () => {
   const data = await listing([
-    row({ id: 1, title: 'thin', sources: ['imdb'] }),
-    row({ id: 2, title: 'audiences', sources: ['imdb', 'rtAudience', 'letterboxd'] }),
-    row({ id: 3, title: 'full', sources: ALL })
+    row({ id: 1, title: 'thin' }),
+    row({ id: 2, title: 'audiences' }),
+    row({ id: 3, title: 'full' })
   ])
 
   assert.deepEqual(titles(data), ['thin', 'audiences', 'full'], 'the job ranked them; this only slices')
@@ -199,6 +185,17 @@ test('a lookback narrows the ranked list too', async () => {
 
   assert.deepEqual(titles(await listing(rows)), ['this week', 'two months ago'])
   assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week'])
+})
+
+// The same filter as discover, read off the row: a change of sort must not change the list
+test('the language filter narrows the ranked list the same way', async () => {
+  const rows = [
+    row({ id: 1, title: 'english', originalLanguage: 'en' }),
+    row({ id: 2, title: 'japanese', originalLanguage: 'ja' })
+  ]
+
+  assert.deepEqual(titles(await listing(rows, { english: 'on' })), ['english'])
+  assert.deepEqual(titles(await listing(rows)), ['english', 'japanese'])
 })
 
 test('a page is twenty titles, and the count follows the filter', async () => {

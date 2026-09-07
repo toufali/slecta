@@ -8,7 +8,8 @@ import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 const data = over => ({
   tmdbId: 7, title: 'A Title', overview: 'Words', releaseDate: '2026-01-01', rating: 'PG-13',
   genres: 'Drama', cast: 'Someone', director: 'Someone', creator: 'Someone', runtime: 100,
-  seasons: 1, languages: 'English', providers: [], quotes: [], score: 83, ...over
+  // Not English, so the assertion cannot match the panel's own "English" label by accident
+  seasons: 1, language: 'Japanese', providers: [], quotes: [], score: 83, ...over
 })
 
 // Carry the mark as an attribute, so Declarative Shadow DOM delivers it with nothing recomputed
@@ -63,4 +64,12 @@ test('the badge qualifies a thin score in words a screen reader can reach', () =
     'the band colour is withheld, which has to hold before the element upgrades too')
   assert.match(rendered, /:host\(:not\(\[low-confidence\]\)\) figcaption\{\s*display: none/,
     'a settled badge must drop the caption from the accessibility tree, not just hide it')
+})
+
+// The spoken list read as needing subtitles for a film that is substantially English
+test('the detail page names the original language', () => {
+  for (const view of [movieDetail, tvShowDetail]) {
+    assert.match(view(data()), /<label>Language:<\/label><span>Japanese<\/span>/)
+    assert.doesNotMatch(view(data()), /Spoken languages/)
+  }
 })

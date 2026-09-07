@@ -142,7 +142,7 @@ test('an upstream lookup failure fails the title, not the run', async () => {
 test('a detail field TMDB stops populating fails the title', async () => {
   const [movie, tv] = [tmdb.getMovieDetail, tmdb.getTvShowDetail]
   const detail = extra => async () => ({
-    title: 't', overview: 'o', cast: 'c', rating: 'R', languages: 'l', genres: 'g', ...extra
+    title: 't', overview: 'o', cast: 'c', rating: 'R', language: 'l', genres: 'g', ...extra
   })
   tmdb.getMovieDetail = detail({ director: '', runtime: 120 })
   tmdb.getTvShowDetail = detail({ creator: '', seasons: 2 })
@@ -199,4 +199,35 @@ test('the richer rates of the smaller catalogue are tolerated too', () => {
   const shows = healthy({ mediaType: 'tv', total: 194, processed: 194, sources: { imdb: 189, metacritic: 100, rtCritic: 135, rtAudience: 137 } })
 
   assert.equal(checkRunCoverage([movies, shows], true).ok, true)
+})
+
+// Turn a quiet 503 into a red build: only the checks run before traffic reaches a bumped deploy
+test('the checks fail whenever a ranked list cannot be served', async () => {
+  const { checkRankedIndex } = await import('./checks.js')
+  const { default: redis } = await import('../services/redisService.js')
+  const { indexKey } = await import('../services/indexService.js')
+  const real = redis.getCache
+
+  try {
+    redis.getCache = async () => null
+    assert.deepEqual((await checkRankedIndex()).missing, ['movies', 'shows'], 'nothing published')
+
+    redis.getCache = async key => key === indexKey('movies') ? [{ id: 1 }] : null
+    assert.deepEqual((await checkRankedIndex()).missing, ['shows'], 'one catalogue published')
+
+    redis.getCache = async () => [{ id: 1 }]
+    assert.equal((await checkRankedIndex()).ok, true)
+
+    // Elsewhere an outage must not read as absent data; here both mean the list will not serve, and
+    // passing would let a flaky read hide a generation nobody published
+    redis.getCache = async () => undefined
+
+    const outage = await checkRankedIndex()
+
+    assert.equal(outage.ok, false)
+    assert.deepEqual(outage.unreadable, ['movies', 'shows'])
+    assert.deepEqual(outage.missing, [], 'reported apart: one says run the job, the other fix Redis')
+  } finally {
+    redis.getCache = real
+  }
 })

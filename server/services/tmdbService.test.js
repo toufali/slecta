@@ -74,7 +74,8 @@ for (const method of ['getMovies', 'getTvShows']) {
 const ROW = {
   id: 7, title: 'A Movie', name: 'A Show', genre_ids: [28],
   release_date: '2026-01-02', first_air_date: '2026-03-04',
-  poster_path: '/p.jpg', vote_average: 7.5, vote_count: 99, popularity: 12
+  poster_path: '/p.jpg', vote_average: 7.5, vote_count: 99, popularity: 12,
+  original_language: 'ja'
 }
 
 // init is not run in this file, so supply only the fields the row mapping reads. Set once: the
@@ -237,6 +238,36 @@ test('a lookback from a month end lands on a month end', () => {
   assert.deepEqual(tmdb.dateWindow(undefined, new Date('2028-02-29T12:00:00.000Z')), { from: '2027-02-28', to: '2028-02-29' })
 })
 
+// The ranked filter reads this off the row, so a typo here breaks it while discover stays correct
+test('each catalogue maps the original language onto its rows', async () => {
+  captureUrl()
+
+  assert.equal((await tmdb.getMovies()).movies[0].originalLanguage, 'ja')
+  assert.equal((await tmdb.getTvShows()).shows[0].originalLanguage, 'ja')
+})
+
+// Without the override the page reads "cn", and TMDB uses it for every Cantonese title
+test('the detail page names a language, including the code Intl does not know', async () => {
+  captureDetail({ original_language: 'cn' })
+
+  assert.equal((await tmdb.getMovieDetail(11)).language, 'Cantonese')
+
+  captureDetail({ original_language: 'ja' })
+
+  assert.equal((await tmdb.getMovieDetail(12)).language, 'Japanese')
+})
+
+// Send the state back, or the checkbox renders unticked on the next page
+test('a list page carries the language choice and sends the code', async () => {
+  const seen = captureUrl()
+
+  assert.equal((await tmdb.getMovies({ english: 'on' })).inEnglish, 'on')
+  assert.equal((await tmdb.getMovies()).inEnglish, undefined)
+
+  assert.match(decodeURIComponent(seen[0]), /with_original_language=en(&|$)/)
+  assert.doesNotMatch(seen[1], /with_original_language/, 'unticked is no filter, not an empty one')
+})
+
 // The validator bounds both by these, so losing a wiring rejects every value rather than only the
 // out-of-range ones — an unwired lookback 400s every submit the panel makes
 test('the filter rules carry the catalogue vote floor and lookback', () => {
@@ -275,7 +306,7 @@ const DETAIL = {
   external_ids: { imdb_id: 'tt1', wikidata_id: 'Q1' },
   'watch/providers': { results: {} },
   videos: { results: [] },
-  spoken_languages: [{ english_name: 'English' }],
+  original_language: 'en',
   genres: [{ name: 'Action' }],
   // movie-side
   title: 'A Movie', release_date: '2026-01-02', runtime: 100,
@@ -288,12 +319,12 @@ const DETAIL = {
   created_by: [{ name: 'A Creator' }]
 }
 
-function captureDetail() {
+function captureDetail(over) {
   const seen = []
 
   globalThis.fetch = async url => {
     seen.push(String(url))
-    return new Response(JSON.stringify(DETAIL), { status: 200 })
+    return new Response(JSON.stringify({ ...DETAIL, ...over }), { status: 200 })
   }
 
   return seen
@@ -335,6 +366,20 @@ test('a movie carries a director and a runtime, a show a creator and a season co
   assert.equal('seasons' in movie, false)
 })
 
+// The nightly check fails a settled title missing any of these, so a field renamed in one place and
+// not the other passes every test and fails against TMDB
+test('every field the nightly check requires is one the detail record carries', async () => {
+  const { REQUIRED_DETAIL } = await import('../jobs/checks.js')
+
+  captureDetail()
+
+  for (const [mediaType, detail] of [['movie', await tmdb.getMovieDetail(7)], ['tv', await tmdb.getTvShowDetail(7)]]) {
+    for (const field of REQUIRED_DETAIL[mediaType]) {
+      assert.ok(field in detail, `${mediaType} detail has no ${field}`)
+    }
+  }
+})
+
 // The cached object is stored and served as JSON, so its key order is part of the shape
 test('the stored field order is unchanged for both catalogues', async () => {
   captureDetail()
@@ -342,12 +387,12 @@ test('the stored field order is unchanged for both catalogues', async () => {
   assert.deepEqual(Object.keys(await tmdb.getMovieDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'rating', 'cast', 'director', 'runtime',
-    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
   ])
   assert.deepEqual(Object.keys(await tmdb.getTvShowDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'cast', 'creator', 'rating', 'seasons',
-    'languages', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
   ])
 })
 

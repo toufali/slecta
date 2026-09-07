@@ -48,7 +48,7 @@ export const movieDetail = data => `
   <p><label>Cast:</label><span>${data.cast}</span></p>
   <p><label>Director:</label><span>${data.director}</span></p>
   <p><label>Running time:</label><span>${data.runtime ? `${data.runtime} min` : ''}</span></p>
-  <p><label>Spoken languages:</label><span>${data.languages}</span></p>
+  <p><label>Language:</label><span>${data.language}</span></p>
   <div class='providers'>
     <p><label>Available on:</label></p>
     <ul>${providers(data.providers)}</ul>

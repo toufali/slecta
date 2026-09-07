@@ -21,7 +21,7 @@ const SHOW = {
 }
 
 test('a request from the filter panel passes', () => {
-  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50', months: '6' }
+  const query = { sort: 'popularity.desc', wg: ['27', '878'], wr: 'R', page: '3', streaming: 'on', minVotes: '50', months: '6', english: 'on' }
 
   assert.deepEqual(invalidFilters(query, MOVIE), [])
 })
@@ -39,6 +39,15 @@ test('a lookback is whole months inside the catalogue window', () => {
   }
   for (const months of ['1', '6', '12', '']) {
     assert.deepEqual(invalidFilters({ months }, SHOW), [], months)
+  }
+})
+
+test('the language filter takes only the value the checkbox sends', () => {
+  for (const english of ['true', 'en', 'yes', 'On']) {
+    assert.deepEqual(invalidFilters({ english }, MOVIE), ['english'], english)
+  }
+  for (const english of ['on', '']) {
+    assert.deepEqual(invalidFilters({ english }, SHOW), [], english)
   }
 })
 

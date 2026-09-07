@@ -7,7 +7,7 @@ import tmdb from './services/tmdbService.js'
 import scoreService from './services/scoreService.js'
 import log from './utils/logger.js'
 import { cacheScores } from './jobs/cacheScores.js'
-import { checkReferenceTitles } from './jobs/checks.js'
+import { checkRankedIndex, checkReferenceTitles } from './jobs/checks.js'
 
 // ms between requests to one host, ≈2 a second. A run is ~730 each to RT and Metacritic, ~2,200 cold
 const HOST_INTERVAL = 500
@@ -26,9 +26,10 @@ try {
   scoreService.throttleMs = HOST_INTERVAL
 
   if (checksOnly) {
-    const reference = await checkReferenceTitles()
+    // The ranked list too: a bumped row shape leaves it unpublished, and this is what runs first
+    const [reference, ranked] = [await checkReferenceTitles(), await checkRankedIndex()]
 
-    process.exitCode = reference.ok ? 0 : 1
+    process.exitCode = reference.ok && ranked.ok ? 0 : 1
   } else {
     const { coverage, reference } = await cacheScores()
 

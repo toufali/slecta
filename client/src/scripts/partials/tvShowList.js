@@ -96,16 +96,17 @@ function renderlistDescription(data) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, ratings, streaming
+  let sort, genres, ratings, streaming, language
 
   sort = `<label>Shows sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
+  if (data.inEnglish) language = `<output>in English</output>`
 
   const lookbackText = `<label>first aired in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming, lookbackText].filter(item => item))
+  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming, language, lookbackText].filter(item => item))
   window.scrollTo(0, 0)
 }
 

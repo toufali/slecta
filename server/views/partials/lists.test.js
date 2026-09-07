@@ -39,8 +39,17 @@ test('the handle carries the unit, not only the readout beside it', () => {
   }
 })
 
+// The panel renders the request's own state back, or an applied filter shows as unticked
+test('the language checkbox reflects the request', () => {
+  for (const view of [movieList, tvShowList]) {
+    assert.match(view(data({ inEnglish: 'on' })), /name='english' checked/)
+    assert.doesNotMatch(view(data()), /name='english' checked/)
+  }
+})
+
 // Each catalogue is bounded by its own date field, and a show is not "released"
 test('each catalogue describes its own date field', () => {
   assert.match(movieList(data()), /released in the last/)
   assert.match(tvShowList(data()), /first aired in the last/)
 })
+

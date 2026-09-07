@@ -4,6 +4,8 @@
 
 import tmdb from '../services/tmdbService.js'
 import scoreService, { scoreKey } from '../services/scoreService.js'
+import redis from '../services/redisService.js'
+import { indexKey, INDEX_VERSION } from '../services/indexService.js'
 import log from '../utils/logger.js'
 
 // Points of drift allowed. A dead source returns nothing at all, not a near-miss.
@@ -16,10 +18,11 @@ const REFERENCE_TITLES = [
   { mediaType: 'tv', tmdbId: 1396, name: 'Breaking Bad', expected: { imdb: 95, metacritic: 87, rtCritic: 96, rtAudience: 97 } }
 ]
 
-// Detail fields the page renders. A settled title missing one means TMDB moved a field
-const REQUIRED_DETAIL = {
-  movie: ['title', 'overview', 'cast', 'director', 'runtime', 'rating', 'languages', 'genres'],
-  tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'languages', 'genres']
+// Detail fields the page renders; a settled title missing one means TMDB moved a field. Exported so
+// a test can hold it against the real record: renamed in one place only, this agrees with itself.
+export const REQUIRED_DETAIL = {
+  movie: ['title', 'overview', 'cast', 'director', 'runtime', 'rating', 'language', 'genres'],
+  tv: ['title', 'overview', 'cast', 'creator', 'seasons', 'rating', 'language', 'genres']
 }
 
 // `minResolved` and `maxUnreachable` divide by every title tried; `minScored` divides by the titles
@@ -37,6 +40,34 @@ const MAX_FAILED_RATE = 0.1
 
 // A title no source could score at all, which is every source failing for it at once
 const MAX_UNSCORED_RATE = 0.1
+
+/**
+ * Whether a ranked list can be served. Run at deploy, so a row-shape bump fails the build rather than
+ * leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
+ *
+ * Fails closed on an unreadable Redis as well as an absent key. The two are distinguished elsewhere
+ * so a blip cannot discard data, but here they are the same answer: the list will not serve. Passing
+ * on an outage would also let a flaky read hide a generation nobody published.
+ * @return {{ok: boolean, missing: string[], unreadable: string[]}}
+ */
+export async function checkRankedIndex() {
+  const missing = []
+  const unreadable = []
+
+  for (const segment of ['movies', 'shows']) {
+    const rows = await redis.getCache(indexKey(segment))
+
+    if (rows === undefined) unreadable.push(segment)
+    else if (!rows) missing.push(segment)
+  }
+
+  // Logged apart, since one says run the job and the other says fix Redis
+  if (missing.length) log.error('Ranked list missing, run the scoring job', { missing, version: INDEX_VERSION })
+  if (unreadable.length) log.error('Ranked list could not be read', { unreadable, version: INDEX_VERSION })
+  if (!missing.length && !unreadable.length) log.info('Ranked list present', { version: INDEX_VERSION })
+
+  return { ok: !missing.length && !unreadable.length, missing, unreadable }
+}
 
 /** Score known titles and compare every source against its expected value. */
 export async function checkReferenceTitles() {

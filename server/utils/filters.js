@@ -18,6 +18,9 @@ const CHECKS = {
   minVotes: (value, { minVotes }) => isDigits(value) && +value >= minVotes,
   // A lookback outside the catalogue's own window is a mistake, not a request for a wider one
   months: (value, { lookbackMax }) => isDigits(value) && +value >= 1 && +value <= lookbackMax,
+  // Only the checkbox's own value, like `streaming`. Discover ignores an original-language value it
+  // does not know rather than erroring, so anything else would read as no filter at all.
+  english: value => value === 'on',
   sort: (value, { sorts }) => sorts.some(option => option.value === value),
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',
