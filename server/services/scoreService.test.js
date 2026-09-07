@@ -783,9 +783,9 @@ test('a Wikidata slug with a trailing slash still reaches Metacritic', async () 
 
 // `m/breach` answers 200 with a confident 2007 title for a 2026 release. The year in schema.org
 // JSON-LD is what separates them; any 200 used to be accepted.
-const rtPage = (critic, audience, year) => () => ok(
+const rtPage = (critic, audience, year, actor) => () => ok(
   `<script id="media-scorecard-json">${JSON.stringify({ criticsScore: { score: critic }, audienceScore: { score: audience } })}</script>` +
-  (year ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-02-16` })}</script>` : '')
+  (year ? `<script type="application/ld+json">${JSON.stringify({ '@type': 'Movie', dateCreated: `${year}-02-16`, ...actor ? { actor } : {} })}</script>` : '')
 )
 
 // Per-host request counting, since the point of one GET is that it replaces a probe plus a read
@@ -812,7 +812,7 @@ test('a guessed slug for a different film is rejected, and the year variant trie
   }, false)
 
   assert.equal(score.scores.rtCritic, 70, 'the 2026 page, not the 2007 one')
-  assert.deepEqual(rejections(), [{ slug: 'm/breach', pageYear: 2007, wantYear: 2026 }])
+  assert.deepEqual(rejections(), [{ slug: 'm/breach', reason: 'year', pageYear: 2007, wantYear: 2026 }])
   assert.deepEqual(seen.filter(url => url.includes('rottentomatoes')),
     ['https://www.rottentomatoes.com/m/breach', 'https://www.rottentomatoes.com/m/breach_2026'])
 })
@@ -1426,4 +1426,50 @@ test('a title only TMDB could have scored has no aggregate at all', async () => 
 
   assert.deepEqual(score.scores, {})
   assert.equal(aggregate(score), undefined)
+})
+
+// A mockbuster copies the title and the year deliberately, which the year check cannot see
+test('a page sharing the year is rejected when it shares no cast', async () => {
+  const rejections = warnings('Slug rejected as a different title')
+
+  stubHosts({
+    'www.rottentomatoes.com': rtPage(93, 97, 2026, [{ name: 'Matt Damon' }, { name: 'Tom Holland' }]),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/mockbuster', {
+    title: 'The Odyssey', releaseDate: '2026-07-03', mediaType: 'movie', cast: 'Mike Ferguson, Ashley Doris'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, undefined, 'the other film\'s critic score')
+  assert.deepEqual(rejections().map(r => r.reason), ['cast', 'cast'], 'the bare guess and the year variant')
+})
+
+// Overlap of one is a correct match in this catalogue, so only a total mismatch may reject
+test('a page sharing one cast member is accepted', async () => {
+  stubHosts({
+    'www.rottentomatoes.com': rtPage(93, 97, 2026, [{ name: 'matt-damon' }, { name: 'Someone Else' }]),
+    'www.metacritic.com': () => new Response('', { status: 404 })
+  })
+
+  const score = await scoreService.getScore('test/movie/oneoverlap', {
+    title: 'The Odyssey', releaseDate: '2026-07-03', mediaType: 'movie', cast: 'Matt Damon, Nobody Known'
+  }, false)
+
+  assert.equal(score.scores.rtCritic, 93)
+})
+
+test('a page with no cast is verified on its year alone', async () => {
+  for (const cast of ['Matt Damon, Tom Holland', undefined]) {
+    stubHosts({
+      'www.rottentomatoes.com': rtPage(93, 97, 2026),
+      'www.metacritic.com': () => new Response('', { status: 404 })
+    })
+
+    const score = await scoreService.getScore(`test/movie/nocast-${Boolean(cast)}`, {
+      title: 'The Odyssey', releaseDate: '2026-07-03', mediaType: 'movie', cast
+    }, false)
+
+    assert.equal(score.scores.rtCritic, 93, String(cast))
+  }
 })

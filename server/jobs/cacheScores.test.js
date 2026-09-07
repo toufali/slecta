@@ -32,7 +32,7 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
   tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }] })
-  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', seasons: 1, providers: [{ provider_id: 8 }] })
+  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', seasons: 1, cast: 'A Name', providers: [{ provider_id: 8 }] })
   scoreService.getScore = async (key, data) => {
     scored.push(key)
     passed.push(data)
@@ -705,9 +705,8 @@ test('every page of a walk is bounded by the same window', async () => {
   }
 })
 
-// The season count decides which RT page a show is read from, so a detail field that stops at the
-// job silently reverts every show to the banded series page
-test('a show carries its season count to the score lookup', async () => {
+// Both decide which page a title is scored from, so a field that stops here degrades scoring quietly
+test('a show carries its season count and cast to the score lookup', async () => {
   const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
   const { passed, restore } = stub({ shows })
 
@@ -715,7 +714,7 @@ test('a show carries its season count to the score lookup', async () => {
     await cacheScores()
 
     // By title, since the reference-title check scores a show of its own after the walk
-    assert.deepEqual(passed.filter(data => data.title === 'show 9').map(data => data.seasons), [1])
+    assert.deepEqual(passed.filter(data => data.title === 'show 9').map(data => [data.seasons, data.cast]), [[1, 'A Name']])
   } finally {
     restore()
   }
