@@ -10,6 +10,17 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 // Imported after the env is set — static imports are hoisted and would run env.js first
 const { checkRunCoverage, checkReferenceTitles } = await import('./checks.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
+const { default: log } = await import('../utils/logger.js')
+
+// The alert policy matches severity>=ERROR, so which level a tier logs at *is* the silence
+function captureLevels() {
+  const seen = []
+  const real = { error: log.error, warn: log.warn, info: log.info }
+
+  for (const level of ['error', 'warn', 'info']) log[level] = message => seen.push(`${level}: ${message}`)
+
+  return { seen, restore: () => Object.assign(log, real) }
+}
 
 // A run where every source resolved for every title. `sources` is shorthand for the scored tally:
 // titles a source did not score are read as ones it does not carry, which is a healthy run's shape.
@@ -25,6 +36,7 @@ const healthy = ({ sources, ...over } = {}) => {
 }
 
 const reasons = result => result.problems.map(p => p.reason ?? p.source)
+const tiers = result => [...new Set(result.problems.map(p => p.tier))].sort()
 
 test('a healthy run reports no problems', () => {
   assert.equal(checkRunCoverage([healthy()], true).ok, true)
@@ -45,8 +57,9 @@ test('a dead source trips its floor', () => {
 })
 
 // The detection the loosened floors gave up: a source blocked for part of the run trips its
-// unreachable ceiling while every score it did return still clears the resolved floor
-test('a source blocking for part of the run fails, where the resolved floor alone passes', () => {
+// unreachable ceiling while every score it did return still clears the resolved floor. A fifth
+// unreachable is a bad night rather than a block, so it warns without waking anyone.
+test('a source blocking for part of the run warns, where the resolved floor alone says nothing', () => {
   const stats = healthy({
     sources: { imdb: 20, metacritic: 20, rtCritic: 16, rtAudience: 16 },
     outcomes: {
@@ -58,7 +71,8 @@ test('a source blocking for part of the run fails, where the resolved floor alon
   })
   const result = checkRunCoverage([stats], true)
 
-  assert.equal(result.ok, false)
+  assert.equal(result.ok, true, 'a warn leaves the run green')
+  assert.deepEqual(tiers(result), ['warn'])
   assert.deepEqual(reasons(result), ['could not be read', 'could not be read'])
 })
 
@@ -160,12 +174,14 @@ test('a detail field TMDB stops populating fails the title', async () => {
   }
 })
 
-// Half the measured rate is the drop worth catching: a source degrading rather than disappearing
-test('a source at half its measured rate trips', () => {
+// Half the measured rate is the drop worth seeing: a source degrading rather than disappearing, so
+// it is logged and not alerted
+test('a source at half its measured rate warns', () => {
   const stats = healthy({ sources: { imdb: 20, metacritic: 3, rtCritic: 5, rtAudience: 5 } })
   const result = checkRunCoverage([stats], true)
 
-  assert.equal(result.ok, false)
+  assert.equal(result.ok, true)
+  assert.deepEqual(tiers(result), ['warn'])
   assert.deepEqual(reasons(result), ['metacritic', 'rtCritic', 'rtAudience'])
 })
 
@@ -229,5 +245,111 @@ test('the checks fail whenever a ranked list cannot be served', async () => {
     assert.deepEqual(outage.missing, [], 'reported apart: one says run the job, the other fix Redis')
   } finally {
     redis.getCache = real
+  }
+})
+
+// The alert that started this: 9 unreachable Metacritic reads of 362 TV titles, against a 2% floor
+// on a catalogue half the size of film's. Nothing was wrong and the affected titles kept their
+// scores, so at 2.5% it now clears the floor outright rather than being logged as a shortfall.
+test('the night that alerted now passes without comment', () => {
+  const tv = healthy({
+    mediaType: 'tv', total: 362, processed: 362, unscored: 12,
+    outcomes: {
+      imdb: { scored: 358, absent: 4 },
+      metacritic: { scored: 96, unscored: 60, absent: 197, unreachable: 9 },
+      rtCritic: { scored: 168, unscored: 40, absent: 154 },
+      rtAudience: { scored: 190, unscored: 18, absent: 154 }
+    }
+  })
+  const result = checkRunCoverage([tv], true)
+
+  assert.equal(result.ok, true, 'a slow night is not a failed run')
+  assert.deepEqual(result.problems, [], '2.5% unreachable is normal variance, not a shortfall')
+})
+
+// Between the tiers: loud in the logs, silent to whoever is asleep
+test('a source well over its ceiling warns without alerting', () => {
+  const tv = healthy({
+    mediaType: 'tv', total: 362, processed: 362,
+    outcomes: {
+      imdb: { scored: 358, absent: 4 },
+      metacritic: { scored: 96, unscored: 60, absent: 176, unreachable: 30 },
+      rtCritic: { scored: 168, unscored: 40, absent: 154 },
+      rtAudience: { scored: 190, unscored: 18, absent: 154 }
+    }
+  })
+  const result = checkRunCoverage([tv], true)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(tiers(result), ['warn'])
+  assert.deepEqual(reasons(result), ['could not be read'])
+})
+
+// A real block is near-total, and it still has to page on the first night rather than warn twice
+test('a source failing on every title alerts immediately', () => {
+  const stats = healthy({
+    outcomes: {
+      imdb: { scored: 20 },
+      metacritic: { unreachable: 20 },
+      rtCritic: { scored: 20 },
+      rtAudience: { scored: 20 }
+    }
+  })
+  const result = checkRunCoverage([stats], true)
+
+  assert.equal(result.ok, false)
+  assert.ok(tiers(result).includes('alert'))
+  assert.deepEqual(result.problems.filter(p => p.tier === 'alert').map(p => p.source), ['metacritic', 'metacritic', 'metacritic'])
+})
+
+// A structural failure is not a rate: there is no marginal version of publishing no ranked list
+test('a structural failure alerts whatever the rates say', () => {
+  for (const over of [{ indexFailed: true }, { processed: 0 }]) {
+    const result = checkRunCoverage([healthy(over)], true)
+
+    assert.equal(result.ok, false, JSON.stringify(over))
+    assert.deepEqual(tiers(result), ['alert'])
+  }
+
+  assert.equal(checkRunCoverage([healthy()], false).ok, false, 'a failed IMDb refresh hides every rate')
+})
+
+// A warn logged at ERROR would fire the alert and defeat the whole tiering, silently
+test('only an alert reaches ERROR', () => {
+  const warnOnly = healthy({ outcomes: { imdb: { scored: 20 }, metacritic: { scored: 20 }, rtCritic: { scored: 16, unreachable: 4 }, rtAudience: { scored: 20 } } })
+  const alerting = healthy({ outcomes: { imdb: { scored: 20 }, metacritic: { unreachable: 20 }, rtCritic: { scored: 20 }, rtAudience: { scored: 20 } } })
+
+  for (const [stats, expected] of [[healthy(), ['info: Run coverage passed']], [warnOnly, ['warn: Run coverage short of its limits']], [alerting, ['error: Run coverage FAILED']]]) {
+    const { seen, restore } = captureLevels()
+
+    try {
+      checkRunCoverage([stats], true)
+    } finally {
+      restore()
+    }
+
+    assert.deepEqual(seen, expected)
+  }
+})
+
+// The run-level limits got the same two tiers, and leaving any of them on one threshold is how the
+// next false alarm arrives
+test('every run-level limit warns before it alerts', () => {
+  const cases = [
+    ['titles failed to score', { failed: 3 }, { failed: 12 }],
+    ['titles no source could score', { unscored: 3 }, { unscored: 12 }],
+    ['scores not persisted', { notCached: 3 }, { notCached: 12 }]
+  ]
+
+  for (const [reason, marginal, catastrophic] of cases) {
+    const warned = checkRunCoverage([healthy(marginal)], true)
+
+    assert.equal(warned.ok, true, reason)
+    assert.deepEqual(warned.problems.map(p => [p.tier, p.reason]), [['warn', reason]])
+
+    const alerted = checkRunCoverage([healthy(catastrophic)], true)
+
+    assert.equal(alerted.ok, false, reason)
+    assert.deepEqual(alerted.problems.map(p => [p.tier, p.reason]), [['alert', reason]])
   }
 })

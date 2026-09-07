@@ -27,19 +27,47 @@ export const REQUIRED_DETAIL = {
 
 // `minResolved` and `maxUnreachable` divide by every title tried; `minScored` divides by the titles
 // the source carries, which the vote floor moves far less.
+// A minimum alerts at 0.05 whatever its warn level: a source resolving under a twentieth of the
+// catalogue has stopped, and that reads the same for one normally at 0.9 as for one at 0.25.
+const STOPPED = 0.05
+
 const SOURCE_LIMITS = {
-  // IMDb is a local dataset: nothing to reach and no page to be absent from, so only `minResolved` binds
-  imdb: { minResolved: 0.9, maxUnreachable: 0.02, minScored: 0.9 },
-  metacritic: { minResolved: 0.25, maxUnreachable: 0.02, minScored: 0.55 },
-  rtCritic: { minResolved: 0.45, maxUnreachable: 0.02, minScored: 0.55 },
-  rtAudience: { minResolved: 0.4, maxUnreachable: 0.02, minScored: 0.55 }
+  // IMDb is a local dataset: nothing to reach and no page to be absent from, so only `resolved` binds
+  imdb: {
+    resolved: { warn: 0.9, alert: STOPPED },
+    unreachable: { warn: 0.05, alert: 0.25 },
+    scored: { warn: 0.9, alert: STOPPED }
+  },
+  metacritic: {
+    resolved: { warn: 0.25, alert: STOPPED },
+    unreachable: { warn: 0.05, alert: 0.25 },
+    scored: { warn: 0.55, alert: STOPPED }
+  },
+  rtCritic: {
+    resolved: { warn: 0.45, alert: STOPPED },
+    unreachable: { warn: 0.05, alert: 0.25 },
+    scored: { warn: 0.55, alert: STOPPED }
+  },
+  rtAudience: {
+    resolved: { warn: 0.4, alert: STOPPED },
+    unreachable: { warn: 0.05, alert: 0.25 },
+    scored: { warn: 0.55, alert: STOPPED }
+  }
 }
 
+// Which tier a rate has reached, or nothing when it is within its limits. One place decides, so a
+// check cannot compare against the wrong tier.
+const belowTier = (rate, limit) => rate < limit.alert ? 'alert' : rate < limit.warn ? 'warn' : undefined
+const aboveTier = (rate, limit) => rate > limit.alert ? 'alert' : rate > limit.warn ? 'warn' : undefined
+
 // Source rates divide by titles scored, which hides a batch where almost everything failed
-const MAX_FAILED_RATE = 0.1
+// Two tiers for every limit: `warn` is worth reading in the logs, `alert` is worth waking someone.
+// The alert condition matches severity>=ERROR, so a warn is silent by construction. Judgement, not
+// measurement: an alert level is where a source has stopped rather than dipped.
+const MAX_FAILED_RATE = { warn: 0.1, alert: 0.5 }
 
 // A title no source could score at all, which is every source failing for it at once
-const MAX_UNSCORED_RATE = 0.1
+const MAX_UNSCORED_RATE = { warn: 0.1, alert: 0.5 }
 
 /**
  * Whether a ranked list can be served. Run at deploy, so a row-shape bump fails the build rather than
@@ -126,16 +154,21 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
   const problems = []
 
   // A failed refresh leaves yesterday's data in place, so every source rate still looks fine
-  if (!imdbRefreshed) problems.push({ reason: 'IMDb dataset refresh failed' })
+  if (!imdbRefreshed) problems.push({ tier: 'alert', reason: 'IMDb dataset refresh failed' })
 
   for (const stats of allStats) {
     if (!stats.processed) {
-      problems.push({ mediaType: stats.mediaType, reason: 'nothing processed' })
+      problems.push({ mediaType: stats.mediaType, tier: 'alert', reason: 'nothing processed' })
       continue
     }
 
     // Scores cached but nothing sortable published is a failed run, not a healthy one
-    if (stats.indexFailed) problems.push({ mediaType: stats.mediaType, reason: 'score index not published' })
+    if (stats.indexFailed) problems.push({ mediaType: stats.mediaType, tier: 'alert', reason: 'score index not published' })
+
+    // Driven by the limits themselves, so a source cannot be listed for checking without one and
+    // then skipped silently, which `rate < undefined` would do
+    // Every shortfall carries the tier it reached, so nothing here decides what is worth an alert
+    const report = (tier, fields) => tier && problems.push({ mediaType: stats.mediaType, tier, ...fields })
 
     // Driven by the limits themselves, so a source cannot be listed for checking without one and
     // then skipped silently, which `rate < undefined` would do
@@ -143,51 +176,50 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
       const { unreachable = 0, unscored = 0, scored = 0 } = stats.outcomes?.[source] ?? {}
       const resolvedRate = scored / stats.processed
 
-      if (resolvedRate < limits.minResolved) {
-        problems.push({ mediaType: stats.mediaType, source, rate: round(resolvedRate), min: limits.minResolved })
-      }
+      report(belowTier(resolvedRate, limits.resolved),
+        { source, rate: round(resolvedRate), min: limits.resolved.warn })
 
       const unreachableRate = unreachable / stats.processed
 
-      if (unreachableRate > limits.maxUnreachable) {
-        problems.push({ mediaType: stats.mediaType, source, reason: 'could not be read', rate: round(unreachableRate), max: limits.maxUnreachable })
-      }
+      report(aboveTier(unreachableRate, limits.unreachable),
+        { source, reason: 'could not be read', rate: round(unreachableRate), max: limits.unreachable.warn })
 
       // A denominator of zero fails rather than dividing to NaN, which `< min` would read as a pass
       const carried = scored + unscored
       const scoredRate = carried ? scored / carried : 0
 
-      if (scoredRate < limits.minScored) {
-        problems.push({ mediaType: stats.mediaType, source, reason: 'no score on the pages that carry it', rate: round(scoredRate), min: limits.minScored })
-      }
+      report(belowTier(scoredRate, limits.scored),
+        { source, reason: 'no score on the pages that carry it', rate: round(scoredRate), min: limits.scored.warn })
     }
 
     const failedRate = stats.failed / stats.total
 
-    if (failedRate > MAX_FAILED_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'titles failed to score', rate: round(failedRate), max: MAX_FAILED_RATE })
-    }
+    report(aboveTier(failedRate, MAX_FAILED_RATE),
+      { reason: 'titles failed to score', rate: round(failedRate), max: MAX_FAILED_RATE.warn })
 
     const unscoredRate = stats.unscored / stats.processed
 
-    if (unscoredRate > MAX_UNSCORED_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'titles no source could score', rate: round(unscoredRate), max: MAX_UNSCORED_RATE })
-    }
+    report(aboveTier(unscoredRate, MAX_UNSCORED_RATE),
+      { reason: 'titles no source could score', rate: round(unscoredRate), max: MAX_UNSCORED_RATE.warn })
 
     // Scoring can succeed while the Redis write fails, leaving the cache cold but every rate green
     const notCachedRate = stats.notCached / stats.processed
 
-    if (notCachedRate > MAX_FAILED_RATE) {
-      problems.push({ mediaType: stats.mediaType, reason: 'scores not persisted', rate: round(notCachedRate), max: MAX_FAILED_RATE })
-    }
+    report(aboveTier(notCachedRate, MAX_FAILED_RATE),
+      { reason: 'scores not persisted', rate: round(notCachedRate), max: MAX_FAILED_RATE.warn })
   }
 
-  const summary = problems.map(p => [p.mediaType, p.source, p.reason ?? `resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')
+  const describe = list => list.map(p => [p.mediaType, p.source, p.reason ?? `resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')
+  const alerts = problems.filter(problem => problem.tier === 'alert')
+  const warnings = problems.filter(problem => problem.tier === 'warn')
 
-  if (problems.length) log.error('Run coverage FAILED', { summary, problems })
-  else log.info('Run coverage passed')
+  // Only an alert reaches ERROR, which is what the alert policy matches — a warn is loud in the logs
+  // and silent to whoever is asleep
+  if (alerts.length) log.error('Run coverage FAILED', { summary: describe(alerts), problems: alerts })
+  if (warnings.length) log.warn('Run coverage short of its limits', { summary: describe(warnings), problems: warnings })
+  if (!problems.length) log.info('Run coverage passed')
 
-  return { ok: problems.length === 0, problems }
+  return { ok: alerts.length === 0, problems }
 }
 
 function round(value) {
