@@ -55,10 +55,10 @@ const SOURCE_LIMITS = {
   }
 }
 
-// Which tier a rate has reached, or nothing when it is within its limits. One place decides, so a
-// check cannot compare against the wrong tier.
-const belowTier = (rate, limit) => rate < limit.alert ? 'alert' : rate < limit.warn ? 'warn' : undefined
-const aboveTier = (rate, limit) => rate > limit.alert ? 'alert' : rate > limit.warn ? 'warn' : undefined
+// The tier a rate has reached and the boundary it crossed, or nothing when it is within its limits.
+// Both come from here, so a log cannot name one tier's boundary while reporting another's.
+const belowTier = (rate, limit) => rate < limit.alert ? { tier: 'alert', min: limit.alert } : rate < limit.warn ? { tier: 'warn', min: limit.warn } : undefined
+const aboveTier = (rate, limit) => rate > limit.alert ? { tier: 'alert', max: limit.alert } : rate > limit.warn ? { tier: 'warn', max: limit.warn } : undefined
 
 // Source rates divide by titles scored, which hides a batch where almost everything failed
 // Two tiers for every limit: `warn` is worth reading in the logs, `alert` is worth waking someone.
@@ -167,8 +167,9 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
 
     // Driven by the limits themselves, so a source cannot be listed for checking without one and
     // then skipped silently, which `rate < undefined` would do
-    // Every shortfall carries the tier it reached, so nothing here decides what is worth an alert
-    const report = (tier, fields) => tier && problems.push({ mediaType: stats.mediaType, tier, ...fields })
+    // Every shortfall carries the tier it reached and the boundary it crossed, so nothing here
+    // decides what is worth an alert
+    const report = (shortfall, fields) => shortfall && problems.push({ mediaType: stats.mediaType, ...shortfall, ...fields })
 
     // Driven by the limits themselves, so a source cannot be listed for checking without one and
     // then skipped silently, which `rate < undefined` would do
@@ -176,37 +177,31 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
       const { unreachable = 0, unscored = 0, scored = 0 } = stats.outcomes?.[source] ?? {}
       const resolvedRate = scored / stats.processed
 
-      report(belowTier(resolvedRate, limits.resolved),
-        { source, rate: round(resolvedRate), min: limits.resolved.warn })
+      report(belowTier(resolvedRate, limits.resolved), { source, rate: round(resolvedRate) })
 
       const unreachableRate = unreachable / stats.processed
 
-      report(aboveTier(unreachableRate, limits.unreachable),
-        { source, reason: 'could not be read', rate: round(unreachableRate), max: limits.unreachable.warn })
+      report(aboveTier(unreachableRate, limits.unreachable), { source, reason: 'could not be read', rate: round(unreachableRate) })
 
       // A denominator of zero fails rather than dividing to NaN, which `< min` would read as a pass
       const carried = scored + unscored
       const scoredRate = carried ? scored / carried : 0
 
-      report(belowTier(scoredRate, limits.scored),
-        { source, reason: 'no score on the pages that carry it', rate: round(scoredRate), min: limits.scored.warn })
+      report(belowTier(scoredRate, limits.scored), { source, reason: 'no score on the pages that carry it', rate: round(scoredRate) })
     }
 
     const failedRate = stats.failed / stats.total
 
-    report(aboveTier(failedRate, MAX_FAILED_RATE),
-      { reason: 'titles failed to score', rate: round(failedRate), max: MAX_FAILED_RATE.warn })
+    report(aboveTier(failedRate, MAX_FAILED_RATE), { reason: 'titles failed to score', rate: round(failedRate) })
 
     const unscoredRate = stats.unscored / stats.processed
 
-    report(aboveTier(unscoredRate, MAX_UNSCORED_RATE),
-      { reason: 'titles no source could score', rate: round(unscoredRate), max: MAX_UNSCORED_RATE.warn })
+    report(aboveTier(unscoredRate, MAX_UNSCORED_RATE), { reason: 'titles no source could score', rate: round(unscoredRate) })
 
     // Scoring can succeed while the Redis write fails, leaving the cache cold but every rate green
     const notCachedRate = stats.notCached / stats.processed
 
-    report(aboveTier(notCachedRate, MAX_FAILED_RATE),
-      { reason: 'scores not persisted', rate: round(notCachedRate), max: MAX_FAILED_RATE.warn })
+    report(aboveTier(notCachedRate, MAX_FAILED_RATE), { reason: 'scores not persisted', rate: round(notCachedRate) })
   }
 
   const describe = list => list.map(p => [p.mediaType, p.source, p.reason ?? `resolved for only ${Math.round(p.rate * 100)}%`].filter(Boolean).join(': ')).join('; ')

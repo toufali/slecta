@@ -353,3 +353,26 @@ test('every run-level limit warns before it alerts', () => {
     assert.deepEqual(alerted.problems.map(p => [p.tier, p.reason]), [['alert', reason]])
   }
 })
+
+// Whoever reads this at 3am needs the boundary that fired, not the other tier's
+test('a shortfall is logged against the boundary it crossed', () => {
+  const unreachable = fraction => healthy({
+    outcomes: {
+      imdb: { scored: 20 },
+      metacritic: { scored: 20 - fraction, unreachable: fraction },
+      rtCritic: { scored: 20 },
+      rtAudience: { scored: 20 }
+    }
+  })
+
+  const [warned] = checkRunCoverage([unreachable(4)], true).problems
+  const [alerted] = checkRunCoverage([unreachable(10)], true).problems
+
+  assert.deepEqual([warned.tier, warned.max], ['warn', 0.05])
+  assert.deepEqual([alerted.tier, alerted.max], ['alert', 0.25])
+
+  // Minima report the floor they fell below, not the other one
+  const [floor] = checkRunCoverage([healthy({ sources: { imdb: 0, metacritic: 20, rtCritic: 20, rtAudience: 20 } })], true).problems
+
+  assert.deepEqual([floor.tier, floor.min], ['alert', 0.05])
+})
