@@ -8,6 +8,7 @@ import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 const data = over => ({
   tmdbId: 7, title: 'A Title', overview: 'Words', releaseDate: '2026-01-01', rating: 'PG-13',
   genres: 'Drama', cast: 'Someone', director: 'Someone', creator: 'Someone', runtime: 100,
+  // Not English, so the assertion cannot match the panel's own "English" label by accident
   seasons: 1, language: 'Japanese', providers: [], quotes: [], score: 83, ...over
 })
 

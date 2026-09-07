@@ -29,7 +29,8 @@ const day = date => date.toISOString().substring(0, 10)
 
 export const ENGLISH = 'en'
 
-// TMDB uses `cn` for Cantonese, which is not an ISO 639-1 code, so `Intl` has no name for it
+// The detail page names a language rather than showing its code. `cn` is TMDB's own code for
+// Cantonese, not an ISO one, so `Intl` hands back the code and the page would read "cn".
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
@@ -438,8 +439,6 @@ class TmdbService {
       overview: json.overview,
       releaseDate: json[media.dateField],
       ...media.detail(json, this.region),
-      // Read the original, not the spoken list: a substantially English film lists several spoken
-      // languages and so reads as needing subtitles
       language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,

@@ -246,7 +246,7 @@ test('each catalogue maps the original language onto its rows', async () => {
   assert.equal((await tmdb.getTvShows()).shows[0].originalLanguage, 'ja')
 })
 
-// `cn` is TMDB's own code and not an ISO one, so `Intl` answers with the code itself
+// Without the override the page reads "cn", and TMDB uses it for every Cantonese title
 test('the detail page names a language, including the code Intl does not know', async () => {
   captureDetail({ original_language: 'cn' })
 
