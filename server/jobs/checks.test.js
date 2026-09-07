@@ -12,7 +12,6 @@ const { checkRunCoverage, checkReferenceTitles } = await import('./checks.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: log } = await import('../utils/logger.js')
 
-// The alert policy matches severity>=ERROR, so which level a tier logs at *is* the silence
 function captureLevels() {
   const seen = []
   const real = { error: log.error, warn: log.warn, info: log.info }
@@ -57,8 +56,7 @@ test('a dead source trips its floor', () => {
 })
 
 // The detection the loosened floors gave up: a source blocked for part of the run trips its
-// unreachable ceiling while every score it did return still clears the resolved floor. A fifth
-// unreachable is a bad night rather than a block, so it warns without waking anyone.
+// unreachable ceiling while every score it did return still clears the resolved floor
 test('a source blocking for part of the run warns, where the resolved floor alone says nothing', () => {
   const stats = healthy({
     sources: { imdb: 20, metacritic: 20, rtCritic: 16, rtAudience: 16 },
@@ -174,8 +172,7 @@ test('a detail field TMDB stops populating fails the title', async () => {
   }
 })
 
-// Half the measured rate is the drop worth seeing: a source degrading rather than disappearing, so
-// it is logged and not alerted
+// A source degrading rather than disappearing
 test('a source at half its measured rate warns', () => {
   const stats = healthy({ sources: { imdb: 20, metacritic: 3, rtCritic: 5, rtAudience: 5 } })
   const result = checkRunCoverage([stats], true)
@@ -248,9 +245,7 @@ test('the checks fail whenever a ranked list cannot be served', async () => {
   }
 })
 
-// The alert that started this: 9 unreachable Metacritic reads of 362 TV titles, against a 2% floor
-// on a catalogue half the size of film's. Nothing was wrong and the affected titles kept their
-// scores, so at 2.5% it now clears the floor outright rather than being logged as a shortfall.
+// The night that alerted, at 2.5% unreachable against the old 2% floor. Nothing was wrong.
 test('the night that alerted now passes without comment', () => {
   const tv = healthy({
     mediaType: 'tv', total: 362, processed: 362, unscored: 12,
@@ -267,7 +262,6 @@ test('the night that alerted now passes without comment', () => {
   assert.deepEqual(result.problems, [], '2.5% unreachable is normal variance, not a shortfall')
 })
 
-// Between the tiers: loud in the logs, silent to whoever is asleep
 test('a source well over its ceiling warns without alerting', () => {
   const tv = healthy({
     mediaType: 'tv', total: 362, processed: 362,
@@ -285,7 +279,6 @@ test('a source well over its ceiling warns without alerting', () => {
   assert.deepEqual(reasons(result), ['could not be read'])
 })
 
-// A real block is near-total, and it still has to page on the first night rather than warn twice
 test('a source failing on every title alerts immediately', () => {
   const stats = healthy({
     outcomes: {
@@ -314,7 +307,6 @@ test('a structural failure alerts whatever the rates say', () => {
   assert.equal(checkRunCoverage([healthy()], false).ok, false, 'a failed IMDb refresh hides every rate')
 })
 
-// A warn logged at ERROR would fire the alert and defeat the whole tiering, silently
 test('only an alert reaches ERROR', () => {
   const warnOnly = healthy({ outcomes: { imdb: { scored: 20 }, metacritic: { scored: 20 }, rtCritic: { scored: 16, unreachable: 4 }, rtAudience: { scored: 20 } } })
   const alerting = healthy({ outcomes: { imdb: { scored: 20 }, metacritic: { unreachable: 20 }, rtCritic: { scored: 20 }, rtAudience: { scored: 20 } } })
@@ -332,8 +324,7 @@ test('only an alert reaches ERROR', () => {
   }
 })
 
-// The run-level limits got the same two tiers, and leaving any of them on one threshold is how the
-// next false alarm arrives
+// Leaving any of these on one threshold is how the next false alarm arrives
 test('every run-level limit warns before it alerts', () => {
   const cases = [
     ['titles failed to score', { failed: 3 }, { failed: 12 }],
@@ -354,7 +345,6 @@ test('every run-level limit warns before it alerts', () => {
   }
 })
 
-// Whoever reads this at 3am needs the boundary that fired, not the other tier's
 test('a shortfall is logged against the boundary it crossed', () => {
   const unreachable = fraction => healthy({
     outcomes: {
@@ -371,7 +361,6 @@ test('a shortfall is logged against the boundary it crossed', () => {
   assert.deepEqual([warned.tier, warned.max], ['warn', 0.05])
   assert.deepEqual([alerted.tier, alerted.max], ['alert', 0.25])
 
-  // Minima report the floor they fell below, not the other one
   const [floor] = checkRunCoverage([healthy({ sources: { imdb: 0, metacritic: 20, rtCritic: 20, rtAudience: 20 } })], true).problems
 
   assert.deepEqual([floor.tier, floor.min], ['alert', 0.05])

@@ -27,8 +27,8 @@ export const REQUIRED_DETAIL = {
 
 // `minResolved` and `maxUnreachable` divide by every title tried; `minScored` divides by the titles
 // the source carries, which the vote floor moves far less.
-// A minimum alerts at 0.05 whatever its warn level: a source resolving under a twentieth of the
-// catalogue has stopped, and that reads the same for one normally at 0.9 as for one at 0.25.
+// One alert floor for every minimum: a source resolving almost nothing has stopped, whatever its
+// usual rate
 const STOPPED = 0.05
 
 const SOURCE_LIMITS = {
@@ -55,15 +55,13 @@ const SOURCE_LIMITS = {
   }
 }
 
-// The tier a rate has reached and the boundary it crossed, or nothing when it is within its limits.
-// Both come from here, so a log cannot name one tier's boundary while reporting another's.
+// Tier and boundary together, so a log cannot report one tier against the other's threshold
 const belowTier = (rate, limit) => rate < limit.alert ? { tier: 'alert', min: limit.alert } : rate < limit.warn ? { tier: 'warn', min: limit.warn } : undefined
 const aboveTier = (rate, limit) => rate > limit.alert ? { tier: 'alert', max: limit.alert } : rate > limit.warn ? { tier: 'warn', max: limit.warn } : undefined
 
 // Source rates divide by titles scored, which hides a batch where almost everything failed
-// Two tiers for every limit: `warn` is worth reading in the logs, `alert` is worth waking someone.
-// The alert condition matches severity>=ERROR, so a warn is silent by construction. Judgement, not
-// measurement: an alert level is where a source has stopped rather than dipped.
+// Two tiers for every limit. Only `alert` logs at ERROR, which is what the alert policy matches, so
+// a `warn` is silent by construction. Where each sits is judgement, not measurement.
 const MAX_FAILED_RATE = { warn: 0.1, alert: 0.5 }
 
 // A title no source could score at all, which is every source failing for it at once
@@ -167,8 +165,6 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
 
     // Driven by the limits themselves, so a source cannot be listed for checking without one and
     // then skipped silently, which `rate < undefined` would do
-    // Every shortfall carries the tier it reached and the boundary it crossed, so nothing here
-    // decides what is worth an alert
     const report = (shortfall, fields) => shortfall && problems.push({ mediaType: stats.mediaType, ...shortfall, ...fields })
 
     // Driven by the limits themselves, so a source cannot be listed for checking without one and
@@ -208,8 +204,6 @@ export function checkRunCoverage(allStats, imdbRefreshed) {
   const alerts = problems.filter(problem => problem.tier === 'alert')
   const warnings = problems.filter(problem => problem.tier === 'warn')
 
-  // Only an alert reaches ERROR, which is what the alert policy matches — a warn is loud in the logs
-  // and silent to whoever is asleep
   if (alerts.length) log.error('Run coverage FAILED', { summary: describe(alerts), problems: alerts })
   if (warnings.length) log.warn('Run coverage short of its limits', { summary: describe(warnings), problems: warnings })
   if (!problems.length) log.info('Run coverage passed')

@@ -34,8 +34,7 @@ try {
     const { coverage, reference } = await cacheScores()
 
     // exitCode, not process.exit(): stdout is a pipe here and exiting discards buffered logs.
-    // `coverage.ok` is already the alert tier alone, so a slow night leaves the execution green
-    // rather than making it indistinguishable from a broken run in Cloud Run's history.
+    // `coverage.ok` is the alert tier alone, so a slow night leaves the execution green.
     process.exitCode = coverage.ok && reference.ok ? 0 : 1
   }
 } catch (e) {
