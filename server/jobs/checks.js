@@ -42,22 +42,31 @@ const MAX_FAILED_RATE = 0.1
 const MAX_UNSCORED_RATE = 0.1
 
 /**
- * Whether a ranked list exists to serve. Run at deploy, so a row-shape bump fails the build rather
- * than leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
- * @return {{ok: boolean, missing: string[]}}
+ * Whether a ranked list can be served. Run at deploy, so a row-shape bump fails the build rather than
+ * leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
+ *
+ * Fails closed on an unreadable Redis as well as an absent key. The two are distinguished elsewhere
+ * so a blip cannot discard data, but here they are the same answer: the list will not serve. Passing
+ * on an outage would also let a flaky read hide a generation nobody published.
+ * @return {{ok: boolean, missing: string[], unreadable: string[]}}
  */
 export async function checkRankedIndex() {
   const missing = []
+  const unreadable = []
 
   for (const segment of ['movies', 'shows']) {
-    // undefined is an unreadable Redis, which is not the same as a generation nobody has published
-    if (await redis.getCache(indexKey(segment)) === null) missing.push(segment)
+    const rows = await redis.getCache(indexKey(segment))
+
+    if (rows === undefined) unreadable.push(segment)
+    else if (!rows) missing.push(segment)
   }
 
+  // Logged apart, since one says run the job and the other says fix Redis
   if (missing.length) log.error('Ranked list missing, run the scoring job', { missing, version: INDEX_VERSION })
-  else log.info('Ranked list present', { version: INDEX_VERSION })
+  if (unreadable.length) log.error('Ranked list could not be read', { unreadable, version: INDEX_VERSION })
+  if (!missing.length && !unreadable.length) log.info('Ranked list present', { version: INDEX_VERSION })
 
-  return { ok: missing.length === 0, missing }
+  return { ok: !missing.length && !unreadable.length, missing, unreadable }
 }
 
 /** Score known titles and compare every source against its expected value. */

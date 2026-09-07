@@ -202,7 +202,7 @@ test('the richer rates of the smaller catalogue are tolerated too', () => {
 })
 
 // Turn a quiet 503 into a red build: only the checks run before traffic reaches a bumped deploy
-test('a missing ranked list fails the checks, and an unreadable Redis does not', async () => {
+test('the checks fail whenever a ranked list cannot be served', async () => {
   const { checkRankedIndex } = await import('./checks.js')
   const { default: redis } = await import('../services/redisService.js')
   const { indexKey } = await import('../services/indexService.js')
@@ -218,8 +218,15 @@ test('a missing ranked list fails the checks, and an unreadable Redis does not',
     redis.getCache = async () => [{ id: 1 }]
     assert.equal((await checkRankedIndex()).ok, true)
 
+    // Elsewhere an outage must not read as absent data; here both mean the list will not serve, and
+    // passing would let a flaky read hide a generation nobody published
     redis.getCache = async () => undefined
-    assert.equal((await checkRankedIndex()).ok, true, 'an outage is not an unpublished list')
+
+    const outage = await checkRankedIndex()
+
+    assert.equal(outage.ok, false)
+    assert.deepEqual(outage.unreadable, ['movies', 'shows'])
+    assert.deepEqual(outage.missing, [], 'reported apart: one says run the job, the other fix Redis')
   } finally {
     redis.getCache = real
   }
