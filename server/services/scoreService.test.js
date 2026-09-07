@@ -1473,3 +1473,26 @@ test('a page with no cast is verified on its year alone', async () => {
     assert.equal(score.scores.rtCritic, 93, String(cast))
   }
 })
+
+// An ASCII-only key collapses a non-Latin name to the empty string, and two of those read as an
+// overlap — disabling the check for the titles most likely to be mismatched
+test('casts written in another script are compared, not collapsed', async () => {
+  const scoreFor = async (key, ours, theirs) => {
+    stubHosts({
+      'www.rottentomatoes.com': rtPage(93, 97, 2026, theirs.map(name => ({ name }))),
+      'www.metacritic.com': () => new Response('', { status: 404 })
+    })
+
+    const score = await scoreService.getScore(key, {
+      title: 'A Show', releaseDate: '2026-07-03', mediaType: 'movie', cast: ours.join(', ')
+    }, false)
+
+    return score.scores.rtCritic
+  }
+
+  assert.equal(await scoreFor('test/movie/jp-differ', ['三船敏郎', '志村喬'], ['大河内傳次郎', '原節子']), undefined)
+  assert.equal(await scoreFor('test/movie/jp-match', ['三船敏郎', '志村喬'], ['三船敏郎', '誰か']), 93)
+
+  // A name with no letters at all keys to the empty string on both sides, which would match itself
+  assert.equal(await scoreFor('test/movie/empty-key', ['Mike Ferguson', ''], ['-', 'Matt Damon']), undefined)
+})

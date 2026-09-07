@@ -167,9 +167,10 @@ function pageItem(html, types) {
   }
 }
 
-// Letters alone, since the two sides punctuate a name differently
-const nameKey = name => String(name).toLowerCase().replace(/[^a-z]/g, '')
-const castOf = item => [].concat(item?.actor ?? []).map(actor => actor?.name ?? actor).filter(Boolean).map(nameKey)
+// Letters alone, since the two sides punctuate a name differently. Any script: an ASCII-only key
+// collapses a name written in one to the empty string, and two of those would read as an overlap.
+const nameKey = name => String(name).toLowerCase().normalize('NFKD').replace(/[^\p{L}]/gu, '')
+const castOf = item => [].concat(item?.actor ?? []).map(actor => actor?.name ?? actor).map(nameKey).filter(Boolean)
 
 const pageFacts = (html, types) => {
   const item = pageItem(html, types)
@@ -376,7 +377,7 @@ class ScoreService {
     const prefix = host => HOSTS[host].path[mediaType] ?? HOSTS[host].path.movie
     const year = yearOf(releaseDate)
     // Already stored for both catalogues, so verifying against it costs no fetch
-    const ourCast = String(cast ?? '').split(', ').filter(Boolean).map(nameKey)
+    const ourCast = String(cast ?? '').split(', ').map(nameKey).filter(Boolean)
     const wiki = {}
     // True when no lookup was needed: a call never made cannot have gone unanswered
     let wikiAnswered = true
