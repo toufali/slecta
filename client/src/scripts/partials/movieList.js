@@ -1,4 +1,4 @@
-import { resetPageNav } from '../utils/pageNav.js'
+import { initMore, resetMore } from '../utils/more.js'
 import { monthsText } from '../utils/months.js'
 
 const list = document.querySelector('[data-partial="movieList"] ul')
@@ -13,6 +13,12 @@ export default function init() {
   filterToggle.addEventListener('mousedown', handleMouseEvent)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
+  initMore({ endpoint: filterForm.action, segment: 'movies', append: appendRows })
+  renderScores()
+}
+
+function appendRows(rows) {
+  list.append(...cardItems(rows))
   renderScores()
 }
 
@@ -40,10 +46,10 @@ async function handleSubmit(e) {
 
   filterPanel.classList.toggle('visible', false)
 
-  renderMovieList(data.movies)
+  list.replaceChildren(...cardItems(data.movies))
   renderlistDescription(data)
   renderScores()
-  resetPageNav(params, data.totalPages)
+  resetMore(params, data.totalPages)
   updateUrl(params)
 }
 
@@ -61,26 +67,24 @@ async function getMovieData(form, params) {
   return json
 }
 
-function renderMovieList(movies) {
-  const movieItems = movies.map(movie => {
-    const item = document.createElement('li')
-    const movieCard = document.createElement('movie-card')
+const cardItems = rows => rows.map(row => {
+  const item = document.createElement('li')
+  const movieCard = document.createElement('movie-card')
 
-    movieCard.data = movie
+  movieCard.data = row
 
-    item.append(movieCard)
-    return item
-  });
-
-  list.replaceChildren(...movieItems)
-}
+  item.append(movieCard)
+  return item
+})
 
 async function renderScores() {
   const cards = document.querySelectorAll('movie-card')
 
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
-    if (scoreBadge.score === undefined) {
+
+    // Claimed, not just shown: appending starts a second walk over cards the first has not reached
+    if (scoreBadge.score === undefined && !scoreBadge.classList.contains('loading')) {
       scoreBadge.classList.add('loading')
 
       const score = await fetch(`/api/v1/movies/${card.id}/score`).then(res => res.json())

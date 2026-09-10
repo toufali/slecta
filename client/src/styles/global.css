@@ -140,23 +140,15 @@ footer::before{
   z-index: -1;
 }
 
-footer .pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--padding-md);
-  margin-bottom: var(--padding-md);
+footer .more {
+  display: block;
+  width: min(100%, 12rem);
+  margin: 0 auto var(--padding-md);
 }
 
-/* Equal thirds, so the label stays centred as the buttons appear and disappear at the boundaries */
-footer .pagination > * {
-  flex: 1 1 0;
-  max-width: 12rem;
-}
-
-footer .pagination .page-number {
-  color: var(--gray-70);
-  font: var(--h4-font);
+/* The only feedback while the fetch is in flight: nothing else on the page has changed yet */
+footer .more.loading {
+  opacity: .6;
 }
 
 h1 {

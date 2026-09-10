@@ -3,7 +3,7 @@ import index from '../services/indexService.js'
 import scoreService, { aggregate, lowConfidence, scoreKey } from '../services/scoreService.js'
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
-import { pageLinks } from '../utils/pagination.js'
+import { nextPageHref } from '../utils/pagination.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
 import { movieDetail } from '../views/partials/movieDetail.js'
@@ -56,8 +56,8 @@ export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
   const data = await list(ctx, media)
 
-  // Built here rather than in `list`: the API shares that and would carry hrefs to its own path
-  data.pagination = pageLinks(ctx.path, ctx.query, data.totalPages)
+  // Built here rather than in `list`: the API shares that and would carry an href to its own path
+  data.nextPage = nextPageHref(ctx.path, ctx.query, data.totalPages)
 
   return ctx.body = mainView({
     partial: media.listView,
