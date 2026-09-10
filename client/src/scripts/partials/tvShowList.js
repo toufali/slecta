@@ -13,17 +13,17 @@ export default function init() {
   filterToggle.addEventListener('mousedown', handleMouseEvent)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
-  initMore({ endpoint: filterForm.action, segment: 'shows', append: appendRows })
+  initMore(filterForm.action, appendRows)
   renderScores()
 }
 
-function appendRows(rows) {
-  const items = cardItems(rows)
+function appendRows(data) {
+  const items = cardItems(data.shows)
 
   list.append(...items)
-  renderScores()
+  renderScores(items.map(item => item.firstChild))
 
-  return items[0]?.querySelector('movie-card').shadowRoot.querySelector('a')
+  return items[0]?.firstChild.shadowRoot.querySelector('a')
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
@@ -81,14 +81,11 @@ const cardItems = rows => rows.map(row => {
   return item
 })
 
-async function renderScores() {
-  const cards = document.querySelectorAll('movie-card')
-
+async function renderScores(cards = document.querySelectorAll('movie-card')) {
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
 
-    // Claimed, not just shown: appending starts a second walk over cards the first has not reached
-    if (scoreBadge.score === undefined && !scoreBadge.classList.contains('loading')) {
+    if (scoreBadge.score === undefined) {
       scoreBadge.classList.add('loading')
 
       try {
@@ -97,7 +94,7 @@ async function renderScores() {
         scoreBadge.lowConfidence = score.lowConfidence
         scoreBadge.score = score.avgScore
       } catch (e) {
-        // Caught per card, so one failure neither strands the claim nor ends the walk
+        // Caught per card, so one failure does not end the walk
         console.error(e)
       } finally {
         scoreBadge.classList.remove('loading')

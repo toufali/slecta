@@ -10,7 +10,6 @@
 export function nextPageHref(path, query, totalPages) {
   const page = Number(query.page) || 1
 
-  // A negated comparison, so an unreadable count and a page past the end both fall through
   if (!(page < totalPages)) return
 
   const params = new URLSearchParams()
