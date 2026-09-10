@@ -70,6 +70,17 @@ fieldset:last-of-type > button{
   display: block;
 }
 
+.more {
+  display: block;
+  width: min(100%, 640px);
+  margin: var(--padding-lg) auto 0;
+}
+
+/* The only feedback while the fetch is in flight: nothing else on the page has changed yet */
+.more.loading {
+  opacity: .6;
+}
+
 .filter-toggle {
   /* note Firefox Android hit area bug */
   /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */

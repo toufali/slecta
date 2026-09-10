@@ -1,13 +1,11 @@
-// The footer's More control appends the next page rather than navigating to it, so a reader keeps
+// The list's More control appends the next page rather than navigating to it, so a reader keeps
 // their place. The address bar is left alone deliberately: tracking the page would make a reload
 // or a shared link open a slice of the window with nothing before it.
 
-const footer = document.querySelector('footer')
+const main = document.querySelector('main')
 
 let inFlight = false
 let generation = 0
-
-const control = () => footer.querySelector('.more')
 
 /**
  * @param {object} config
@@ -18,7 +16,7 @@ const control = () => footer.querySelector('.more')
  */
 export function initMore({ endpoint, segment, append }) {
   // Delegated, so a control rebuilt by `resetMore` does not need rebinding
-  footer.addEventListener('click', async e => {
+  main.addEventListener('click', async e => {
     const link = e.target.closest('.more')
 
     if (!link) return
@@ -70,7 +68,7 @@ export function initMore({ endpoint, segment, append }) {
  * @param {number} [totalPages]
  */
 export function resetMore(params, totalPages) {
-  const existing = control()
+  const existing = main.querySelector('.more')
 
   generation++
 
@@ -86,14 +84,8 @@ export function resetMore(params, totalPages) {
 
   // Built when absent: a list that arrived as one page rendered no control, and filtering to a
   // wider one would leave the rest unreachable without a reload
-  const link = document.createElement('a')
-
-  link.className = 'button secondary more'
-  link.rel = 'next'
-  link.href = href
-  link.textContent = 'More'
-
-  footer.prepend(link)
+  main.querySelector('.filter-toggle')
+    .insertAdjacentHTML('beforebegin', `<a class='button secondary more' rel='next' href='${href}'>More</a>`)
 }
 
 // Negated comparisons, so an unreadable count reads as the end of the list: `totalPages` is

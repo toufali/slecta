@@ -50,6 +50,8 @@ export const tvShowList = data => `
   ${data.shows.map(show => `<li>${movieCard(show)}</li>`).join('')}
 </ul>
 
+${!data.nextPage ? '' : `<a class='button secondary more' rel='next' href='${data.nextPage}'>More</a>`}
+
 <button class='filter-toggle primary' type='button'>FILTER</button>
 
 <div class='filter-panel hidden'>

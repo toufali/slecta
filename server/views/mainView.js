@@ -1,9 +1,3 @@
-// Above the About link and louder than it: reaching the rest of the window is the more useful
-// thing to do from the bottom of a list. Secondary, so it does not compete with the filter button.
-// A link rather than a button, so it still pages the list when the client script never loads.
-const moreLink = href => !href ? '' : `
-    <a class='button secondary more' rel='next' href='${href}'>More</a>`
-
 export const mainView = data => `
 <!doctype html>
 <html lang=en>
@@ -53,7 +47,6 @@ export const mainView = data => `
     ${data.partial(data.content)}
   </main>
   <footer>
-    ${moreLink(data.content?.nextPage)}
     <a href='/about'>About Slecta</a>
   </footer>
 </body>

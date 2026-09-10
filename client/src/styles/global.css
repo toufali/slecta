@@ -140,17 +140,6 @@ footer::before{
   z-index: -1;
 }
 
-footer .more {
-  display: block;
-  width: min(100%, 12rem);
-  margin: 0 auto var(--padding-md);
-}
-
-/* The only feedback while the fetch is in flight: nothing else on the page has changed yet */
-footer .more.loading {
-  opacity: .6;
-}
-
 h1 {
   font: var(--h1-font);
   margin: var(--padding-md) 0;

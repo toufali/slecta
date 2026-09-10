@@ -53,3 +53,16 @@ test('each catalogue describes its own date field', () => {
   assert.match(tvShowList(data()), /first aired in the last/)
 })
 
+
+// The render condition follows the href rather than re-deriving the boundary from a page count,
+// which is what stranded a reader when the list metadata could not be read
+test('the More control renders only when there is a next page, above the filter button', () => {
+  for (const view of [movieList, tvShowList]) {
+    const rendered = view(data({ nextPage: '/movies?page=2' }))
+    const more = rendered.indexOf("<a class='button secondary more' rel='next' href='/movies?page=2'>More</a>")
+
+    assert.notEqual(more, -1)
+    assert.ok(rendered.indexOf('</ul>') < more && more < rendered.indexOf('filter-toggle'))
+    assert.doesNotMatch(view(data()), /secondary more/)
+  }
+})
