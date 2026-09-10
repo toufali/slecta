@@ -18,8 +18,12 @@ export default function init() {
 }
 
 function appendRows(rows) {
-  list.append(...cardItems(rows))
+  const items = cardItems(rows)
+
+  list.append(...items)
   renderScores()
+
+  return items[0]?.querySelector('movie-card').shadowRoot.querySelector('a')
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
@@ -87,11 +91,17 @@ async function renderScores() {
     if (scoreBadge.score === undefined && !scoreBadge.classList.contains('loading')) {
       scoreBadge.classList.add('loading')
 
-      const score = await fetch(`/api/v1/movies/${card.id}/score`).then(res => res.json())
+      try {
+        const score = await fetch(`/api/v1/movies/${card.id}/score`).then(res => res.json())
 
-      scoreBadge.lowConfidence = score.lowConfidence
-      scoreBadge.score = score.avgScore
-      scoreBadge.classList.remove('loading')
+        scoreBadge.lowConfidence = score.lowConfidence
+        scoreBadge.score = score.avgScore
+      } catch (e) {
+        // Caught per card, so one failure neither strands the claim nor ends the walk
+        console.error(e)
+      } finally {
+        scoreBadge.classList.remove('loading')
+      }
     }
   }
 }

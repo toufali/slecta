@@ -13,7 +13,8 @@ const control = () => footer.querySelector('.more')
  * @param {object} config
  * @param {string} config.endpoint API path answering the same query as the page route
  * @param {string} config.segment property the rows arrive under, `movies` or `shows`
- * @param {(rows: object[]) => void} config.append
+ * @param {(rows: object[]) => (HTMLElement|undefined)} config.append returns the first row's
+ *   focusable element, which is where a keyboard reader has to be put
  */
 export function initMore({ endpoint, segment, append }) {
   // Delegated, so a control rebuilt by `resetMore` does not need rebinding
@@ -33,6 +34,8 @@ export function initMore({ endpoint, segment, append }) {
       const asked = new URL(link.href)
       const api = new URL(endpoint, location)
       const era = generation
+      // Read before the fetch, while the activation that set it is still the last thing to happen
+      const byKeyboard = link.matches(':focus-visible')
 
       api.search = asked.search
 
@@ -44,7 +47,12 @@ export function initMore({ endpoint, segment, append }) {
 
       if (era !== generation) return // a filter landed first, and these rows answer the old query
 
-      append(data[segment])
+      const first = append(data[segment])
+
+      // Tab order is document order, so a reader tabbing on from the control would skip the batch
+      // it just loaded. Before `advance`, which removes the control and would drop focus with it.
+      if (byKeyboard) first?.focus()
+
       advance(link, Number(asked.searchParams.get('page')), data.totalPages)
     } catch (e) {
       // Left in place, so the reader can ask again rather than lose the rest of the window
