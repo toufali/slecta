@@ -73,16 +73,9 @@ fieldset:last-of-type > button{
   display: block;
 }
 
-/* One card column wide, so the controls align with the grid: same auto-fill arithmetic the
-   list's grid-template runs, and the two must agree */
-main {
-  container-type: inline-size;
-}
-
 .filter-toggle {
-  --columns: round(down, calc((100cqw + var(--padding-md)) / (var(--min-width) + var(--padding-md))), 1);
   display: block;
-  width: calc((100cqw - (var(--columns) - 1) * var(--padding-md)) / var(--columns));
+  width: min(100%, 480px);
   margin: var(--padding-lg) auto 0;
 }
 
