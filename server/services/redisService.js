@@ -85,6 +85,22 @@ class RedisService {
   }
 
   /**
+   * Read many keys in one round trip. One entry per key: null for a miss or an unparseable value.
+   * @return {(Array|undefined)} undefined when Redis could not answer, which is not a miss
+   */
+  async mGetCache(keys) {
+    if (!client?.isReady) return
+
+    try {
+      const values = await bounded(client.mGet(keys))
+
+      return values.map(value => value === null ? null : JSON.parse(value, this.#jsonReviver))
+    } catch (e) {
+      log.warn('Unable to read from the Redis cache', { keys: keys.length, error: e })
+    }
+  }
+
+  /**
    * Write a value, optionally only when the key is absent.
    * @return {'written'|'declined'|'failed'} `declined` only when `ifAbsent` found the key present.
    *   A caller that needs to know *why* a write did not happen must branch on this, not on falsiness.

@@ -1,8 +1,9 @@
 // The ranked list the nightly job publishes, read back as a catalogue page. TMDB cannot sort on a
 // score it does not hold, so "Top Rated" is served from here instead of from discover.
 
-import redis from './redisService.js'
+import redis, { WRITTEN } from './redisService.js'
 import tmdb, { ENGLISH } from './tmdbService.js'
+import { aggregate, scoreKey, SCORE_TTL } from './scoreService.js'
 import log from '../utils/logger.js'
 
 // Bump when the row shape changes, then run the job by hand: the deploy runs the checks only, so
@@ -10,6 +11,12 @@ import log from '../utils/logger.js'
 export const INDEX_VERSION = 2
 
 export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
+
+// No longer than the records it projects
+export const INDEX_TTL = SCORE_TTL
+
+// Votes then id break the ties an integer score produces, so the order does not reshuffle between runs
+export const byRank = (a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id
 
 // Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
@@ -85,6 +92,33 @@ class IndexService {
     if (rows.cacheHit) Object.defineProperty(data, 'cacheHit', { value: true })
 
     return data
+  }
+
+  /**
+   * Re-sort the ranked list from the records Redis holds now. The score endpoint calls this after
+   * a live write, since a record refreshed between nightly runs otherwise ranks by a stale number.
+   */
+  async rerank(mediaType) {
+    const { segment } = tmdb.catalogue(mediaType)
+    const key = indexKey(segment)
+    const rows = await redis.getCache(key)
+
+    if (!rows?.length) return
+
+    const records = await redis.mGetCache(rows.map(row => scoreKey(segment, row.id)))
+
+    if (!records) return
+
+    rows.forEach((row, i) => {
+      const score = aggregate(records[i])
+
+      // A row whose record has expired keeps its frozen score: there is nothing to recompute from
+      if (score !== undefined) row.score = score
+    })
+
+    rows.sort(byRank)
+
+    if (await redis.setCache(key, rows, INDEX_TTL) !== WRITTEN) log.warn('Re-rank write failed', { segment })
   }
 
   // Deliberately without `score`: the row's is a sort key, and `attachScores` fills the rendered one

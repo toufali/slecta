@@ -131,6 +131,10 @@ export const getScore = mediaType => async ctx => {
   // Checks the cache again, since the detail fetch above gives another request time to fill it
   data = await scoreService.getScore(key, { imdbId, wikiId, title, releaseDate, mediaType, seasons, cast })
 
+  // A record refreshed between nightly runs otherwise ranks by the number it replaced. Awaited:
+  // Cloud Run yields the CPU after the response, so work left behind it may never run.
+  if (data) await index.rerank(mediaType)
+
   return ctx.body = served(data)
 }
 
