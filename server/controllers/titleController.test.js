@@ -221,9 +221,12 @@ test('each detail page renders through the shared view with its own rows', async
   assert.match(movie.body, /data-partial='titleDetail'/)
   assert.match(movie.body, /<label>Director:/)
 
+  assert.match(movie.body, /href='\/movies' class="current"/, 'a detail page keeps its tab lit')
+
   const tv = context()
   await showDetail('tv')(tv)
   assert.match(tv.body, /data-partial='titleDetail'/)
+  assert.match(tv.body, /href='\/shows' class="current"/)
   assert.match(tv.body, /<label>Creator:/)
   assert.match(tv.body, /<li title='Seasons'>3 seasons<\/li>/)
   assert.doesNotMatch(tv.body, /<label>Director:/)

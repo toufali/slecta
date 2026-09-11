@@ -59,7 +59,8 @@ export const showList = mediaType => async ctx => {
 
   return ctx.body = mainView({
     partial: media.listView,
-    content: data
+    content: data,
+    section: media.segment
   })
 }
 
@@ -82,7 +83,8 @@ export const showDetail = mediaType => async ctx => {
 
   return ctx.body = mainView({
     partial: media.detailView,
-    content: data
+    content: data,
+    section: media.segment
   })
 }
 
