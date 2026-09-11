@@ -35,8 +35,8 @@ const ratingFields = data => data.allRatings.reduce((acc, cur) => {
   return acc
 }, ``)
 
-function listDescription(data) {
-  // TODO: this is almost the same function as `client/scripts/movieList.js` – any way to DRY?
+function listDescription(data, dated) {
+  // TODO: this is almost the same function as `client/scripts/titleList.js` – any way to DRY?
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
@@ -48,18 +48,28 @@ function listDescription(data) {
   if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
 
-  const lookback = `<label>released in the last <output>${monthsText(data.lookback)}</output></label>`
+  const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
   return conjunctionFmt.format([streaming, language, sort, genres, ratings, lookback].filter(item => item))
 }
 
-export const movieList = data => `
-<link rel='stylesheet' href='/styles/partials/movieList.css' type='text/css'>
+// One view serves both catalogues; which one is answered by the key the data carries
+const COPY = {
+  movies: { noun: 'Movies', dated: 'released', datedHeading: 'Released' },
+  shows: { noun: 'TV Shows', dated: 'first aired', datedHeading: 'First aired' }
+}
 
-<h1 class='list-description'>Movies ${listDescription(data)}</h1>
+export const titleList = data => {
+  const segment = data.movies ? 'movies' : 'shows'
+  const { noun, dated, datedHeading } = COPY[segment]
+
+  return `
+<link rel='stylesheet' href='/styles/partials/titleList.css' type='text/css'>
+
+<h1 class='list-description'>${noun} ${listDescription(data, dated)}</h1>
 
 <ul class='movie-list'>
-  ${data.movies.map(movie => `<li>${movieCard(movie)}</li>`).join('')}
+  ${data[segment].map(title => `<li>${movieCard(title)}</li>`).join('')}
 </ul>
 
 <a class='button secondary more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
@@ -67,7 +77,7 @@ export const movieList = data => `
 <button class='filter-toggle primary' type='button'>FILTER</button>
 
 <div class='filter-panel hidden'>
-  <form name='movie-filter' action='/api/v1/movies'>
+  <form name='movie-filter' action='/api/v1/${segment}'>
     <fieldset>
       <h3>Sort by:</h3>
       ${sortingFields(data)}
@@ -76,12 +86,12 @@ export const movieList = data => `
       <h3>Include genres:</h3>
       ${genreFields(data)}
     </fieldset>
-    <fieldset>
+    ${!data.allRatings ? '' : `<fieldset>
       <h3>Include ratings:</h3>
       ${ratingFields(data)}
-    </fieldset>
+    </fieldset>`}
     <fieldset>
-      <h3 id='lookback-label'>Released in the last:</h3>
+      <h3 id='lookback-label'>${datedHeading} in the last:</h3>
       <div class='lookback'>
         <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label' aria-valuetext='${monthsText(data.lookback)}'>
         <!-- Hidden because the value text now reads the same words: announced twice, once per handle move -->
@@ -108,3 +118,4 @@ export const movieList = data => `
   </form>
 </div>
 `
+}

@@ -1,7 +1,7 @@
 // One script serves both catalogue lists. Everything the two pages disagree about is the payload
 // key — read off the filter form's own action — and the wording below.
 
-import { monthsText } from './utils/months.js'
+import { monthsText } from '../utils/months.js'
 
 const list = document.querySelector('.movie-list')
 const listDescription = document.querySelector('.list-description')
