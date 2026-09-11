@@ -85,7 +85,6 @@ fieldset:last-of-type > button{
   margin: var(--padding-lg) auto 0;
 }
 
-.more:active,
 .more.loading {
   box-shadow: inset 0 0 24px 24px var(--green-50);
 }
