@@ -79,12 +79,20 @@ main {
   container-type: inline-size;
 }
 
-.more,
 .filter-toggle {
   --columns: round(down, calc((100cqw + var(--padding-md)) / (var(--min-width) + var(--padding-md))), 1);
   display: block;
   width: calc((100cqw - (var(--columns) - 1) * var(--padding-md)) / var(--columns));
   margin: var(--padding-lg) auto 0;
+}
+
+.more {
+  display: block;
+  width: fit-content;
+  margin: var(--padding-lg) auto 0;
+  padding: var(--padding-sm) var(--padding-md);
+  border: 2px solid var(--blue-50);
+  border-radius: 50px;
 }
 
 .more.loading {

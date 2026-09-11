@@ -71,7 +71,7 @@ export const titleList = data => {
   ${data[segment].map(title => `<li>${movieCard(title)}</li>`).join('')}
 </ul>
 
-<a class='button secondary more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
+<a class='button more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
 
 <button class='filter-toggle primary' type='button'>FILTER</button>
 
