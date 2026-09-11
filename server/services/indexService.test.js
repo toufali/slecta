@@ -6,6 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: index, indexKey } = await import('./indexService.js')
+const { scoreKey } = await import('./scoreService.js')
 const { default: tmdb } = await import('./tmdbService.js')
 const { default: redis, WRITTEN } = await import('./redisService.js')
 
@@ -237,54 +238,49 @@ test('the page carries the same shape a discover page does', async () => {
   assert.ok(data.allRatings, 'movies carry certifications')
 })
 
-// A record refreshed between nightly runs otherwise ranks by the number it replaced
-test('a re-rank sorts the rows by their current records, guarded by the bytes it read', async () => {
-  const stored = [row({ id: 1, title: 'stale', score: 87 }), row({ id: 2, title: 'settled', score: 88 })]
-  const written = []
+test('a re-rank moves the one row whose record was rewritten', async () => {
+  const stored = [row({ id: 1, title: 'settled', score: 88 }), row({ id: 2, title: 'stale', score: 87 })]
+  const writes = []
+  const reads = []
 
-  redis.getCache = async () => structuredClone(stored)
-  redis.mGetCache = async keys => {
-    assert.deepEqual(keys, ['movies/1/score/v2', 'movies/2/score/v2'])
-    return [{ scores: { rtCritic: 92 }, counts: { rtCritic: 12 } }, null]
+  redis.getCache = async key => { reads.push(key); return { scores: { rtCritic: 92 }, counts: { rtCritic: 12 } } }
+  redis.updateCache = async (key, transform) => { writes.push({ key, rows: transform(stored) }); return WRITTEN }
+
+  try {
+    await index.rerank('movie', 2)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
   }
-  redis.swapCache = async (key, expected, rows) => {
-    written.push({ key, expected, rows })
+
+  assert.deepEqual(reads, [scoreKey('movies', 2)])
+  assert.equal(writes[0].key, indexKey('movies'))
+  assert.deepEqual(writes[0].rows.map(r => [r.title, r.score]), [['stale', 92], ['settled', 88]], 'the refreshed record rose')
+})
+
+test('a re-rank stores nothing when there is nothing to move', async () => {
+  const written = []
+  let record
+
+  redis.getCache = async () => record
+  redis.updateCache = async (key, transform) => {
+    const rows = transform([row({ id: 1, score: 87 })])
+    if (rows !== undefined) written.push(rows)
     return WRITTEN
   }
 
   try {
-    await index.rerank('movie')
+    record = null // expired between the write and this read
+    await index.rerank('movie', 1)
+
+    record = { scores: { imdb: 87 }, counts: { imdb: 5000 } } // the rewrite kept the same number
+    await index.rerank('movie', 1)
+
+    await index.rerank('movie', 99) // a title outside the window has no row
   } finally {
     redis.getCache = realGetCache
-    delete redis.mGetCache
-    delete redis.swapCache
+    delete redis.updateCache
   }
 
-  const [{ key, expected, rows }] = written
-
-  assert.equal(key, indexKey('movies'))
-  assert.deepEqual(rows.map(r => [r.title, r.score]), [['stale', 92], ['settled', 88]], 'the refreshed record rose')
-  assert.equal(expected, JSON.stringify(stored), 'the swap guards on the bytes before the mutation')
-})
-
-// An expired record is not a lower score, and a failed read is not a new ranking
-test('a re-rank keeps a frozen score and never publishes over a failed read', async () => {
-  const writes = []
-
-  redis.getCache = async () => [row({ id: 1, score: 87 })]
-  redis.swapCache = async (...args) => { writes.push(args); return WRITTEN }
-
-  try {
-    redis.mGetCache = async () => [null]
-    await index.rerank('movie')
-    assert.equal(writes[0][2][0].score, 87, 'the frozen score survived its record expiring')
-
-    redis.mGetCache = async () => undefined
-    await index.rerank('movie')
-    assert.equal(writes.length, 1, 'an unreadable batch published nothing')
-  } finally {
-    redis.getCache = realGetCache
-    delete redis.mGetCache
-    delete redis.swapCache
-  }
+  assert.deepEqual(written, [])
 })

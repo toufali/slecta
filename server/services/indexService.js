@@ -1,7 +1,7 @@
 // The ranked list the nightly job publishes, read back as a catalogue page. TMDB cannot sort on a
 // score it does not hold, so "Top Rated" is served from here instead of from discover.
 
-import redis, { FAILED } from './redisService.js'
+import redis from './redisService.js'
 import tmdb, { ENGLISH } from './tmdbService.js'
 import { aggregate, scoreKey } from './scoreService.js'
 import log from '../utils/logger.js'
@@ -92,33 +92,26 @@ class IndexService {
   }
 
   /**
-   * Re-sort the ranked list from the records Redis holds now. The score endpoint calls this after
-   * a live write, since a record refreshed between nightly runs otherwise ranks by a stale number.
+   * Re-rank one title after its record was written: a record refreshed between nightly runs
+   * otherwise ranks by the number it replaced. Read back from storage rather than trusting the
+   * caller's copy, so the rank can never carry a number Redis does not hold.
    */
-  async rerank(mediaType) {
+  async rerank(mediaType, id) {
     const { segment } = tmdb.catalogue(mediaType)
-    const key = indexKey(segment)
-    const rows = await redis.getCache(key)
+    const score = aggregate(await redis.getCache(scoreKey(segment, id)))
 
-    if (!rows?.length) return
+    if (score === undefined) return
 
-    // Serialised before the mutation below: the swap compares against these bytes, so a nightly
-    // publish or another re-rank landing in between declines this one instead of being overwritten
-    const before = JSON.stringify(rows)
-    const records = await redis.mGetCache(rows.map(row => scoreKey(segment, row.id)))
+    await redis.updateCache(indexKey(segment), rows => {
+      const row = rows.find(row => row.id === id)
 
-    if (!records) return
+      // Absent for a title outside the window; unchanged when the rewrite kept the same number
+      if (!row || row.score === score) return
 
-    rows.forEach((row, i) => {
-      const score = aggregate(records[i])
+      row.score = score
 
-      // A row whose record has expired keeps its frozen score: there is nothing to recompute from
-      if (score !== undefined) row.score = score
+      return rows.sort(byRank)
     })
-
-    rows.sort(byRank)
-
-    if (await redis.swapCache(key, before, rows) === FAILED) log.warn('Re-rank write failed', { segment })
   }
 
   // Deliberately without `score`: the row's is a sort key, and `attachScores` fills the rendered one

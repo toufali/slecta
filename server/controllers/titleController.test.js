@@ -30,7 +30,7 @@ function recordCalls() {
   // Defaulted as the service defaults it, so the assertion is on the effective type rather than
   // on whether the argument was passed explicitly
   reviewService.getQuotes = async (id, name, date, mediaType = 'movie') => { calls.push(['quotes', id, mediaType]); return [] }
-  index.rerank = async mediaType => calls.push(['rerank', mediaType])
+  index.rerank = async (mediaType, id) => calls.push(['rerank', mediaType, id])
 
   return calls
 }
@@ -79,8 +79,7 @@ for (const { mediaType, segment, seasons } of MEDIA) {
       // Undefined, not false: the detail fetch above gives another request time to fill the cache,
       // so the score lookup has to check it again before paying for the sources
       ['score', scoreKey(segment, 7), mediaType, undefined, seasons, 'A Name'],
-      // A live write re-ranks its own catalogue; the cached-score test asserts the hit path stays quiet
-      ['rerank', mediaType]
+      ['rerank', mediaType, 7]
     ])
   })
 
