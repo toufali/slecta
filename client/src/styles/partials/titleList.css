@@ -16,7 +16,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+  /* Cancel what inline-block adds: siblings paint their padding outside the line, this one cannot */
+  margin-block: calc(var(--padding-xs) * -1);
+  vertical-align: text-bottom;
 }
 
 .list-description output{
