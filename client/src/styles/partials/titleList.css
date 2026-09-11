@@ -73,8 +73,7 @@ fieldset:last-of-type > button{
   display: block;
 }
 
-.more,
-.filter-toggle {
+.more {
   display: block;
   width: min(100%, 640px);
   margin: var(--padding-lg) auto 0;
@@ -94,6 +93,9 @@ fieldset:last-of-type > button{
   /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */
   position: sticky;
   bottom: var(--padding-md);
+  display: block;
+  width: fit-content;
+  margin: var(--padding-lg) auto 0;
 }
 
 .lookback {
