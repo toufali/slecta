@@ -1,5 +1,4 @@
 .list-description{
-  cursor: pointer;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -10,6 +9,7 @@
 }
 
 .list-description output{
+  cursor: pointer;
   text-transform: uppercase;
   font-weight: bold;
   background-color: rgb(0 0 0 / .5);

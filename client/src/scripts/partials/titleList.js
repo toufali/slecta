@@ -19,8 +19,8 @@ let generation = 0
 
 export default function init() {
   filterToggle.addEventListener('click', togglePanel)
-  // The description names what is filtered, which makes it the natural thing to press to change it
-  listDescription.addEventListener('click', togglePanel)
+  // The chips name what is filtered, which makes them the natural thing to press to change it
+  listDescription.addEventListener('click', e => e.target.closest('output') && togglePanel())
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
