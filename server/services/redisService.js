@@ -19,6 +19,7 @@ let degraded = false
 // Named rather than literal, so a mistyped comparison is a link error and not a silent false
 export const WRITTEN = 'written'
 export const DECLINED = 'declined'
+export const CONFLICT = 'conflict'
 export const FAILED = 'failed'
 
 class RedisService {
@@ -89,8 +90,8 @@ class RedisService {
    * older snapshot cannot publish over a newer one. Keeps the key's remaining TTL.
    * @param {string} key
    * @param {(value: any) => any} transform returns the value to store, or undefined to store nothing
-   * @return {'written'|'declined'|'failed'} `declined` when nothing was stored: the key was absent,
-   *   the transform declined, or the value changed underneath
+   * @return {'written'|'declined'|'conflict'|'failed'} `declined` when the key was absent or the
+   *   transform stored nothing; `conflict` when the value changed underneath, which a caller may retry
    */
   async updateCache(key, transform) {
     if (!client?.isReady) return FAILED
@@ -109,7 +110,7 @@ class RedisService {
         { keys: [key], arguments: [raw, JSON.stringify(value, this.#jsonReplacer)] }
       ))
 
-      return swapped === 'OK' ? WRITTEN : DECLINED
+      return swapped === 'OK' ? WRITTEN : CONFLICT
     } catch (e) {
       log.error('Unable to update the Redis cache', { key, error: e })
       return FAILED

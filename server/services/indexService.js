@@ -1,7 +1,7 @@
 // The ranked list the nightly job publishes, read back as a catalogue page. TMDB cannot sort on a
 // score it does not hold, so "Top Rated" is served from here instead of from discover.
 
-import redis from './redisService.js'
+import redis, { CONFLICT } from './redisService.js'
 import tmdb, { ENGLISH } from './tmdbService.js'
 import { aggregate, scoreKey } from './scoreService.js'
 import log from '../utils/logger.js'
@@ -98,20 +98,28 @@ class IndexService {
    */
   async rerank(mediaType, id) {
     const { segment } = tmdb.catalogue(mediaType)
-    const score = aggregate(await redis.getCache(scoreKey(segment, id)))
 
-    if (score === undefined) return
+    // Two live writes can race on the index; the loser re-reads and tries once more
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const score = aggregate(await redis.getCache(scoreKey(segment, id)))
 
-    await redis.updateCache(indexKey(segment), rows => {
-      const row = rows.find(row => row.id === id)
+      if (score === undefined) return
 
-      // Absent for a title outside the window; unchanged when the rewrite kept the same number
-      if (!row || row.score === score) return
+      const outcome = await redis.updateCache(indexKey(segment), rows => {
+        const row = rows.find(row => row.id === id)
 
-      row.score = score
+        // Absent for a title outside the window; unchanged when the rewrite kept the same number
+        if (!row || row.score === score) return
 
-      return rows.sort(byRank)
-    })
+        row.score = score
+
+        return rows.sort(byRank)
+      })
+
+      if (outcome !== CONFLICT) return
+    }
+
+    log.warn('Re-rank lost twice, leaving the rank to the next write or run', { segment, id })
   }
 
   // Deliberately without `score`: the row's is a sort key, and `attachScores` fills the rendered one

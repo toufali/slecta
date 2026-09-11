@@ -8,7 +8,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 const { default: index, indexKey } = await import('./indexService.js')
 const { scoreKey } = await import('./scoreService.js')
 const { default: tmdb } = await import('./tmdbService.js')
-const { default: redis, WRITTEN } = await import('./redisService.js')
+const { default: redis, WRITTEN, CONFLICT } = await import('./redisService.js')
 
 // `init` never runs here, so the presentation config a card is built from has to be supplied
 tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
@@ -256,6 +256,27 @@ test('a re-rank moves the one row whose record was rewritten', async () => {
   assert.deepEqual(reads, [scoreKey('movies', 2)])
   assert.equal(writes[0].key, indexKey('movies'))
   assert.deepEqual(writes[0].rows.map(r => [r.title, r.score]), [['stale', 92], ['settled', 88]], 'the refreshed record rose')
+})
+
+test('a re-rank that loses the race re-reads and tries once more', async () => {
+  const outcomes = [CONFLICT, WRITTEN]
+  const reads = []
+
+  redis.getCache = async key => { reads.push(key); return { scores: { imdb: 90 }, counts: { imdb: 9999 } } }
+  redis.updateCache = async (key, transform) => {
+    transform([row({ id: 1, score: 87 })])
+    return outcomes.shift()
+  }
+
+  try {
+    await index.rerank('movie', 1)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(outcomes, [], 'the conflict was retried')
+  assert.equal(reads.length, 2, 'the retry re-reads the record it ranks on')
 })
 
 test('a re-rank stores nothing when there is nothing to move', async () => {
