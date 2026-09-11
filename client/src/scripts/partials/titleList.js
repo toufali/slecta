@@ -47,8 +47,6 @@ async function handleMore(e) {
   if (more.classList.contains('loading')) return // a double tap arrives before the fetch lands
 
   const era = generation
-  // Held past a fast response, so the fill is seen and not just technically applied
-  const hold = new Promise(resolve => setTimeout(resolve, 300))
 
   more.classList.add('loading')
 
@@ -82,8 +80,6 @@ async function handleMore(e) {
     // Left in place, so the reader can ask again rather than lose the rest of the window
     console.error(e)
   } finally {
-    await hold
-
     // A filter that landed mid-fetch reset the control; this settle must not release its claim
     if (era === generation) more.classList.remove('loading')
   }
