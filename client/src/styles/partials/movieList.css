@@ -82,6 +82,11 @@ fieldset:last-of-type > button{
   opacity: .6;
 }
 
+/* The display above beats the UA hidden rule */
+.more[hidden] {
+  display: none;
+}
+
 .filter-toggle {
   /* note Firefox Android hit area bug */
   /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */

@@ -1,6 +1,5 @@
 import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
-import { moreLink } from '../../../client/src/scripts/utils/moreLink.js'
 
 const sortingFields = data => data.allSorting.reduce((acc, cur) => {
   acc += `
@@ -51,7 +50,7 @@ export const tvShowList = data => `
   ${data.shows.map(show => `<li>${movieCard(show)}</li>`).join('')}
 </ul>
 
-${moreLink(data.nextPage)}
+<a class='button secondary more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
 
 <button class='filter-toggle primary' type='button'>FILTER</button>
 
