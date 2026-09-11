@@ -71,9 +71,9 @@ export const titleList = data => {
   ${data[segment].map(title => `<li>${movieCard(title)}</li>`).join('')}
 </ul>
 
-<a class='button secondary more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
+<a class='button pill more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>Show more</a>
 
-<button class='filter-toggle primary' type='button'>FILTER</button>
+<button class='filter-toggle primary' type='button'>Filter</button>
 
 <div class='filter-panel hidden'>
   <form name='movie-filter' action='/api/v1/${segment}'>
