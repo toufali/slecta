@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { nextPageHref } from './pagination.js'
+import { nextPageHref } from './nextPage.js'
 
 test('the link targets the page after the one requested', () => {
   assert.equal(nextPageHref('/movies', {}, 41), '/movies?page=2')
