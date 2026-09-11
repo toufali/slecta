@@ -19,6 +19,7 @@ let degraded = false
 // Named rather than literal, so a mistyped comparison is a link error and not a silent false
 export const WRITTEN = 'written'
 export const DECLINED = 'declined'
+export const CONFLICT = 'conflict'
 export const FAILED = 'failed'
 
 class RedisService {
@@ -81,6 +82,38 @@ class RedisService {
       return value
     } catch (e) {
       log.warn('Unable to read from the Redis cache', { key, error: e })
+    }
+  }
+
+  /**
+   * Read, transform, write back — but only when the stored bytes are still the ones read, so an
+   * older snapshot cannot publish over a newer one. Keeps the key's remaining TTL.
+   * @param {string} key
+   * @param {(value: any) => any} transform returns the value to store, or undefined to store nothing
+   * @return {'written'|'declined'|'conflict'|'failed'} `declined` when the key was absent or the
+   *   transform stored nothing; `conflict` when the value changed underneath, which a caller may retry
+   */
+  async updateCache(key, transform) {
+    if (!client?.isReady) return FAILED
+
+    try {
+      const raw = await bounded(client.get(key))
+
+      if (raw === null) return DECLINED
+
+      const value = transform(JSON.parse(raw, this.#jsonReviver))
+
+      if (value === undefined) return DECLINED
+
+      const swapped = await bounded(client.eval(
+        "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL') end",
+        { keys: [key], arguments: [raw, JSON.stringify(value, this.#jsonReplacer)] }
+      ))
+
+      return swapped === 'OK' ? WRITTEN : CONFLICT
+    } catch (e) {
+      log.error('Unable to update the Redis cache', { key, error: e })
+      return FAILED
     }
   }
 

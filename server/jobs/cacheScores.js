@@ -4,7 +4,7 @@ import tmdb from '../services/tmdbService.js'
 import scoreService, { aggregate, scoreKey, SCORE_TTL } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
-import { indexKey } from '../services/indexService.js'
+import { indexKey, byRank } from '../services/indexService.js'
 import log from '../utils/logger.js'
 import { checkReferenceTitles, checkRunCoverage } from './checks.js'
 
@@ -121,9 +121,8 @@ async function publishIndex(mediaType, rows, titles, complete, confirmed) {
   if (!all.length) return log.error('Score index left in place, nothing to publish', { mediaType })
 
   // TMDB cannot sort on a score it does not hold, and sorting one fetched page would rank a page
-  // rather than the catalogue. Stored ranked so a request only filters and slices. Votes then id
-  // break the ties an integer score produces, so the order does not reshuffle on finish order.
-  all.sort((a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id)
+  // rather than the catalogue. Stored ranked so a request only filters and slices.
+  all.sort(byRank)
 
   if (await redis.setCache(key, all, INDEX_TTL) === WRITTEN) return true
 

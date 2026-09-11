@@ -6,8 +6,9 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
 }
 
 const { default: index, indexKey } = await import('./indexService.js')
+const { scoreKey } = await import('./scoreService.js')
 const { default: tmdb } = await import('./tmdbService.js')
-const { default: redis } = await import('./redisService.js')
+const { default: redis, WRITTEN, CONFLICT } = await import('./redisService.js')
 
 // `init` never runs here, so the presentation config a card is built from has to be supplied
 tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
@@ -235,4 +236,89 @@ test('the page carries the same shape a discover page does', async () => {
   assert.ok(data.allSorting.some(option => option.value === 'score'))
   assert.equal(data.allGenres.get(35), 'Comedy')
   assert.ok(data.allRatings, 'movies carry certifications')
+})
+
+test('a re-rank moves the one row whose record was rewritten', async () => {
+  const stored = [row({ id: 1, title: 'settled', score: 88 }), row({ id: 2, title: 'stale', score: 87 })]
+  const writes = []
+  const reads = []
+
+  redis.getCache = async key => { reads.push(key); return { scores: { rtCritic: 92 }, counts: { rtCritic: 12 } } }
+  redis.updateCache = async (key, transform) => { writes.push({ key, rows: transform(stored) }); return WRITTEN }
+
+  try {
+    await index.rerank('movie', 2)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(reads, [scoreKey('movies', 2)])
+  assert.equal(writes[0].key, indexKey('movies'))
+  assert.deepEqual(writes[0].rows.map(r => [r.title, r.score]), [['stale', 92], ['settled', 88]], 'the refreshed record rose')
+})
+
+test('a re-rank that loses the race re-reads and tries once more', async () => {
+  const outcomes = [CONFLICT, WRITTEN]
+  const reads = []
+
+  redis.getCache = async key => { reads.push(key); return { scores: { imdb: 90 }, counts: { imdb: 9999 } } }
+  redis.updateCache = async (key, transform) => {
+    transform([row({ id: 1, score: 87 })])
+    return outcomes.shift()
+  }
+
+  try {
+    await index.rerank('movie', 1)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(outcomes, [], 'the conflict was retried')
+  assert.equal(reads.length, 2, 'the retry re-reads the record it ranks on')
+})
+
+// The nightly walk omits an unscorable title; a live rewrite that scored nothing has to agree
+test('a record whose sources answered nothing drops the row', async () => {
+  const written = []
+
+  redis.getCache = async () => ({ scores: {} })
+  redis.updateCache = async (key, transform) => { written.push(transform([row({ id: 1 }), row({ id: 2 })])); return WRITTEN }
+
+  try {
+    await index.rerank('movie', 1)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(written[0].map(r => r.id), [2])
+})
+
+test('a re-rank stores nothing when there is nothing to move', async () => {
+  const written = []
+  let record
+
+  redis.getCache = async () => record
+  redis.updateCache = async (key, transform) => {
+    const rows = transform([row({ id: 1, score: 87 })])
+    if (rows !== undefined) written.push(rows)
+    return WRITTEN
+  }
+
+  try {
+    record = null // expired between the write and this read
+    await index.rerank('movie', 1)
+
+    record = { scores: { imdb: 87 }, counts: { imdb: 5000 } } // the rewrite kept the same number
+    await index.rerank('movie', 1)
+
+    await index.rerank('movie', 99) // a title outside the window has no row
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(written, [])
 })
