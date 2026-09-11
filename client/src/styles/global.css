@@ -249,7 +249,6 @@ fieldset {
   border: none;
 }
 
-/* One pill look, two structures: a label sweeps its span on :checked, a button sweeps itself */
 label.pill,
 button.pill,
 .button.pill {
