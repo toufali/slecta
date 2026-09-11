@@ -53,7 +53,6 @@ test('each catalogue describes its own date field', () => {
   assert.match(tvShowList(data()), /first aired in the last/)
 })
 
-// Hidden rather than absent, so the client toggles one permanent node and never builds markup
 test('the More control ships hidden without a next page, above the filter button', () => {
   for (const view of [movieList, tvShowList]) {
     const rendered = view(data({ nextPage: '/movies?page=2' }))

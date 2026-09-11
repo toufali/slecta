@@ -77,7 +77,6 @@ fieldset:last-of-type > button{
   margin: var(--padding-lg) auto 0;
 }
 
-/* The only feedback while the fetch is in flight: nothing else on the page has changed yet */
 .more.loading {
   opacity: .6;
 }

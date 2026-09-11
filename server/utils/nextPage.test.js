@@ -20,7 +20,6 @@ test('every filter survives into the link', () => {
   )
 })
 
-// A repeated filter arrives as an array, and flattening it would send TMDB one comma-joined genre
 test('a filter given more than once stays repeated', () => {
   assert.equal(nextPageHref('/movies', { wg: ['28', '12'] }, 4), '/movies?wg=28&wg=12&page=2')
 })

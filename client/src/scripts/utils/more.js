@@ -11,7 +11,7 @@ let generation = 0
 /**
  * @param {string} endpoint API path answering the same query as the page route
  * @param {(data: object) => (HTMLElement|undefined)} append renders the response's rows and
- *   returns the first row's focusable element, which is where a keyboard reader has to be put
+ *   returns the first row's focusable element
  */
 export function initMore(endpoint, append) {
   const link = main.querySelector('.more')
@@ -52,8 +52,7 @@ export function initMore(endpoint, append) {
       // Left in place, so the reader can ask again rather than lose the rest of the window
       console.error(e)
     } finally {
-      // Era-gated: a filter that landed mid-fetch reset the control, and this settle must not
-      // release a claim a newer fetch holds
+      // A filter that landed mid-fetch reset the control; this settle must not release its claim
       if (era === generation) link.classList.remove('loading')
     }
   })

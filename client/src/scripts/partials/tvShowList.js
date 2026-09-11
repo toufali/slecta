@@ -94,7 +94,6 @@ async function renderScores(cards = document.querySelectorAll('movie-card')) {
         scoreBadge.lowConfidence = score.lowConfidence
         scoreBadge.score = score.avgScore
       } catch (e) {
-        // Caught per card, so one failure does not end the walk
         console.error(e)
       } finally {
         scoreBadge.classList.remove('loading')
