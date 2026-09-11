@@ -6,9 +6,8 @@ import { attachScores } from './attachScores.js'
 import { nextPageHref } from '../utils/nextPage.js'
 import { mainView } from '../views/mainView.js'
 import { movieList } from '../views/partials/movieList.js'
-import { movieDetail } from '../views/partials/movieDetail.js'
 import { tvShowList } from '../views/partials/tvShowList.js'
-import { tvShowDetail } from '../views/partials/tvShowDetail.js'
+import { titleDetail } from '../views/partials/titleDetail.js'
 
 // Everything the two media types disagree about, so a handler holds none of it. `segment` covers
 // both the cache-key prefix and the name TMDB's list response uses — they are already the same
@@ -20,7 +19,7 @@ const MEDIA = {
     list: query => tmdb.getMovies(query),
     detail: id => tmdb.getMovieDetail(id),
     listView: movieList,
-    detailView: movieDetail
+    detailView: titleDetail
   },
   tv: {
     mediaType: 'tv',
@@ -28,7 +27,7 @@ const MEDIA = {
     list: query => tmdb.getTvShows(query),
     detail: id => tmdb.getTvShowDetail(id),
     listView: tvShowList,
-    detailView: tvShowDetail
+    detailView: titleDetail
   }
 }
 

@@ -1,13 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { movieDetail } from './movieDetail.js'
-import { tvShowDetail } from './tvShowDetail.js'
+import { titleDetail } from './titleDetail.js'
 import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
 import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 
 const data = over => ({
   tmdbId: 7, title: 'A Title', overview: 'Words', releaseDate: '2026-01-01', rating: 'PG-13',
-  genres: 'Drama', cast: 'Someone', director: 'Someone', creator: 'Someone', runtime: 100,
+  genres: 'Drama', cast: 'Someone', director: 'Someone', runtime: 100,
   // Not English, so the assertion cannot match the panel's own "English" label by accident
   seasons: 1, language: 'Japanese', providers: [], quotes: [], score: 83, ...over
 })
@@ -25,20 +24,18 @@ test('the badge carries the mark only when the score is thin', () => {
 
 // Grey alone is not self-evident, so back it with something visible where there is room
 test('a thin score is explained in words, and a settled one is not', () => {
-  for (const view of [movieDetail, tvShowDetail]) {
-    assert.match(view(data({ lowConfidence: true })), /<p class='unsettled'>Few ratings so far/)
-    assert.match(view(data({ lowConfidence: false })), /<p class='unsettled' hidden>/)
-  }
+  assert.match(titleDetail(data({ lowConfidence: true })), /<p class='unsettled'>Few ratings so far/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /<p class='unsettled' hidden>/)
 })
 
 // Ship the line either way, since a cache miss fills the badge in by script
 test('the line ships hidden rather than absent', () => {
-  assert.match(movieDetail(data({ lowConfidence: false })), /class='unsettled' hidden/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /class='unsettled' hidden/)
 })
 
 // Naming the source belongs in the component breakdown; the badge answers how much to trust it
 test('no source is named beside the badge', () => {
-  const rendered = movieDetail(data({ lowConfidence: true }))
+  const rendered = titleDetail(data({ lowConfidence: true }))
   const header = rendered.match(/<header>[\s\S]*?<\/header>/)[0]
 
   for (const source of ['IMDb', 'imdb', 'Rotten', 'Metacritic', 'Tomatoes']) {
@@ -68,8 +65,24 @@ test('the badge qualifies a thin score in words a screen reader can reach', () =
 
 // The spoken list read as needing subtitles for a film that is substantially English
 test('the detail page names the original language', () => {
-  for (const view of [movieDetail, tvShowDetail]) {
-    assert.match(view(data()), /<label>Language:<\/label><span>Japanese<\/span>/)
-    assert.doesNotMatch(view(data()), /Spoken languages/)
-  }
+  assert.match(titleDetail(data()), /<label>Language:<\/label><span>Japanese<\/span>/)
+  assert.doesNotMatch(titleDetail(data()), /Spoken languages/)
+})
+
+// One view serves both catalogues, rendering the rows the record carries
+test('the rows follow the record: a film gets a director, a show gets a creator and seasons', () => {
+  const film = titleDetail(data())
+  const show = titleDetail(data({ director: undefined, runtime: undefined, creator: 'Someone', seasons: 3 }))
+
+  assert.match(film, /<label>Director:/)
+  assert.match(film, /<label>Running time:<\/label><span>100 min/)
+  assert.doesNotMatch(film, /<label>Creator:|title='Seasons'/)
+  assert.match(show, /<label>Creator:/)
+  assert.match(show, /<li title='Seasons'>3 seasons<\/li>/)
+  assert.doesNotMatch(show, /<label>Director:|Running time/)
+})
+
+// A single season carries no information the page does not already show
+test('one season is not worth a row', () => {
+  assert.doesNotMatch(titleDetail(data({ seasons: 1 })), /Seasons/)
 })

@@ -188,3 +188,24 @@ test('a record with no score is not marked', async () => {
   assert.equal(ctx.body.avgScore, undefined)
   assert.equal(ctx.body.lowConfidence, false)
 })
+
+// The wiring is one line per catalogue, and serving the wrong view would change no response shape
+test('each detail page renders through the shared view with its own rows', async () => {
+  recordCalls()
+  scoreService.getScoreFromCache = async () => null
+  reviewService.getQuotesFromCache = async () => []
+  tmdb.getMovieDetail = async () => ({ title: 'A Movie', director: 'Someone', runtime: 100 })
+  tmdb.getTvShowDetail = async () => ({ title: 'A Show', creator: 'Someone', seasons: 3 })
+
+  const movie = context()
+  await showDetail('movie')(movie)
+  assert.match(movie.body, /data-partial='titleDetail'/)
+  assert.match(movie.body, /<label>Director:/)
+
+  const tv = context()
+  await showDetail('tv')(tv)
+  assert.match(tv.body, /data-partial='titleDetail'/)
+  assert.match(tv.body, /<label>Creator:/)
+  assert.match(tv.body, /<li title='Seasons'>3 seasons<\/li>/)
+  assert.doesNotMatch(tv.body, /<label>Director:/)
+})
