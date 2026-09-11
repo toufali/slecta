@@ -53,3 +53,13 @@ test('each catalogue describes its own date field', () => {
   assert.match(tvShowList(data()), /first aired in the last/)
 })
 
+test('the More control ships hidden without a next page, above the filter button', () => {
+  for (const view of [movieList, tvShowList]) {
+    const rendered = view(data({ nextPage: '/movies?page=2' }))
+    const more = rendered.indexOf("<a class='button secondary more' rel='next' href='/movies?page=2'>More</a>")
+
+    assert.notEqual(more, -1)
+    assert.ok(rendered.indexOf('</ul>') < more && more < rendered.indexOf('filter-toggle'))
+    assert.match(view(data()), /<a class='button secondary more' rel='next' hidden>More<\/a>/)
+  }
+})

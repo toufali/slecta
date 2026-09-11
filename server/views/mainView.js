@@ -1,12 +1,3 @@
-// Above the About link and louder than it: reaching the rest of the window is the more useful
-// thing to do from the bottom of a list. Secondary, so it does not compete with the filter button.
-const pageNav = ({ page, prev, next } = {}) => !(prev || next) ? '' : `
-    <nav class='pagination' aria-label='Pagination'>
-      ${prev ? `<a class='button secondary' rel='prev' href='${prev}'>Previous</a>` : '<span></span>'}
-      <span class='page-number'>Page ${page}</span>
-      ${next ? `<a class='button secondary' rel='next' href='${next}'>Next</a>` : '<span></span>'}
-    </nav>`
-
 export const mainView = data => `
 <!doctype html>
 <html lang=en>
@@ -56,7 +47,6 @@ export const mainView = data => `
     ${data.partial(data.content)}
   </main>
   <footer>
-    ${pageNav(data.content?.pagination)}
     <a href='/about'>About Slecta</a>
   </footer>
 </body>

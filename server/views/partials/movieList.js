@@ -62,6 +62,8 @@ export const movieList = data => `
   ${data.movies.map(movie => `<li>${movieCard(movie)}</li>`).join('')}
 </ul>
 
+<a class='button secondary more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
+
 <button class='filter-toggle primary' type='button'>FILTER</button>
 
 <div class='filter-panel hidden'>

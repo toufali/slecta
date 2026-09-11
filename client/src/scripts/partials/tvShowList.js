@@ -1,4 +1,4 @@
-import { resetPageNav } from '../utils/pageNav.js'
+import { initMore, resetMore } from '../utils/more.js'
 import { monthsText } from '../utils/months.js'
 
 const list = document.querySelector('[data-partial="tvShowList"] ul')
@@ -13,7 +13,17 @@ export default function init() {
   filterToggle.addEventListener('mousedown', handleMouseEvent)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
+  initMore(filterForm.action, appendRows)
   renderScores()
+}
+
+function appendRows(data) {
+  const items = cardItems(data.shows)
+
+  list.append(...items)
+  renderScores(items.map(item => item.firstChild))
+
+  return items[0]?.firstChild.shadowRoot.querySelector('a')
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
@@ -40,10 +50,10 @@ async function handleSubmit(e) {
 
   filterPanel.classList.toggle('visible', false)
 
-  renderTvShowList(data.shows)
+  list.replaceChildren(...cardItems(data.shows))
   renderlistDescription(data)
   renderScores()
-  resetPageNav(params, data.totalPages)
+  resetMore(params, data.totalPages)
   updateUrl(params)
 }
 
@@ -61,33 +71,33 @@ async function getTvShowData(form, params) {
   return json
 }
 
-function renderTvShowList(shows) {
-  const tvShowItems = shows.map(show => {
-    const item = document.createElement('li')
-    const movieCard = document.createElement('movie-card')
+const cardItems = rows => rows.map(row => {
+  const item = document.createElement('li')
+  const movieCard = document.createElement('movie-card')
 
-    movieCard.data = show
+  movieCard.data = row
 
-    item.append(movieCard)
-    return item
-  });
+  item.append(movieCard)
+  return item
+})
 
-  list.replaceChildren(...tvShowItems)
-}
-
-async function renderScores() {
-  const cards = document.querySelectorAll('movie-card')
-
+async function renderScores(cards = document.querySelectorAll('movie-card')) {
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
+
     if (scoreBadge.score === undefined) {
       scoreBadge.classList.add('loading')
 
-      const score = await fetch(`/api/v1/shows/${card.id}/score`).then(res => res.json())
+      try {
+        const score = await fetch(`/api/v1/shows/${card.id}/score`).then(res => res.json())
 
-      scoreBadge.lowConfidence = score.lowConfidence
-      scoreBadge.score = score.avgScore
-      scoreBadge.classList.remove('loading')
+        scoreBadge.lowConfidence = score.lowConfidence
+        scoreBadge.score = score.avgScore
+      } catch (e) {
+        console.error(e)
+      } finally {
+        scoreBadge.classList.remove('loading')
+      }
     }
   }
 }
