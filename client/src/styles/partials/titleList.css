@@ -1,12 +1,22 @@
 .list-description{
   cursor: default;
   user-select: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   font: var(--h3-font);
   line-height: 1.4;
   color: var(--gray-70);
-  white-space: nowrap;
+  white-space: pre-wrap;
+}
+
+.list-description .genres{
+  display: inline-block;
+  max-width: 26ch;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .list-description output{

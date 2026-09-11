@@ -45,7 +45,7 @@ function listDescription(data, dated) {
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.inEnglish) language = `<output>in English</output>`
-  if (data.withGenres) genres = `<label>with genre <output>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output class='genres'>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
 
   const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
