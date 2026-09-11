@@ -29,8 +29,8 @@ function providers(items) {
     .join('')
 }
 
-export const tvShowDetail = data => `
-<link rel='stylesheet' href='/styles/partials/movieDetail.css' type='text/css'>
+export const titleDetail = data => `
+<link rel='stylesheet' href='/styles/partials/titleDetail.css' type='text/css'>
 <figure>${data.backdropUrl ? `<img src='${data.backdropUrl}' alt=''>` : ''}${ytTrailer(data.ytTrailerId)}</figure>
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
@@ -40,14 +40,16 @@ export const tvShowDetail = data => `
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
-      <li title='Seasons'>${data.seasons > 1 ? `${data.seasons} seasons` : ''}</li>
+      ${data.seasons > 1 ? `<li title='Seasons'>${data.seasons} seasons</li>` : ''}
       <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>
   <p><label>Synopsis:</label><span>${data.overview}</span></p>
   <p><label>Cast:</label><span>${data.cast}</span></p>
-  <p><label>Creator:</label><span>${data.creator}</span></p>
+  ${!data.director ? '' : `<p><label>Director:</label><span>${data.director}</span></p>`}
+  ${!data.creator ? '' : `<p><label>Creator:</label><span>${data.creator}</span></p>`}
+  ${!data.runtime ? '' : `<p><label>Running time:</label><span>${data.runtime} min</span></p>`}
   <p><label>Language:</label><span>${data.language}</span></p>
   <div class='providers'>
     <p><label>Available on:</label></p>
