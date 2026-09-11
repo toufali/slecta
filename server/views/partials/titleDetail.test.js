@@ -69,7 +69,6 @@ test('the detail page names the original language', () => {
   assert.doesNotMatch(titleDetail(data()), /Spoken languages/)
 })
 
-// One view serves both catalogues, rendering the rows the record carries
 test('the rows follow the record: a film gets a director, a show gets a creator and seasons', () => {
   const film = titleDetail(data())
   const show = titleDetail(data({ director: undefined, runtime: undefined, creator: 'Someone', seasons: 3 }))

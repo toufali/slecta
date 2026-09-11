@@ -2,7 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { titleList } from './titleList.js'
 
-// One view serves both catalogues, so every fixture is one or the other by its payload key
 const movie = over => ({
   movies: [],
   allGenres: new Map([[28, 'Action']]),

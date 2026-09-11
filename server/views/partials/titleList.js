@@ -53,7 +53,6 @@ function listDescription(data, dated) {
   return conjunctionFmt.format([streaming, language, sort, genres, ratings, lookback].filter(item => item))
 }
 
-// One view serves both catalogues; which one is answered by the key the data carries
 const COPY = {
   movies: { noun: 'Movies', dated: 'released', datedHeading: 'Released' },
   shows: { noun: 'TV Shows', dated: 'first aired', datedHeading: 'First aired' }
