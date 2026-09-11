@@ -77,10 +77,10 @@ test('the ratings fieldset renders only when the data carries ratings', () => {
 test('the More control ships hidden without a next page, above the filter button', () => {
   for (const data of [movie, tv]) {
     const rendered = titleList(data({ nextPage: '/movies?page=2' }))
-    const more = rendered.indexOf("<a class='button more' rel='next' href='/movies?page=2'>More</a>")
+    const more = rendered.indexOf("<a class='button more' rel='next' href='/movies?page=2'>Show more</a>")
 
     assert.notEqual(more, -1)
     assert.ok(rendered.indexOf('</ul>') < more && more < rendered.indexOf('filter-toggle'))
-    assert.match(titleList(data()), /<a class='button more' rel='next' hidden>More<\/a>/)
+    assert.match(titleList(data()), /<a class='button more' rel='next' hidden>Show more<\/a>/)
   }
 })

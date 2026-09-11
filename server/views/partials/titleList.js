@@ -73,7 +73,7 @@ export const titleList = data => {
 
 <a class='button more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>More</a>
 
-<button class='filter-toggle primary' type='button'>FILTER</button>
+<button class='filter-toggle primary' type='button'>Filter</button>
 
 <div class='filter-panel hidden'>
   <form name='movie-filter' action='/api/v1/${segment}'>
