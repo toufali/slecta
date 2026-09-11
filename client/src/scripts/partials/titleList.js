@@ -18,7 +18,9 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('mousedown', handleMouseEvent)
+  filterToggle.addEventListener('mousedown', togglePanel)
+  // The description names what is filtered, which makes it the natural thing to press to change it
+  listDescription.addEventListener('click', togglePanel)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
@@ -32,13 +34,9 @@ function handleLookback() {
   lookback.ariaValueText = lookbackOutput.textContent
 }
 
-function handleMouseEvent(e) {
-  switch (true) {
-    case e.target.matches('.filter-toggle'):
-      filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
-      filterPanel.scroll(0, 0)
-      break
-  }
+function togglePanel() {
+  filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
+  filterPanel.scroll(0, 0)
 }
 
 // The More control appends the next page rather than navigating to it, so a reader keeps their
