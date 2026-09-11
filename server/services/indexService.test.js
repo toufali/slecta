@@ -279,6 +279,23 @@ test('a re-rank that loses the race re-reads and tries once more', async () => {
   assert.equal(reads.length, 2, 'the retry re-reads the record it ranks on')
 })
 
+// The nightly walk omits an unscorable title; a live rewrite that scored nothing has to agree
+test('a record whose sources answered nothing drops the row', async () => {
+  const written = []
+
+  redis.getCache = async () => ({ scores: {} })
+  redis.updateCache = async (key, transform) => { written.push(transform([row({ id: 1 }), row({ id: 2 })])); return WRITTEN }
+
+  try {
+    await index.rerank('movie', 1)
+  } finally {
+    redis.getCache = realGetCache
+    delete redis.updateCache
+  }
+
+  assert.deepEqual(written[0].map(r => r.id), [2])
+})
+
 test('a re-rank stores nothing when there is nothing to move', async () => {
   const written = []
   let record

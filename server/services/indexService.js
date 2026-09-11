@@ -101,15 +101,21 @@ class IndexService {
 
     // Two live writes can race on the index; the loser re-reads and tries once more
     for (let attempt = 0; attempt < 2; attempt++) {
-      const score = aggregate(await redis.getCache(scoreKey(segment, id)))
+      const record = await redis.getCache(scoreKey(segment, id))
 
-      if (score === undefined) return
+      // Absent or unreadable says nothing about the title, and the frozen rank stands
+      if (!record) return
+
+      const score = aggregate(record)
 
       const outcome = await redis.updateCache(indexKey(segment), rows => {
         const row = rows.find(row => row.id === id)
 
         // Absent for a title outside the window; unchanged when the rewrite kept the same number
         if (!row || row.score === score) return
+
+        // A record whose sources answered nothing is dropped, as the nightly walk drops it
+        if (score === undefined) return rows.filter(other => other !== row)
 
         row.score = score
 
