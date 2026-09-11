@@ -15,7 +15,7 @@ const more = document.querySelector('.more')
 const segment = new URL(filterForm.action).pathname.split('/').pop()
 const { noun, dated } = {
   movies: { noun: 'Movies', dated: 'released' },
-  shows: { noun: 'Shows', dated: 'first aired' }
+  shows: { noun: 'TV Shows', dated: 'first aired' }
 }[segment]
 
 let generation = 0
