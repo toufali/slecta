@@ -90,11 +90,6 @@ main {
   display: block;
   width: fit-content;
   margin: var(--padding-lg) auto 0;
-  padding: var(--padding-sm) var(--padding-md);
-  border: 2px solid var(--blue-50);
-  border-radius: 50px;
-  box-shadow: inset 0 0 0 0 var(--green-50);
-  transition: box-shadow .2s ease-out;
 }
 
 .more:active,

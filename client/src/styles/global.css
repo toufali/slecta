@@ -203,6 +203,15 @@ button.secondary,
   transition: filter .3s;
 }
 
+button.pill,
+.button.pill {
+  padding: var(--padding-sm) var(--padding-md);
+  border: 2px solid var(--blue-50);
+  border-radius: 50px;
+  box-shadow: inset 0 0 0 0 var(--green-50);
+  transition: box-shadow .2s ease-out;
+}
+
 /* `all: unset` above drops the outline with everything else, so focus has to be put back */
 button:focus-visible,
 .button:focus-visible {
