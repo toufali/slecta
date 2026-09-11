@@ -270,10 +270,13 @@ label.pill input {
 label.pill span,
 button.pill,
 .button.pill {
-  display: inline-block;
   padding: var(--padding-sm) var(--padding-md);
   box-shadow: inset 0 0 0 0 var(--green-50);
   transition: box-shadow .2s ease-out;
+}
+
+label.pill span {
+  display: inline-block;
 }
 
 label.pill input:checked + span{
