@@ -73,9 +73,17 @@ fieldset:last-of-type > button{
   display: block;
 }
 
-.more {
+/* One card column wide, so the controls align with the grid: same auto-fill arithmetic the
+   list's grid-template runs, and the two must agree */
+main {
+  container-type: inline-size;
+}
+
+.more,
+.filter-toggle {
+  --columns: round(down, calc((100cqw + var(--padding-md)) / (var(--min-width) + var(--padding-md))), 1);
   display: block;
-  width: min(100%, 640px);
+  width: calc((100cqw - (var(--columns) - 1) * var(--padding-md)) / var(--columns));
   margin: var(--padding-lg) auto 0;
 }
 
@@ -93,9 +101,18 @@ fieldset:last-of-type > button{
   /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */
   position: sticky;
   bottom: var(--padding-md);
-  display: block;
-  width: fit-content;
-  margin: var(--padding-lg) auto 0;
+}
+
+.filter-toggle::before {
+  content: '';
+  display: inline-block;
+  height: 18px;
+  aspect-ratio: 1;
+  vertical-align: -3px;
+  margin-right: var(--padding-sm);
+  background-color: currentColor;
+  -webkit-mask: url(/images/filter-icon.svg) no-repeat center / contain;
+  mask: url(/images/filter-icon.svg) no-repeat center / contain;
 }
 
 .lookback {
