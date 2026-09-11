@@ -18,7 +18,7 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('mousedown', togglePanel)
+  filterToggle.addEventListener('click', togglePanel)
   // The description names what is filtered, which makes it the natural thing to press to change it
   listDescription.addEventListener('click', togglePanel)
   filterForm.addEventListener('submit', handleSubmit)
