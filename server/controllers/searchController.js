@@ -4,7 +4,8 @@ import { searchList } from '../views/partials/searchList.js'
 
 export async function showSearch(ctx) {
   return ctx.body = mainView({
-    partial: searchList
+    partial: searchList,
+    section: 'search'
   })
 }
 

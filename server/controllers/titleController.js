@@ -5,8 +5,7 @@ import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { nextPageHref } from '../utils/nextPage.js'
 import { mainView } from '../views/mainView.js'
-import { movieList } from '../views/partials/movieList.js'
-import { tvShowList } from '../views/partials/tvShowList.js'
+import { titleList } from '../views/partials/titleList.js'
 import { titleDetail } from '../views/partials/titleDetail.js'
 
 // Everything the two media types disagree about, so a handler holds none of it. `segment` covers
@@ -18,7 +17,7 @@ const MEDIA = {
     segment: 'movies',
     list: query => tmdb.getMovies(query),
     detail: id => tmdb.getMovieDetail(id),
-    listView: movieList,
+    listView: titleList,
     detailView: titleDetail
   },
   tv: {
@@ -26,7 +25,7 @@ const MEDIA = {
     segment: 'shows',
     list: query => tmdb.getTvShows(query),
     detail: id => tmdb.getTvShowDetail(id),
-    listView: tvShowList,
+    listView: titleList,
     detailView: titleDetail
   }
 }
@@ -60,7 +59,8 @@ export const showList = mediaType => async ctx => {
 
   return ctx.body = mainView({
     partial: media.listView,
-    content: data
+    content: data,
+    section: media.segment
   })
 }
 
@@ -83,7 +83,8 @@ export const showDetail = mediaType => async ctx => {
 
   return ctx.body = mainView({
     partial: media.detailView,
-    content: data
+    content: data,
+    section: media.segment
   })
 }
 

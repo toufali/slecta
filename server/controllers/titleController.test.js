@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { showDetail, getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
+const { showList, showDetail, getList, getDetail, getScore, getQuotes } = await import('./titleController.js')
 const { scoreKey } = await import('../services/scoreService.js')
 const { default: tmdb } = await import('../services/tmdbService.js')
 const { default: scoreService } = await import('../services/scoreService.js')
@@ -190,6 +190,25 @@ test('a record with no score is not marked', async () => {
 })
 
 // The wiring is one line per catalogue, and serving the wrong view would change no response shape
+test('each list page renders through the shared view with its own catalogue', async () => {
+  recordCalls()
+  const shape = { allGenres: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 }
+  tmdb.getMovies = async () => ({ movies: [], allRatings: [{ certification: 'R', meaning: 'r' }], ...shape })
+  tmdb.getTvShows = async () => ({ shows: [], ...shape })
+
+  const movies = context()
+  await showList('movie')(movies)
+  assert.match(movies.body, /data-partial='titleList'/)
+  assert.match(movies.body, /<h1 class='list-description'>Movies /)
+  assert.match(movies.body, /href='\/movies' class="current"/)
+
+  const shows = context()
+  await showList('tv')(shows)
+  assert.match(shows.body, /data-partial='titleList'/)
+  assert.match(shows.body, /<h1 class='list-description'>TV Shows /)
+  assert.match(shows.body, /href='\/shows' class="current"/)
+})
+
 test('each detail page renders through the shared view with its own rows', async () => {
   recordCalls()
   scoreService.getScoreFromCache = async () => null
@@ -202,9 +221,12 @@ test('each detail page renders through the shared view with its own rows', async
   assert.match(movie.body, /data-partial='titleDetail'/)
   assert.match(movie.body, /<label>Director:/)
 
+  assert.match(movie.body, /href='\/movies' class="current"/, 'a detail page keeps its tab lit')
+
   const tv = context()
   await showDetail('tv')(tv)
   assert.match(tv.body, /data-partial='titleDetail'/)
+  assert.match(tv.body, /href='\/shows' class="current"/)
   assert.match(tv.body, /<label>Creator:/)
   assert.match(tv.body, /<li title='Seasons'>3 seasons<\/li>/)
   assert.doesNotMatch(tv.body, /<label>Director:/)
