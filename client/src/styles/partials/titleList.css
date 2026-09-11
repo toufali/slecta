@@ -1,4 +1,7 @@
 .list-description{
+  /* Control chrome now, so no I-beam and no text selection on a fast chip toggle */
+  cursor: default;
+  user-select: none;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
