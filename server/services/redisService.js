@@ -94,9 +94,40 @@ class RedisService {
     try {
       const values = await bounded(client.mGet(keys))
 
-      return values.map(value => value === null ? null : JSON.parse(value, this.#jsonReviver))
+      return values.map((value, i) => {
+        if (value === null) return null
+
+        try {
+          return JSON.parse(value, this.#jsonReviver)
+        } catch {
+          // One corrupt entry is that entry's miss, not the batch's failure
+          log.warn('Unparseable cache value', { key: keys[i] })
+          return null
+        }
+      })
     } catch (e) {
       log.warn('Unable to read from the Redis cache', { keys: keys.length, error: e })
+    }
+  }
+
+  /**
+   * Replace a value only when the stored bytes still match what the caller read, so an older
+   * snapshot cannot publish over a newer one. Keeps the key's remaining TTL.
+   * @return {'written'|'declined'|'failed'} `declined` when the value changed or expired underneath
+   */
+  async swapCache(key, expected, value) {
+    if (!client?.isReady) return FAILED
+
+    try {
+      const swapped = await bounded(client.eval(
+        "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL') end",
+        { keys: [key], arguments: [expected, JSON.stringify(value, this.#jsonReplacer)] }
+      ))
+
+      return swapped === 'OK' ? WRITTEN : DECLINED
+    } catch (e) {
+      log.error('Unable to swap a Redis cache value', { key, error: e })
+      return FAILED
     }
   }
 
