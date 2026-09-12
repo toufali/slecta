@@ -87,8 +87,10 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
+/* Its own full-width line below the facts, clear of the badge that overlaps the row above */
 .details .unsettled {
-  margin-left: auto;
+  flex-basis: 100%;
+  text-align: right;
   font: var(--small-font);
   color: var(--gray-70);
 }
@@ -117,8 +119,6 @@ p:has(span:empty) {
   column-gap: 24px;
   overflow: hidden;
   color: var(--blue-90);
-  /* Reserve the badge's corner, or the caption at the row's right end tucks under it */
-  padding-right: 100px;
 }
 
 .details li {
