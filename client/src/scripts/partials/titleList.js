@@ -1,10 +1,10 @@
 import { monthsText } from '../utils/months.js'
 import { genreText } from '../utils/genres.js'
 
-const list = document.querySelector('.movie-list')
+const list = document.querySelector('.title-list')
 const listDescription = document.querySelector('.list-description')
 const filterPanel = document.querySelector('.filter-panel')
-const filterForm = document.querySelector('form[name="movie-filter"]')
+const filterForm = document.querySelector('form[name="title-filter"]')
 const filterToggle = document.querySelector('.filter-toggle')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
@@ -137,15 +137,15 @@ async function getData(params) {
 
 const cardItems = rows => rows.map(row => {
   const item = document.createElement('li')
-  const movieCard = document.createElement('movie-card')
+  const card = document.createElement('title-card')
 
-  movieCard.data = row
+  card.data = row
 
-  item.append(movieCard)
+  item.append(card)
   return item
 })
 
-async function renderScores(cards = document.querySelectorAll('movie-card')) {
+async function renderScores(cards = document.querySelectorAll('title-card')) {
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
 
