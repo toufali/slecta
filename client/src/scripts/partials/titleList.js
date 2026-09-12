@@ -25,14 +25,14 @@ export default function init() {
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
-  panelClose.addEventListener('click', togglePanel)
+  panelClose.addEventListener('click', closePanel)
   document.addEventListener('keydown', e => e.key === 'Escape' && closeIfOpen(e))
   document.addEventListener('click', e => e.target.closest('.filter-panel, .filter-toggle, .list-description') || closeIfOpen(e))
   renderScores()
 }
 
 function closeIfOpen() {
-  if (filterPanel.classList.contains('visible')) togglePanel()
+  if (filterPanel.classList.contains('visible')) closePanel()
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
@@ -43,8 +43,21 @@ function handleLookback() {
 }
 
 function togglePanel() {
-  filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
+  filterPanel.classList.contains('visible') ? closePanel() : openPanel()
+}
+
+function openPanel() {
+  filterPanel.classList.add('visible')
+  filterPanel.inert = false
   filterPanel.scroll(0, 0)
+}
+
+function closePanel() {
+  // Focus cannot stay inside an inert subtree, so it goes back to the opener
+  if (filterPanel.contains(document.activeElement)) filterToggle.focus()
+
+  filterPanel.classList.remove('visible')
+  filterPanel.inert = true
 }
 
 // The More control appends the next page rather than navigating to it, so a reader keeps their
@@ -126,7 +139,7 @@ async function handleSubmit(e) {
   const params = new URLSearchParams(new FormData(e.target))
   const data = await getData(params)
 
-  filterPanel.classList.toggle('visible', false)
+  closePanel()
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
