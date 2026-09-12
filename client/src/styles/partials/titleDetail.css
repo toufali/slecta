@@ -87,7 +87,6 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-/* Cleared of the badge like the h1 above it, since the badge is positioned over this corner */
 /* Cleared of the badge as the h1 is, since a short title puts this row beside it */
 .facts {
   display: flex;
