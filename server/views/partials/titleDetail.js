@@ -57,5 +57,4 @@ export const titleDetail = data => `
 </article>
 `
 
-// Loaded from the document head by mainView, so it does not block the body render
 titleDetail.styles = '/styles/partials/titleDetail.css'

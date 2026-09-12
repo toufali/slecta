@@ -120,5 +120,4 @@ export const titleList = data => {
 `
 }
 
-// Loaded from the document head by mainView, so it does not block the body render
 titleList.styles = '/styles/partials/titleList.css'

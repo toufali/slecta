@@ -8,5 +8,4 @@ export const searchList = data => `
 <p class='no-results'>No results.</p><!-- TODO: show suggestions/promotions/trending etc -->
 `
 
-// Loaded from the document head by mainView, so it does not block the body render
 searchList.styles = '/styles/partials/searchList.css'
