@@ -9,6 +9,7 @@ const filterToggle = document.querySelector('.filter-toggle')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
 const more = document.querySelector('.more')
+const panelClose = document.querySelector('.filter-panel .close')
 
 const segment = new URL(filterForm.action).pathname.split('/').pop()
 const { noun, dated } = {
@@ -24,7 +25,14 @@ export default function init() {
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
+  panelClose.addEventListener('click', togglePanel)
+  document.addEventListener('keydown', e => e.key === 'Escape' && closeIfOpen(e))
+  document.addEventListener('click', e => e.target.closest('.filter-panel, .filter-toggle, .list-description') || closeIfOpen(e))
   renderScores()
+}
+
+function closeIfOpen() {
+  if (filterPanel.classList.contains('visible')) togglePanel()
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to

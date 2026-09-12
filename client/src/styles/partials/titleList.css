@@ -41,6 +41,18 @@
   transition: opacity .1s ease-in, transform .3s cubic-bezier(0,.25,.25,1);
 }
 
+.filter-panel .close {
+  position: sticky;
+  top: var(--padding-md);
+  z-index: 1;
+  display: block;
+  margin-left: auto;
+  margin-right: var(--padding-md);
+  padding: var(--padding-sm) var(--padding-md);
+  font-size: 1.25rem;
+  color: var(--gray-90);
+}
+
 .filter-panel.visible {
   transform: translateY(0);
   opacity: 1;
