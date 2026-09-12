@@ -24,7 +24,7 @@ test('the badge carries the mark only when the score is thin', () => {
 
 // Grey alone is not self-evident, so back it with something visible where there is room
 test('a thin score is explained in words, and a settled one is not', () => {
-  assert.match(titleDetail(data({ lowConfidence: true })), /<p class='unsettled'>Few ratings so far/)
+  assert.match(titleDetail(data({ lowConfidence: true })), /<p class='unsettled'>Score may be inaccurate/)
   assert.match(titleDetail(data({ lowConfidence: false })), /<p class='unsettled' hidden>/)
 })
 

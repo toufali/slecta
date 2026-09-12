@@ -88,9 +88,17 @@ score-badge{
 }
 
 /* Cleared of the badge like the h1 above it, since the badge is positioned over this corner */
-.unsettled {
+/* Cleared of the badge as the h1 is, since a short title puts this row beside it */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  column-gap: 24px;
   padding-right: 100px;
-  margin: 0 0 var(--padding-sm);
+}
+
+.unsettled {
   font: var(--small-font);
   color: var(--gray-70);
 }
