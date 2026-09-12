@@ -23,7 +23,6 @@ test('a search asks TMDB for the title it was given', async () => {
   assert.deepEqual(ctx.body, [{ echoed: 'dune' }])
 })
 
-// A wrong param name reached TMDB as the string "undefined" and returned films by that name
 test('a missing, blank or repeated title is a 400, not a search for "undefined"', async () => {
   tmdb.getTitlesByString = async () => { throw new Error('must not be asked') }
 
