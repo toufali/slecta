@@ -126,7 +126,6 @@ body > main{
 }
 
 footer{
-  view-transition-name: footer;
   position: relative;
   margin-top: var(--padding-lg);
   padding: var(--padding-lg) var(--padding-md);
