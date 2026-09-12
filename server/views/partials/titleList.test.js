@@ -96,5 +96,5 @@ test('a long genre list reads as two and etc, a short one in full', () => {
 test('the panel carries its own close button, and ships inert', () => {
   assert.match(titleList(movie()), /<button class='close' type='button' aria-label='Close filters'>/)
   // Hidden by opacity alone, the closed panel kept every control in the tab order
-  assert.match(titleList(movie()), /<div class='filter-panel hidden' inert>/)
+  assert.match(titleList(movie()), /<div class='filter-panel' inert>/)
 })

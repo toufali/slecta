@@ -37,11 +37,10 @@ function handleLookback() {
 }
 
 function togglePanel() {
-  filterPanel.classList.contains('visible') ? closePanel() : openPanel()
+  filterPanel.inert ? openPanel() : closePanel()
 }
 
 function openPanel() {
-  filterPanel.classList.add('visible')
   filterPanel.inert = false
   filterPanel.scroll(0, 0)
 }
@@ -50,7 +49,6 @@ function closePanel() {
   // Focus cannot stay inside an inert subtree, so it goes back to the opener
   if (filterPanel.contains(document.activeElement)) filterToggle.focus()
 
-  filterPanel.classList.remove('visible')
   filterPanel.inert = true
 }
 

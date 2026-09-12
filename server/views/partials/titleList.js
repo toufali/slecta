@@ -76,7 +76,7 @@ export const titleList = data => {
 
 <button class='filter-toggle primary' type='button'>Filter</button>
 
-<div class='filter-panel hidden' inert>
+<div class='filter-panel' inert>
   <button class='close' type='button' aria-label='Close filters'>✕</button>
   <form name='movie-filter' action='/api/v1/${segment}'>
     <fieldset>
