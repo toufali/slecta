@@ -91,3 +91,10 @@ test('a long genre list reads as two and etc, a short one in full', () => {
   assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2', '3'] })), /<output>A, B, etc<\/output>/)
   assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2'] })), /<output>A or B<\/output>/)
 })
+
+// On mobile there is no escape key and no click-outside habit; the visible button is the dismissal
+test('the panel carries its own close button, and ships inert', () => {
+  assert.match(titleList(movie()), /<button class='close' type='button' aria-label='Close filters'>/)
+  // Hidden by opacity alone, the closed panel kept every control in the tab order
+  assert.match(titleList(movie()), /<div class='filter-panel' inert>/)
+})

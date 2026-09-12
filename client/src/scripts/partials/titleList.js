@@ -9,6 +9,7 @@ const filterToggle = document.querySelector('.filter-toggle')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
 const more = document.querySelector('.more')
+const panelClose = document.querySelector('.filter-panel .close')
 
 const segment = new URL(filterForm.action).pathname.split('/').pop()
 const { noun, dated } = {
@@ -24,28 +25,26 @@ export default function init() {
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
+  panelClose.addEventListener('click', togglePanel)
   renderScores()
 }
 
-// The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
-// the handle as well, or the value announced is a number with nothing saying what it counts.
 function handleLookback() {
   lookbackOutput.textContent = monthsText(+lookback.value)
   lookback.ariaValueText = lookbackOutput.textContent
 }
 
 function togglePanel() {
-  filterPanel.classList.toggle('visible', !filterPanel.classList.contains('visible'))
+  if (filterPanel.contains(document.activeElement)) filterToggle.focus()
+
+  filterPanel.inert = !filterPanel.inert
   filterPanel.scroll(0, 0)
 }
 
-// The More control appends the next page rather than navigating to it, so a reader keeps their
-// place. The address bar is left alone deliberately: tracking the page would make a reload or a
-// shared link open a slice of the window with nothing before it.
 async function handleMore(e) {
   e.preventDefault()
 
-  if (more.classList.contains('loading')) return // a double tap arrives before the fetch lands
+  if (more.classList.contains('loading')) return
 
   const era = generation
 
@@ -54,7 +53,6 @@ async function handleMore(e) {
   try {
     const asked = new URL(more.href)
     const api = new URL(filterForm.action)
-    // Read before the fetch, while the activation that set it is still the last thing to happen
     const byKeyboard = more.matches(':focus-visible')
 
     api.search = asked.search
@@ -65,23 +63,19 @@ async function handleMore(e) {
 
     const data = await res.json()
 
-    if (era !== generation) return // a filter landed first, and these rows answer the old query
+    if (era !== generation) return
 
     const items = cardItems(data[segment])
 
     list.append(...items)
     renderScores(items.map(item => item.firstChild))
 
-    // Tab order is document order, so a reader tabbing on from the control would skip the batch
-    // it just loaded. Before `advance`, which hides the control and would drop focus with it.
     if (byKeyboard) items[0]?.firstChild.shadowRoot.querySelector('a').focus()
 
     advance(asked, data.totalPages)
   } catch (e) {
-    // Left in place, so the reader can ask again rather than lose the rest of the window
     console.error(e)
   } finally {
-    // A filter that landed mid-fetch reset the control; this settle must not release its claim
     if (era === generation) more.classList.remove('loading')
   }
 }
@@ -101,7 +95,6 @@ function resetMore(params, totalPages) {
   more.hidden = false
 }
 
-// An unknown count reads as the end of the list
 function advance(asked, totalPages) {
   const page = Number(asked.searchParams.get('page'))
 
@@ -116,9 +109,10 @@ async function handleSubmit(e) {
   if (e) e.preventDefault()
 
   const params = new URLSearchParams(new FormData(e.target))
-  const data = await getData(params)
 
-  filterPanel.classList.toggle('visible', false)
+  togglePanel()
+
+  const data = await getData(params)
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
@@ -136,7 +130,7 @@ async function getData(params) {
   }
 
   const json = await res.json()
-  json.allGenres = new Map(json.allGenres) // a Map cannot cross JSON, so the API sent entries
+  json.allGenres = new Map(json.allGenres)
 
   return json
 }
