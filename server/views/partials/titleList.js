@@ -1,5 +1,6 @@
 import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
+import { genreText } from '../../../client/src/scripts/utils/genres.js'
 
 const sortingFields = data => data.allSorting.reduce((acc, cur) => {
   acc += `
@@ -35,13 +36,6 @@ const ratingFields = data => data.allRatings.reduce((acc, cur) => {
   return acc
 }, ``)
 
-// Three genres stand for the rest: the panel holds the full list
-function genreNames(data, disjunctionFmt) {
-  const names = data.withGenres.map(genre => data.allGenres.get(parseInt(genre)))
-
-  return names.length > 3 ? `${names.slice(0, 3).join(', ')}…` : disjunctionFmt.format(names)
-}
-
 function listDescription(data, dated) {
   // TODO: this is almost the same function as `client/scripts/titleList.js` – any way to DRY?
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
@@ -52,7 +46,7 @@ function listDescription(data, dated) {
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.inEnglish) language = `<output>in English</output>`
-  if (data.withGenres) genres = `<label>with genre <output>${genreNames(data, disjunctionFmt)}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${genreText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
 
   const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
