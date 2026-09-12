@@ -87,13 +87,12 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-.unsettled {
-  margin-left: auto;
+.details .unsettled {
   font: var(--small-font);
   color: var(--gray-70);
 }
 
-.unsettled::before {
+.details .unsettled::before {
   content: none;
 }
 
