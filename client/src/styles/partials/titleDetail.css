@@ -93,7 +93,6 @@ score-badge{
 .details .unsettled {
   flex-grow: 1;
   flex-basis: calc((40rem - 100%) * 999);
-  text-align: right;
   font: var(--small-font);
   color: var(--gray-70);
 }
@@ -102,10 +101,10 @@ score-badge{
   content: none;
 }
 
-/* The badge only overlaps the facts row, so its corner is reserved only while the caption shares it */
+/* Right against the badge while it shares the facts row; left under the details once it stacks */
 @container (min-width: 40rem) {
-  .details {
-    padding-right: 100px;
+  .details .unsettled {
+    text-align: right;
   }
 }
 
