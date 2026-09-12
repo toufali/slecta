@@ -115,6 +115,8 @@ p:has(span:empty) {
   column-gap: 24px;
   overflow: hidden;
   color: var(--blue-90);
+  /* Reserve the badge's corner, or the caption at the row's right end tucks under it */
+  padding-right: 100px;
 }
 
 .details li {
