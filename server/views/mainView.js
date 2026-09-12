@@ -29,7 +29,6 @@ export const mainView = data => `
   <link rel='icon' href='data:,' sizes='256x256'>
   <link rel='apple-touch-icon' href='data:,' sizes='180x180'>
 
-  <script>for(const t of['pageswap','pagereveal'])addEventListener(t,e=>{e.viewTransition?.ready.catch(()=>{});e.viewTransition?.finished.catch(()=>{})})</script>
   <script src='/scripts/index.js' type='module'></script>
 </head>
 <body data-partial='${data.partial.name}'>
