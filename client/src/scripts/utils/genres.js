@@ -1,4 +1,3 @@
-// Two genres stand for the rest: the panel holds the full list
 export function genreText(withGenres, allGenres) {
   const names = withGenres.map(genre => allGenres.get(parseInt(genre)))
 
