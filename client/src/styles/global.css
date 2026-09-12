@@ -41,6 +41,7 @@ hr.header-groove{
 
 header.primary{
   container: header / inline-size;
+  view-transition-name: header;
   position: fixed;
   top: 0;
   left: 0;
@@ -120,6 +121,7 @@ body > main{
 }
 
 footer{
+  view-transition-name: footer;
   position: relative;
   margin-top: var(--padding-lg);
   padding: var(--padding-lg) var(--padding-md);
