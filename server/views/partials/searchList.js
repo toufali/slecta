@@ -1,5 +1,4 @@
 export const searchList = data => `
-<link rel='stylesheet' href='/styles/partials/searchList.css' type='text/css'>
 
 <search>
   <h1>Search movies and TV shows by title:</h1>
@@ -8,3 +7,5 @@ export const searchList = data => `
 <ol class='result-list'></ol>
 <p class='no-results'>No results.</p><!-- TODO: show suggestions/promotions/trending etc -->
 `
+
+searchList.styles = '/styles/partials/searchList.css'

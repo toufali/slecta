@@ -41,6 +41,7 @@ hr.header-groove{
 
 header.primary{
   container: header / inline-size;
+  view-transition-name: header;
   position: fixed;
   top: 0;
   left: 0;

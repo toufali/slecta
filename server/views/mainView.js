@@ -21,6 +21,7 @@ export const mainView = data => `
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <link rel='stylesheet' href='/styles/index.css' type='text/css'>
+  ${data.partial.styles ? `<link rel='stylesheet' href='${data.partial.styles}' type='text/css'>` : ''}
   <link rel='icon' href='data:,' sizes='16x16'>
   <link rel='icon' href='data:,' sizes='32x32'>
   <link rel='icon' href='data:,' sizes='48x48'>

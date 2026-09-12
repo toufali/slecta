@@ -30,7 +30,6 @@ function providers(items) {
 }
 
 export const titleDetail = data => `
-<link rel='stylesheet' href='/styles/partials/titleDetail.css' type='text/css'>
 <figure>${data.backdropUrl ? `<img src='${data.backdropUrl}' alt=''>` : ''}${ytTrailer(data.ytTrailerId)}</figure>
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
@@ -57,3 +56,5 @@ export const titleDetail = data => `
   </div>
 </article>
 `
+
+titleDetail.styles = '/styles/partials/titleDetail.css'
