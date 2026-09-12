@@ -28,8 +28,8 @@ async function handleInput(e) {
         <dl>
           <dt><h3 class='title'>${item.title}</h3></dt>
           <dd>${item.mediaTypeText}</dd>
-          ${!item.releaseDate ? '' : `<dd><time title='Release date' datetime="${item.releaseDate}">${new Date(item.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></dd>`}
-          ${!item.genres?.length ? '' : `<dd title='${item.genres.join(', ')}'>${item.genres.join(', ')}</dd>`}
+          ${item.releaseDate ? `<dd><time title='Release date' datetime="${item.releaseDate}">${new Date(item.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></dd>` : ''}
+          ${item.genres?.length ? `<dd title='${item.genres.join(', ')}'>${item.genres.join(', ')}</dd>` : ''}
         </dl>
       </article>
     </a>
