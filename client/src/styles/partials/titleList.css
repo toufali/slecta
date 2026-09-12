@@ -45,9 +45,11 @@
 
 .filter-panel .close {
   display: block;
-  margin-left: auto;
-  padding: var(--padding-sm) var(--padding-md);
+  width: min(100%, var(--max-width));
+  margin-inline: auto;
+  padding: var(--padding-md) var(--padding-lg);
   font-size: 1.25rem;
+  text-align: right;
   color: var(--gray-90);
 }
 
@@ -68,7 +70,11 @@ fieldset > h3 {
 }
 
 fieldset:last-of-type{
+  position: sticky;
+  bottom: 0;
   border-bottom: none;
+  background: var(--blue-10);
+  box-shadow: 0 -8px 12px -8px black;
 }
 
 fieldset:last-of-type > button{
