@@ -84,3 +84,10 @@ test('the More control ships hidden without a next page, above the filter button
     assert.match(titleList(data()), /<a class='button pill more' rel='next' hidden>Show more<\/a>/)
   }
 })
+
+test('a long genre list truncates to three, a short one reads in full', () => {
+  const four = new Map([[1, 'A'], [2, 'B'], [3, 'C'], [4, 'D']])
+
+  assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2', '3', '4'] })), /<output>A, B, C…<\/output>/)
+  assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2', '3'] })), /<output>A, B, or C<\/output>/)
+})

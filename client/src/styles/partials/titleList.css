@@ -10,17 +10,6 @@
   white-space: pre-wrap;
 }
 
-.list-description .genres{
-  display: inline-block;
-  max-width: 26ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* Cancel what inline-block adds: siblings paint their padding outside the line, this one cannot */
-  margin-block: calc(var(--padding-xs) * -1);
-  vertical-align: text-bottom;
-}
-
 .list-description output{
   cursor: pointer;
   text-transform: uppercase;

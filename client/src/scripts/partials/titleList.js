@@ -171,6 +171,13 @@ async function renderScores(cards = document.querySelectorAll('movie-card')) {
   }
 }
 
+// Three genres stand for the rest: the panel holds the full list
+function genreNames(data, disjunctionFmt) {
+  const names = data.withGenres.map(genre => data.allGenres.get(parseInt(genre)))
+
+  return names.length > 3 ? `${names.slice(0, 3).join(', ')}…` : disjunctionFmt.format(names)
+}
+
 function renderlistDescription(data) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
@@ -178,7 +185,7 @@ function renderlistDescription(data) {
   let sort, genres, ratings, streaming, language
 
   sort = `<label>${noun} sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
-  if (data.withGenres) genres = `<label>with genre <output class='genres'>${disjunctionFmt.format(data.withGenres?.map(genre => data.allGenres.get(parseInt(genre))))}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${genreNames(data, disjunctionFmt)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
   if (data.inEnglish) language = `<output>in English</output>`
