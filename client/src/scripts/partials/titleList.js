@@ -26,13 +26,7 @@ export default function init() {
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', closePanel)
-  document.addEventListener('keydown', e => e.key === 'Escape' && closeIfOpen(e))
-  document.addEventListener('click', e => e.target.closest('.filter-panel, .filter-toggle, .list-description') || closeIfOpen(e))
   renderScores()
-}
-
-function closeIfOpen() {
-  if (filterPanel.classList.contains('visible')) closePanel()
 }
 
 // The funnel is mobile-first, so there is no hover to read a bare slider by. The unit belongs to
