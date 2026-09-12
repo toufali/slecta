@@ -65,6 +65,7 @@ figure[data-trailer-active] iframe[src] {
 
 article {
   padding: var(--padding-lg);
+  container-type: inline-size;
 }
 
 header{
@@ -87,9 +88,11 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-/* Its own full-width line below the facts, clear of the badge that overlaps the row above */
+/* Switcher: shares the facts row when wide, its own full-width line when narrow — the calc goes
+   negative (invalid, ignored) above the threshold and huge below it, forcing the wrap */
 .details .unsettled {
-  flex-basis: 100%;
+  flex-grow: 1;
+  flex-basis: calc((40rem - 100%) * 999);
   text-align: right;
   font: var(--small-font);
   color: var(--gray-70);
@@ -97,6 +100,13 @@ score-badge{
 
 .details .unsettled::before {
   content: none;
+}
+
+/* The badge only overlaps the facts row, so its corner is reserved only while the caption shares it */
+@container (min-width: 40rem) {
+  .details {
+    padding-right: 100px;
+  }
 }
 
 label {
