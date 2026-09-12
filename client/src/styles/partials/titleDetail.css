@@ -87,19 +87,14 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-/* Cleared of the badge as the h1 is, since a short title puts this row beside it */
-.facts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: baseline;
-  column-gap: 24px;
-  padding-right: 100px;
-}
-
 .unsettled {
+  margin-left: auto;
   font: var(--small-font);
   color: var(--gray-70);
+}
+
+.unsettled::before {
+  content: none;
 }
 
 label {
