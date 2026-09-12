@@ -16,7 +16,7 @@ html {
   scroll-behavior: smooth;
 }
 
-html:has(.filter-panel.visible){
+html:has(.filter-panel:not([inert])){
   overflow-y: hidden;
 }
 
@@ -53,7 +53,7 @@ header.primary{
   ;
 }
 
-[data-scroll-dir="down"]:not(:has(.filter-panel.visible)) header.primary{
+[data-scroll-dir="down"]:not(:has(.filter-panel:not([inert]))) header.primary{
   transform: translateY(-110%);
   transition-timing-function: ease-in;
 }
