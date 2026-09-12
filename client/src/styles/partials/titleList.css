@@ -45,10 +45,11 @@
 
 .filter-panel .close {
   display: block;
-  margin-left: auto;
-  padding: var(--padding-sm) var(--padding-md);
+  width: min(100%, var(--max-width));
+  margin-inline: auto;
+  padding: var(--padding-md) var(--padding-lg) 0;
   font-size: 1.25rem;
-  color: var(--gray-90);
+  text-align: right;
 }
 
 .filter-panel > form{
@@ -68,6 +69,8 @@ fieldset > h3 {
 }
 
 fieldset:last-of-type{
+  position: sticky;
+  bottom: 0;
   border-bottom: none;
 }
 
@@ -75,6 +78,18 @@ fieldset:last-of-type > button{
   width: min(100%, 640px);
   margin: auto;
   display: block;
+}
+
+fieldset:last-of-type > button::before {
+  content: '';
+  display: inline-block;
+  height: 18px;
+  aspect-ratio: 1;
+  vertical-align: -3px;
+  margin-right: var(--padding-sm);
+  background-color: currentColor;
+  -webkit-mask: url(/images/apply-icon.svg) no-repeat center / contain;
+  mask: url(/images/apply-icon.svg) no-repeat center / contain;
 }
 
 .filter-toggle {
