@@ -88,6 +88,7 @@ score-badge{
 }
 
 .details .unsettled {
+  margin-left: auto;
   font: var(--small-font);
   color: var(--gray-70);
 }
@@ -111,6 +112,7 @@ p:has(span:empty) {
 .details {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   list-style: none;
   column-gap: 24px;
   overflow: hidden;
