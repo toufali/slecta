@@ -2,6 +2,11 @@
   navigation: auto;
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
 * {
   margin: 0;
   padding: 0;
