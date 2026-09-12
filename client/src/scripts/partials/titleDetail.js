@@ -29,7 +29,7 @@ async function getScore() {
   const score = await fetch(`/api/v1/${segment}/${article.id}/score`).then(res => res.json())
 
   // The line ships hidden rather than absent, so a badge filled in here can explain itself too
-  document.querySelector('.unsettled').hidden = !score.lowConfidence
+  document.querySelector('.low-confidence').hidden = !score.lowConfidence
   scoreBadge.lowConfidence = score.lowConfidence
   scoreBadge.score = score.avgScore
   scoreBadge.classList.remove('loading')

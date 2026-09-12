@@ -41,7 +41,7 @@ export const titleDetail = data => `
       <li title='Rating'>${data.rating}</li>
       ${data.seasons > 1 ? `<li title='Seasons'>${data.seasons} seasons</li>` : ''}
       <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
-      <li class='unsettled'${data.lowConfidence ? '' : ' hidden'}>Score may be inaccurate due to limited reviews.</li>
+      <li class='low-confidence'${data.lowConfidence ? '' : ' hidden'}>Score may be inaccurate due to limited reviews.</li>
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>

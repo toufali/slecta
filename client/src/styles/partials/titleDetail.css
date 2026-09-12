@@ -88,22 +88,20 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-/* Switcher: shares the facts row when wide, its own full-width line when narrow — the calc goes
-   negative (invalid, ignored) above the threshold and huge below it, forcing the wrap */
-.details .unsettled {
+/* Switcher: shares the facts row when wide, stacks to its own line when narrow */
+.details .low-confidence {
   flex-grow: 1;
   flex-basis: calc((40rem - 100%) * 999);
   font: var(--small-font);
   color: var(--gray-70);
 }
 
-.details .unsettled::before {
+.details .low-confidence::before {
   content: none;
 }
 
-/* Right against the badge while it shares the facts row; left under the details once it stacks */
 @container (min-width: 40rem) {
-  .details .unsettled {
+  .details .low-confidence {
     text-align: right;
   }
 }
