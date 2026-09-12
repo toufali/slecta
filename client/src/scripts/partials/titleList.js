@@ -109,9 +109,10 @@ async function handleSubmit(e) {
   if (e) e.preventDefault()
 
   const params = new URLSearchParams(new FormData(e.target))
-  const data = await getData(params)
 
   togglePanel()
+
+  const data = await getData(params)
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
