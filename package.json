@@ -13,7 +13,7 @@
     "test": "node --test",
     "start": "node --env-file=.env server/server.js",
     "dev": "node --watch --env-file=.env server/server.js",
-    "stop": "kill $(lsof -ti:3210) 2>/dev/null || true",
+    "stop": "kill $(lsof -tiTCP:3210 -sTCP:LISTEN) 2>/dev/null || true",
     "job": "node --env-file=.env server/job.js",
     "convert:webp": "sh scripts/webp.sh",
     "db:make": "npm run db:make -w server",
