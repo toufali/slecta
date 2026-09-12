@@ -64,7 +64,6 @@ export const titleList = data => {
   const { noun, dated, datedHeading } = COPY[segment]
 
   return `
-<link rel='stylesheet' href='/styles/partials/titleList.css' type='text/css'>
 
 <h1 class='list-description'>${noun} ${listDescription(data, dated)}</h1>
 
@@ -120,3 +119,6 @@ export const titleList = data => {
 </div>
 `
 }
+
+// Loaded from the document head by mainView, so it does not block the body render
+titleList.styles = '/styles/partials/titleList.css'
