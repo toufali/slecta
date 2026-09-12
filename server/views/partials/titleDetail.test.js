@@ -24,13 +24,13 @@ test('the badge carries the mark only when the score is thin', () => {
 
 // Grey alone is not self-evident, so back it with something visible where there is room
 test('a thin score is explained in words, and a settled one is not', () => {
-  assert.match(titleDetail(data({ lowConfidence: true })), /<p class='unsettled'>Few ratings so far/)
-  assert.match(titleDetail(data({ lowConfidence: false })), /<p class='unsettled' hidden>/)
+  assert.match(titleDetail(data({ lowConfidence: true })), /<li class='low-confidence'>Score may be inaccurate/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /<li class='low-confidence' hidden>/)
 })
 
 // Ship the line either way, since a cache miss fills the badge in by script
 test('the line ships hidden rather than absent', () => {
-  assert.match(titleDetail(data({ lowConfidence: false })), /class='unsettled' hidden/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /class='low-confidence' hidden/)
 })
 
 // Naming the source belongs in the component breakdown; the badge answers how much to trust it

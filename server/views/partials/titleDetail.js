@@ -36,12 +36,12 @@ export const titleDetail = data => `
   <header>
     <h1>${data.title}</h1>
     ${scoreBadge(data.score, data.lowConfidence)}
-    <p class='unsettled'${data.lowConfidence ? '' : ' hidden'}>Few ratings so far, so this score may move.</p>
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
       ${data.seasons > 1 ? `<li title='Seasons'>${data.seasons} seasons</li>` : ''}
       <li class='genres' title='${data.genres}'><p>${data.genres}</p></li>
+      <li class='low-confidence'${data.lowConfidence ? '' : ' hidden'}>Score may be inaccurate due to limited reviews.</li>
     </ul>
   </header>
   <div class="quotes">${data.quotes.map(item => reviewQuote(item)).join('')}</div>

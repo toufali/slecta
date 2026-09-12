@@ -65,6 +65,7 @@ figure[data-trailer-active] iframe[src] {
 
 article {
   padding: var(--padding-lg);
+  container-type: inline-size;
 }
 
 header{
@@ -87,12 +88,22 @@ score-badge{
   filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
 }
 
-/* Cleared of the badge like the h1 above it, since the badge is positioned over this corner */
-.unsettled {
-  padding-right: 100px;
-  margin: 0 0 var(--padding-sm);
+/* Switcher: shares the facts row when wide, stacks to its own line when narrow */
+.details .low-confidence {
+  flex-grow: 1;
+  flex-basis: calc((40rem - 100%) * 999);
   font: var(--small-font);
   color: var(--gray-70);
+}
+
+.details .low-confidence::before {
+  content: none;
+}
+
+@container (min-width: 40rem) {
+  .details .low-confidence {
+    text-align: right;
+  }
 }
 
 label {
@@ -110,6 +121,7 @@ p:has(span:empty) {
 .details {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   list-style: none;
   column-gap: 24px;
   overflow: hidden;
