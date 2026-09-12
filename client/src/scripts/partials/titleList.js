@@ -25,7 +25,7 @@ export default function init() {
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
-  panelClose.addEventListener('click', closePanel)
+  panelClose.addEventListener('click', togglePanel)
   renderScores()
 }
 
@@ -37,19 +37,11 @@ function handleLookback() {
 }
 
 function togglePanel() {
-  filterPanel.inert ? openPanel() : closePanel()
-}
-
-function openPanel() {
-  filterPanel.inert = false
-  filterPanel.scroll(0, 0)
-}
-
-function closePanel() {
-  // Focus cannot stay inside an inert subtree, so it goes back to the opener
+  // The browser drops focus the moment a subtree goes inert, so it is handed back first
   if (filterPanel.contains(document.activeElement)) filterToggle.focus()
 
-  filterPanel.inert = true
+  filterPanel.inert = !filterPanel.inert
+  filterPanel.scroll(0, 0)
 }
 
 // The More control appends the next page rather than navigating to it, so a reader keeps their
@@ -131,7 +123,7 @@ async function handleSubmit(e) {
   const params = new URLSearchParams(new FormData(e.target))
   const data = await getData(params)
 
-  closePanel()
+  togglePanel()
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
