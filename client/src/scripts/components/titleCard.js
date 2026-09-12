@@ -74,7 +74,7 @@ if (typeof HTMLElement !== 'undefined') {
   // TODO: this probably doesn't need to be Shadow DOM + Custom Element. See reviewQuote.js for more basic component example
   // Define custom element for browser environment, ignore for server
 
-  class MovieCard extends HTMLElement {
+  class TitleCard extends HTMLElement {
     #data
 
     constructor() {
@@ -100,12 +100,12 @@ if (typeof HTMLElement !== 'undefined') {
     }
   }
 
-  customElements.define('movie-card', MovieCard)
+  customElements.define('title-card', TitleCard)
 }
 
 // Export Declarative Shadow DOM for server-side render
-export const movieCard = data => `
-<movie-card id='${data.id}'>
+export const titleCard = data => `
+<title-card id='${data.id}'>
   <template shadowrootmode="open">${html(data)}</template>
-</movie-card>
+</title-card>
 `

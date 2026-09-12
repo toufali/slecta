@@ -19,7 +19,7 @@
   color: var(--gray-90);
 }
 
-.movie-list {
+.title-list {
   display: grid;
   gap: var(--padding-md);
   grid-template-columns: repeat(auto-fill, minmax(var(--min-width), 1fr));

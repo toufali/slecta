@@ -3,7 +3,7 @@
 import './resizeObserver.js'
 import './scrollObserver.js'
 import './mainView.js'
-import './components/movieCard.js'
+import './components/titleCard.js'
 import './components/scoreBadge.js'
 
 // dynamic import client script associated with partial if it exists

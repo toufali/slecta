@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { titleDetail } from './titleDetail.js'
 import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
-import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
+import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 
 const data = over => ({
   tmdbId: 7, title: 'A Title', overview: 'Words', releaseDate: '2026-01-01', rating: 'PG-13',
@@ -45,7 +45,7 @@ test('no source is named beside the badge', () => {
 
 // Cover the card too: a list is where most readers meet a badge
 test('a card passes the mark to its badge', () => {
-  const card = over => movieCard({ id: 1, title: 'A Film', genres: [], releaseDate: '2026-01-01', posterThumb: '', detailPath: '/movies/1', score: 83, ...over })
+  const card = over => titleCard({ id: 1, title: 'A Film', genres: [], releaseDate: '2026-01-01', posterThumb: '', detailPath: '/movies/1', score: 83, ...over })
   const tag = rendered => rendered.match(/<score-badge[^>]*>/)[0]
 
   assert.match(tag(card({ lowConfidence: true })), /low-confidence/)

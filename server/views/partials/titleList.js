@@ -1,4 +1,4 @@
-import { movieCard } from '../../../client/src/scripts/components/movieCard.js'
+import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
 import { genreText } from '../../../client/src/scripts/utils/genres.js'
 
@@ -67,8 +67,8 @@ export const titleList = data => {
 
 <h1 class='list-description'>${noun} ${listDescription(data, dated)}</h1>
 
-<ul class='movie-list'>
-  ${data[segment].map(title => `<li>${movieCard(title)}</li>`).join('')}
+<ul class='title-list'>
+  ${data[segment].map(title => `<li>${titleCard(title)}</li>`).join('')}
 </ul>
 
 <a class='button pill more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>Show more</a>
@@ -77,7 +77,7 @@ export const titleList = data => {
 
 <div class='filter-panel' inert>
   <button class='close' type='button' aria-label='Close filters'>✕</button>
-  <form name='movie-filter' action='/api/v1/${segment}'>
+  <form name='title-filter' action='/api/v1/${segment}'>
     <fieldset>
       <h3>Sort by:</h3>
       ${sortingFields(data)}
