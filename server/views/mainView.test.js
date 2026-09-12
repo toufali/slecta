@@ -21,3 +21,14 @@ test('the nav marks the section the handler names', () => {
   assert.deepEqual(current(mainView({ partial: searchList, section: 'search' })), ['/search'])
   assert.deepEqual(current(mainView({ partial: titleList, content: {} })), [], 'a page naming no section marks nothing')
 })
+
+// In the head, not the partial body, or the render-blocking link stalls the first paint mid-page
+test('a partial declares its stylesheet into the head, or none when it has no styles', () => {
+  const styled = () => ''
+  styled.styles = '/styles/partials/titleList.css'
+
+  const head = rendered => rendered.slice(0, rendered.indexOf('</head>'))
+
+  assert.match(head(mainView({ partial: styled, content: {} })), /<link rel='stylesheet' href='\/styles\/partials\/titleList.css'/)
+  assert.doesNotMatch(mainView({ partial: titleList, content: {} }), /styles\/partials\//)
+})
