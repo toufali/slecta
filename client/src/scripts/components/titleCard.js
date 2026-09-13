@@ -96,7 +96,8 @@ if (typeof HTMLElement !== 'undefined') {
 
     render() {
       this.setAttribute('id', this.data.id)
-      this.shadowRoot.innerHTML = html(this.data)
+      // Not innerHTML, which skips the nested score-badge's declarative shadow root
+      this.shadowRoot.setHTMLUnsafe(html(this.data))
     }
   }
 
