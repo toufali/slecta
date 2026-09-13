@@ -20,13 +20,25 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('click', togglePanel)
-  listDescription.addEventListener('click', e => e.target.closest('output') && togglePanel())
+  filterToggle.addEventListener('click', () => filterPanel.inert ? openPanel() : closePanel())
+  listDescription.addEventListener('click', e => e.target.closest('output') && openPanel())
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
-  panelClose.addEventListener('click', togglePanel)
+  panelClose.addEventListener('click', closePanel)
+  window.addEventListener('popstate', () => filterPanel.inert || togglePanel())
   renderScores()
+}
+
+function openPanel() {
+  history.pushState({ filterPanel: true }, '')
+  togglePanel()
+}
+
+// Close before popping: an inert panel can't be tapped again, so a double-tap can't pop twice
+function closePanel() {
+  togglePanel()
+  history.back()
 }
 
 function handleLookback() {
@@ -110,7 +122,7 @@ async function handleSubmit(e) {
 
   const params = new URLSearchParams(new FormData(e.target))
 
-  togglePanel()
+  closePanel()
 
   const data = await getData(params)
 
