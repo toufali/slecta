@@ -21,6 +21,9 @@ html:has(.filter-panel:not([inert])){
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   max-width: var(--max-width);
   margin: auto;
   padding: 0 var(--padding-md);
@@ -117,6 +120,7 @@ nav.primary a.current{
 }
 
 body > main{
+  flex-grow: 1;
   margin-top: calc(var(--header-height) + var(--padding-lg));
 }
 
