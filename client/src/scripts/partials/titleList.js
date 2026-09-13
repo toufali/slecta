@@ -26,7 +26,7 @@ export default function init() {
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', closePanel)
-  window.addEventListener('popstate', () => filterPanel.inert || togglePanel())
+  window.addEventListener('popstate', handlePopstate)
   renderScores()
 }
 
@@ -39,6 +39,11 @@ function openPanel() {
 function closePanel() {
   togglePanel()
   history.back()
+}
+
+// Match the entry being traversed to, so Forward reopens the panel and Back closes it
+function handlePopstate(e) {
+  if (Boolean(e.state?.filterPanel) === filterPanel.inert) togglePanel()
 }
 
 function handleLookback() {
