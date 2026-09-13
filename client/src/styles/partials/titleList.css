@@ -50,6 +50,7 @@
   padding: var(--padding-md) var(--padding-lg) 0;
   font-size: 1.25rem;
   text-align: right;
+  text-shadow: 0 0 4px #0008;
 }
 
 .filter-panel > form{
