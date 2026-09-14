@@ -20,12 +20,12 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('click', handleToggle)
+  filterToggle.addEventListener('click', handlePanel)
   listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
-  panelClose.addEventListener('click', handleToggle)
+  panelClose.addEventListener('click', handlePanel)
   window.addEventListener('popstate', handlePopstate)
 
   // A reload restores the pushed entry, but the panel ships closed
@@ -35,11 +35,11 @@ export default function init() {
 }
 
 function handleDescription(e) {
-  if (e.target.closest('output')) handleToggle()
+  if (e.target.closest('output')) handlePanel()
 }
 
 // Flip first: an inert panel can't be tapped again, so a double-tap can't pop twice
-function handleToggle() {
+function handlePanel() {
   togglePanel()
 
   if (filterPanel.inert) history.back()
@@ -132,7 +132,7 @@ async function handleSubmit(e) {
 
   const params = new URLSearchParams(new FormData(e.target))
 
-  handleToggle()
+  handlePanel()
 
   const data = await getData(params)
 
