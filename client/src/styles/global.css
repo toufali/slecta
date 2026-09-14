@@ -88,7 +88,7 @@ header.primary .logo{
 
 nav.primary{
   display: flex;
-  gap: var(--padding-lg);
+  gap: var(--padding-md);
 }
 
 nav.primary a{

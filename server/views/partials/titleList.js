@@ -75,7 +75,7 @@ export const titleList = data => {
 
 <div class='list-actions'>
   <a class='button primary search' href='/search'>Search</a>
-  <button class='filter-toggle primary' type='button'>Filter</button>
+  <button class='primary filter' type='button'>Filter</button>
 </div>
 
 <div class='filter-panel' inert>

@@ -81,7 +81,7 @@ fieldset:last-of-type > button{
 }
 
 fieldset:last-of-type > button::before,
-.filter-toggle::before,
+.filter::before,
 .search::before {
   content: '';
   display: inline-block;
@@ -127,7 +127,7 @@ fieldset:last-of-type > button::before {
   display: none;
 }
 
-.filter-toggle::before {
+.filter::before {
   -webkit-mask: url(/images/filter-icon.svg) no-repeat center / contain;
   mask: url(/images/filter-icon.svg) no-repeat center / contain;
 }

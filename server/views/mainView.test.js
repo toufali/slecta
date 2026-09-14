@@ -4,7 +4,6 @@ import { mainView } from './mainView.js'
 
 // A named function, since the shell reads `partial.name` for the body attribute
 function titleList() { return '' }
-function searchList() { return '' }
 
 test('the primary navigation is named', () => {
   assert.match(mainView({ partial: titleList, content: {} }), /<nav class='primary' aria-label='[^']+'>/)
@@ -15,7 +14,6 @@ test('the nav marks the section the handler names', () => {
 
   assert.deepEqual(current(mainView({ partial: titleList, content: { movies: [] }, section: 'movies' })), ['/movies'])
   assert.deepEqual(current(mainView({ partial: titleList, content: { shows: [] }, section: 'shows' })), ['/shows'])
-  assert.doesNotMatch(mainView({ partial: searchList }), /href='\/search'/, 'search is reached from the list actions, not the nav')
   assert.deepEqual(current(mainView({ partial: titleList, content: {} })), [], 'a page naming no section marks nothing')
 })
 

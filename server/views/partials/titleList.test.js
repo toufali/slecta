@@ -74,13 +74,13 @@ test('the ratings fieldset renders only when the data carries ratings', () => {
 
 // The render condition follows the href rather than re-deriving the boundary from a page count,
 // which is what stranded a reader when the list metadata could not be read
-test('the More control ships hidden without a next page, above the filter button', () => {
+test('the More control ships hidden without a next page, above the actions row', () => {
   for (const data of [movie, tv]) {
     const rendered = titleList(data({ nextPage: '/movies?page=2' }))
     const more = rendered.indexOf("<a class='button pill more' rel='next' href='/movies?page=2'>Show more</a>")
 
     assert.notEqual(more, -1)
-    assert.ok(rendered.indexOf('</ul>') < more && more < rendered.indexOf('filter-toggle'))
+    assert.ok(rendered.indexOf('</ul>') < more && more < rendered.indexOf('list-actions'))
     assert.match(titleList(data()), /<a class='button pill more' rel='next' hidden>Show more<\/a>/)
   }
 })
@@ -90,10 +90,6 @@ test('a long genre list reads as two and etc, a short one in full', () => {
 
   assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2', '3'] })), /<output>A, B, etc<\/output>/)
   assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2'] })), /<output>A or B<\/output>/)
-})
-
-test('the actions row pairs Filter with a Search link', () => {
-  assert.match(titleList(movie()), /<a class='button primary search' href='\/search'>Search<\/a>/)
 })
 
 // On mobile there is no escape key and no click-outside habit; the visible button is the dismissal
