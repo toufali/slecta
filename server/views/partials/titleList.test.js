@@ -93,7 +93,7 @@ test('a long genre list reads as two and etc, a short one in full', () => {
 })
 
 test('the actions row pairs Filter with a Search link', () => {
-  assert.match(titleList(movie()), /<a class='button secondary search' href='\/search'>Search<\/a>/)
+  assert.match(titleList(movie()), /<a class='button primary search' href='\/search'>Search<\/a>/)
 })
 
 // On mobile there is no escape key and no click-outside habit; the visible button is the dismissal
