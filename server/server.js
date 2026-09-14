@@ -16,7 +16,9 @@ await tmdb.init()
 // STATIC_DIR set to 'src' if `npm run dev` called. Files are served direct from source without build/bundle
 // Otherwise, STATIC_DIR defaults to 'dist' – client build required to serve files from bundle
 const staticUrl = new URL(`../client/${STATIC_DIR}`, import.meta.url);
-server.use(serve(staticUrl.pathname));
+// Cached, or every navigation revalidates the render-blocking stylesheet over the network, which
+// can outwait Chrome's cross-document view-transition deadline and abort the cross-fade
+server.use(serve(staticUrl.pathname, { maxage: STATIC_DIR === 'dist' ? 600_000 : 0 }));
 server.use(routes)
 
 // Koa's default handler writes a bare stack to stderr, which Cloud Logging stores without fields
