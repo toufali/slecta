@@ -5,7 +5,7 @@ const list = document.querySelector('.title-list')
 const listDescription = document.querySelector('.list-description')
 const filterPanel = document.querySelector('.filter-panel')
 const filterForm = document.querySelector('form[name="title-filter"]')
-const filterToggle = document.querySelector('.filter-toggle')
+const filterBtn = document.querySelector('.list-actions .filter')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
 const more = document.querySelector('.more')
@@ -20,7 +20,7 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('click', handlePanel)
+  filterBtn.addEventListener('click', handlePanel)
   listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
@@ -57,7 +57,7 @@ function handleLookback() {
 }
 
 function togglePanel() {
-  if (filterPanel.contains(document.activeElement)) filterToggle.focus()
+  if (filterPanel.contains(document.activeElement)) filterBtn.focus()
 
   filterPanel.inert = !filterPanel.inert
   filterPanel.scroll(0, 0)

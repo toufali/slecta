@@ -39,7 +39,6 @@ export const mainView = data => `
       <nav class='primary' aria-label='Sections'>
         <a href='/movies' class="${data.section === 'movies' ? 'current' : ''}" style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
         <a href='/shows' class="${data.section === 'shows' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
-        <a href='/search' class="${data.section === 'search' ? 'current' : ''}" style="--icon-url:url(/images/search-icon.svg)">Search</a>
       </nav>
     </div>
   </header>

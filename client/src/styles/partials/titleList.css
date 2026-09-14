@@ -80,7 +80,9 @@ fieldset:last-of-type > button{
   display: block;
 }
 
-fieldset:last-of-type > button::before {
+fieldset:last-of-type > button::before,
+.filter::before,
+.search::before {
   content: '';
   display: inline-block;
   height: 18px;
@@ -88,14 +90,26 @@ fieldset:last-of-type > button::before {
   vertical-align: -3px;
   margin-right: var(--padding-sm);
   background-color: currentColor;
+}
+
+fieldset:last-of-type > button::before {
   -webkit-mask: url(/images/apply-icon.svg) no-repeat center / contain;
   mask: url(/images/apply-icon.svg) no-repeat center / contain;
 }
 
-.filter-toggle {
-  display: block;
+.list-actions {
+  /* note Firefox Android hit area bug */
+  /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */
+  position: sticky;
+  bottom: var(--padding-md);
+  display: flex;
+  gap: var(--padding-md);
   width: min(100%, 480px);
   margin: var(--padding-lg) auto 0;
+}
+
+.list-actions > * {
+  flex: 1;
 }
 
 .more {
@@ -113,23 +127,14 @@ fieldset:last-of-type > button::before {
   display: none;
 }
 
-.filter-toggle {
-  /* note Firefox Android hit area bug */
-  /* https://stackoverflow.com/questions/70893056/mozilla-android-addressbar-conflict-with-sticky-button-on-bottom */
-  position: sticky;
-  bottom: var(--padding-md);
-}
-
-.filter-toggle::before {
-  content: '';
-  display: inline-block;
-  height: 18px;
-  aspect-ratio: 1;
-  vertical-align: -3px;
-  margin-right: var(--padding-sm);
-  background-color: currentColor;
+.filter::before {
   -webkit-mask: url(/images/filter-icon.svg) no-repeat center / contain;
   mask: url(/images/filter-icon.svg) no-repeat center / contain;
+}
+
+.search::before {
+  -webkit-mask: url(/images/search-icon.svg) no-repeat center / contain;
+  mask: url(/images/search-icon.svg) no-repeat center / contain;
 }
 
 .lookback {

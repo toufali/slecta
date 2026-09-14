@@ -73,7 +73,10 @@ export const titleList = data => {
 
 <a class='button pill more' rel='next' ${data.nextPage ? `href='${data.nextPage}'` : 'hidden'}>Show more</a>
 
-<button class='filter-toggle primary' type='button'>Filter</button>
+<div class='list-actions'>
+  <a class='button primary search' href='/search'>Search</a>
+  <button class='primary filter' type='button'>Filter</button>
+</div>
 
 <div class='filter-panel' inert>
   <button class='close' type='button' aria-label='Close filters'>✕</button>

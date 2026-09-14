@@ -71,7 +71,7 @@ header.primary > div{
   padding: var(--padding-md) var(--padding-md) 0;
 }
 
-@container header (width > 768px) {
+@container header (width > 420px) {
   header.primary > div {
     flex-direction: row;
     justify-content: space-between;
@@ -84,6 +84,11 @@ header.primary .logo{
   height: 50px;
   margin-bottom: var(--padding-sm);
   mix-blend-mode: color-dodge;
+}
+
+nav.primary{
+  display: flex;
+  gap: var(--padding-md);
 }
 
 nav.primary a{
@@ -217,8 +222,8 @@ button:focus-visible,
 
 button.primary:enabled:hover,
 button.secondary:enabled:hover,
-.button.primary:enabled:hover,
-.button.secondary:enabled:hover {
+.button.primary:hover,
+.button.secondary:hover {
   filter: brightness(1.3);
 }
 
