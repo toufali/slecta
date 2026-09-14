@@ -1,4 +1,4 @@
-[data-partial="searchList"] search{
+search{
   display: flex;
   flex-direction: column;
   gap: var(--padding-md);
@@ -10,7 +10,7 @@
   align-items: center;
 }
 
-[data-partial="searchList"] h1 {
+search h1 {
   font: var(--h3-font);
   color: var(--blue-90);
   margin: 0;

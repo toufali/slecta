@@ -1,3 +1,5 @@
+@import './searchList.css';
+
 .list-description{
   cursor: default;
   user-select: none;
@@ -26,7 +28,7 @@
   list-style: none;
 }
 
-.filter-panel {
+.panel {
   position: fixed;
   top: var(--header-height);
   bottom: 0;
@@ -38,12 +40,12 @@
   transition: opacity .1s ease-in, transform .3s cubic-bezier(0,.25,.25,1);
 }
 
-.filter-panel[inert] {
+.panel[inert] {
   opacity: 0;
   transform: translateY(25%);
 }
 
-.filter-panel .close {
+.panel .close {
   display: block;
   width: min(100%, var(--max-width));
   margin-inline: auto;
@@ -52,7 +54,7 @@
   text-align: right;
 }
 
-.filter-panel > form{
+.panel > form{
   display: flex;
   flex-direction: column;
   max-width: var(--max-width);
@@ -153,4 +155,15 @@ fieldset:last-of-type > button::before {
   min-width: 9ch;
   font-weight: bold;
   color: var(--blue-90);
+}
+
+.search-panel search,
+.search-panel .result-list,
+.search-panel .no-results {
+  width: min(100%, var(--max-width));
+  margin-inline: auto;
+}
+
+.search-panel .result-list {
+  padding: var(--padding-md) var(--padding-lg);
 }
