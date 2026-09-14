@@ -28,13 +28,12 @@ export default function init() {
   panelClose.addEventListener('click', handleToggle)
   window.addEventListener('popstate', handlePopstate)
 
-  // A reload onto the pushed entry restores its state but ships the panel closed
+  // A reload restores the pushed entry, but the panel ships closed
   if (history.state?.filterPanel) togglePanel()
 
   renderScores()
 }
 
-// Delegated: the description re-renders on every apply, and only its chips are interactive
 function handleDescription(e) {
   if (e.target.closest('output')) handleToggle()
 }
@@ -135,16 +134,12 @@ async function handleSubmit(e) {
 
   handleToggle()
 
-  // Its back() traverses async: replace the URL only after that lands, or the doomed entry takes the rewrite
-  const popped = new Promise(resolve => addEventListener('popstate', resolve, { once: true }))
   const data = await getData(params)
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
   renderScores()
   resetMore(params, data.totalPages)
-
-  await popped
   updateUrl(params)
 }
 
