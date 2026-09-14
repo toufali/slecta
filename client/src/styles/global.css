@@ -71,8 +71,7 @@ header.primary > div{
   padding: var(--padding-md) var(--padding-md) 0;
 }
 
-/* Two-item threshold, inferred not measured */
-@container header (width > 680px) {
+@container header (width > 480px) {
   header.primary > div {
     flex-direction: row;
     justify-content: space-between;

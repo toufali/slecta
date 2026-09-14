@@ -112,6 +112,11 @@ fieldset:last-of-type > button::before {
   flex: 1;
 }
 
+/* The nav highlight's green, carried over when Search left the nav */
+.list-actions .search {
+  background: var(--green-50);
+}
+
 .more {
   display: block;
   width: fit-content;
