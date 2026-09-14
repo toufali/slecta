@@ -15,7 +15,7 @@ test('the nav marks the section the handler names', () => {
 
   assert.deepEqual(current(mainView({ partial: titleList, content: { movies: [] }, section: 'movies' })), ['/movies'])
   assert.deepEqual(current(mainView({ partial: titleList, content: { shows: [] }, section: 'shows' })), ['/shows'])
-  assert.deepEqual(current(mainView({ partial: searchList, section: 'search' })), ['/search'])
+  assert.doesNotMatch(mainView({ partial: searchList }), /href='\/search'/, 'search is reached from the list actions, not the nav')
   assert.deepEqual(current(mainView({ partial: titleList, content: {} })), [], 'a page naming no section marks nothing')
 })
 

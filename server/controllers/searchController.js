@@ -3,10 +3,7 @@ import { mainView } from '../views/mainView.js'
 import { searchList } from '../views/partials/searchList.js'
 
 export async function showSearch(ctx) {
-  return ctx.body = mainView({
-    partial: searchList,
-    section: 'search'
-  })
+  return ctx.body = mainView({ partial: searchList })
 }
 
 export async function getTitles(ctx) {

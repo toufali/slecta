@@ -92,6 +92,10 @@ test('a long genre list reads as two and etc, a short one in full', () => {
   assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2'] })), /<output>A or B<\/output>/)
 })
 
+test('the actions row pairs Filter with a Search link', () => {
+  assert.match(titleList(movie()), /<a class='button secondary search' href='\/search'>Search<\/a>/)
+})
+
 // On mobile there is no escape key and no click-outside habit; the visible button is the dismissal
 test('the panel carries its own close button, and ships inert', () => {
   assert.match(titleList(movie()), /<button class='close' type='button' aria-label='Close filters'>/)
