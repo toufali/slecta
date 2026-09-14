@@ -135,12 +135,16 @@ async function handleSubmit(e) {
 
   handleToggle()
 
+  // Its back() traverses async: replace the URL only after that lands, or the doomed entry takes the rewrite
+  const popped = new Promise(resolve => addEventListener('popstate', resolve, { once: true }))
   const data = await getData(params)
 
   list.replaceChildren(...cardItems(data[segment]))
   renderlistDescription(data)
   renderScores()
   resetMore(params, data.totalPages)
+
+  await popped
   updateUrl(params)
 }
 
