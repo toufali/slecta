@@ -20,25 +20,26 @@ const { noun, dated } = {
 let generation = 0
 
 export default function init() {
-  filterToggle.addEventListener('click', () => filterPanel.inert ? openPanel() : closePanel())
-  listDescription.addEventListener('click', e => e.target.closest('output') && openPanel())
+  filterToggle.addEventListener('click', handleToggle)
+  listDescription.addEventListener('click', e => e.target.closest('output') && handleToggle())
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
-  panelClose.addEventListener('click', closePanel)
+  panelClose.addEventListener('click', handleToggle)
   window.addEventListener('popstate', handlePopstate)
+
+  // A reload onto the pushed entry restores its state but ships the panel closed
+  if (history.state?.filterPanel) togglePanel()
+
   renderScores()
 }
 
-function openPanel() {
-  history.pushState({ filterPanel: true }, '')
+// Flip first: an inert panel can't be tapped again, so a double-tap can't pop twice
+function handleToggle() {
   togglePanel()
-}
 
-// Close before popping: an inert panel can't be tapped again, so a double-tap can't pop twice
-function closePanel() {
-  togglePanel()
-  history.back()
+  if (filterPanel.inert) history.back()
+  else history.pushState({ filterPanel: true }, '')
 }
 
 // Match the entry being traversed to, so Forward reopens the panel and Back closes it
@@ -127,7 +128,7 @@ async function handleSubmit(e) {
 
   const params = new URLSearchParams(new FormData(e.target))
 
-  closePanel()
+  handleToggle()
 
   const data = await getData(params)
 
