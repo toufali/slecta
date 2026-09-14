@@ -218,8 +218,8 @@ button:focus-visible,
 
 button.primary:enabled:hover,
 button.secondary:enabled:hover,
-.button.primary:enabled:hover,
-.button.secondary:enabled:hover {
+.button.primary:hover,
+.button.secondary:hover {
   filter: brightness(1.3);
 }
 
