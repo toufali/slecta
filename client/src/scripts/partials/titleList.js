@@ -21,7 +21,7 @@ let generation = 0
 
 export default function init() {
   filterToggle.addEventListener('click', handleToggle)
-  listDescription.addEventListener('click', e => e.target.closest('output') && handleToggle())
+  listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
@@ -32,6 +32,11 @@ export default function init() {
   if (history.state?.filterPanel) togglePanel()
 
   renderScores()
+}
+
+// Delegated: the description re-renders on every apply, and only its chips are interactive
+function handleDescription(e) {
+  if (e.target.closest('output')) handleToggle()
 }
 
 // Flip first: an inert panel can't be tapped again, so a double-tap can't pop twice
