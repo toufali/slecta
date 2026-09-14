@@ -1,6 +1,7 @@
 import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
 import { genreText } from '../../../client/src/scripts/utils/genres.js'
+import { searchForm } from './searchList.js'
 
 const sortingFields = data => data.allSorting.reduce((acc, cur) => {
   acc += `
@@ -78,7 +79,12 @@ export const titleList = data => {
   <button class='primary filter' type='button'>Filter</button>
 </div>
 
-<div class='filter-panel' inert>
+<div class='panel search-panel' inert>
+  <button class='close' type='button' aria-label='Close search'>✕</button>
+  ${searchForm}
+</div>
+
+<div class='panel filter-panel' inert>
   <button class='close' type='button' aria-label='Close filters'>✕</button>
   <form name='title-filter' action='/api/v1/${segment}'>
     <fieldset>
