@@ -74,6 +74,8 @@ function handleSearch(e) {
   if (searchPanel.inert) history.back()
   else {
     history.pushState({ searchPanel: true }, '')
+    // A retained query re-syncs the fresh entry's URL, so a later restore matches what is shown
+    if (searchInput.value) handleSearchInput({ target: searchInput })
     searchInput.focus()
   }
 }
@@ -90,7 +92,9 @@ async function handleSearchInput(e) {
   if (title.length < 2) return resultList.replaceChildren()
 
   try {
-    renderResults(resultList, await searchTitles(title))
+    const results = await searchTitles(title)
+
+    if (searchInput.value === title) renderResults(resultList, results)
   } catch (e) {
     console.error(e)
   }

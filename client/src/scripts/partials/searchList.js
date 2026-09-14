@@ -9,10 +9,14 @@ export default function init() {
 }
 
 async function handleInput(e) {
-  if (e.target.value.length < 2) return searchOutput.replaceChildren()
+  const title = e.target.value
+
+  if (title.length < 2) return searchOutput.replaceChildren()
 
   try {
-    renderResults(searchOutput, await searchTitles(e.target.value))
+    const results = await searchTitles(title)
+
+    if (searchInput.value === title) renderResults(searchOutput, results)
   } catch (e) {
     console.error(e)
   }
