@@ -35,6 +35,8 @@ export default function init() {
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
   searchClose.addEventListener('click', handleSearch)
+  // Marked at the keystroke, not at the debounced fetch, so the gap between them is not "no results"
+  searchInput.addEventListener('input', () => resultList.classList.add('loading'))
   searchInput.addEventListener('input', debounce(handleSearchInput))
   window.addEventListener('popstate', handlePopstate)
 

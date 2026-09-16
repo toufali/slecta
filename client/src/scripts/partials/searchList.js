@@ -5,5 +5,6 @@ const searchInput = document.querySelector('input[type="search"]')
 const searchOutput = document.querySelector('.result-list')
 
 export default function init() {
+  searchInput.addEventListener('input', () => searchOutput.classList.add('loading'))
   searchInput.addEventListener('input', debounce(() => runSearch(searchInput, searchOutput)))
 }
