@@ -85,7 +85,7 @@ search h1 {
   display: none;
 }
 
-/* minlength marks empty and one-char values invalid: no search ran, so there is no result to report */
+/* minlength marks empty and one-char input invalid: no search ran */
 search:has(input:invalid) ~ .no-results{
   display: none;
 }

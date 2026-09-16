@@ -16,8 +16,7 @@ export async function runSearch(input, list) {
 
     const results = await res.json()
 
-    // Render only when the input still holds the awaited query, so a slow response cannot
-    // overwrite a newer search or repopulate a cleared list
+    // Drop a response the input has moved past
     if (input.value !== title) return
 
     renderResults(list, results)

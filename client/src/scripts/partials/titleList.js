@@ -35,8 +35,7 @@ export default function init() {
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
   searchClose.addEventListener('click', handleSearch)
-  // Synchronous at the keystroke: the loading mark covers the debounce gap, and the URL lands on
-  // the overlay's own entry before a quick close can traverse away from it
+  // Keep this half synchronous: the URL must land on the overlay's entry before a quick close traverses away
   searchInput.addEventListener('input', handleSearchInput)
   searchInput.addEventListener('input', debounce(() => runSearch(searchInput, resultList)))
   window.addEventListener('popstate', handlePopstate)
@@ -50,8 +49,7 @@ export default function init() {
   renderScores()
 }
 
-// The overlay's own entry survives back-from-a-title and reload; a typed or shared URL arrives
-// without one, so it is given one, and close still lands on the clean list
+// A typed or shared URL arrives without the overlay's entry; synthesise one so close lands on the list
 function restoreSearch(title) {
   if (!history.state?.searchPanel) {
     const entry = location.href
@@ -78,7 +76,7 @@ function handleSearch(e) {
   if (searchPanel.inert) history.back()
   else {
     history.pushState({ searchPanel: true }, '')
-    // A retained query re-syncs the fresh entry's URL, so a later restore matches what is shown
+    // Re-sync a retained query onto the fresh entry, so a later restore matches what is shown
     if (searchInput.value) {
       handleSearchInput()
       runSearch(searchInput, resultList)
@@ -115,7 +113,7 @@ function handlePopstate(e) {
   if (Boolean(e.state?.filterPanel) === filterPanel.inert) togglePanel()
   if (Boolean(e.state?.searchPanel) === searchPanel.inert) togglePanel(searchPanel, searchBtn)
 
-  // Retained DOM does not survive a reload between traversals; the entry's URL is the truth
+  // Retained DOM does not survive a reload; the entry's URL is the truth
   if (e.state?.searchPanel) {
     const title = new URLSearchParams(location.search).get('title') ?? ''
 
