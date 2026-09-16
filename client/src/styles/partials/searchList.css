@@ -85,6 +85,12 @@ search h1 {
   display: none;
 }
 
+/* An empty input means no search yet, not no results */
+search:has(:placeholder-shown) ~ .no-results{
+  display: none;
+}
+
 .no-results{
   padding: var(--padding-md);
+  text-align: center;
 }
