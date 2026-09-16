@@ -113,18 +113,32 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
+  // The picker offers subscriptions, not TMDB's full provider list of storefronts and aggregators.
+  // Ids are curated; names come from the provider endpoint, since they drift (Max did).
+  providerSubscriptions = [
+    8, // Netflix
+    9, // Amazon Prime Video
+    337, // Disney+
+    1899, // Max
+    15, // Hulu
+    350, // Apple TV+
+    531, // Paramount+
+    386, // Peacock
+  ]
   imgConfig
   genres = {}
   ratings
+  providers
 
   async init() {
-    const [imgConfig, genres, ratings] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings()])
+    const [imgConfig, genres, ratings, providers] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings(), this.#getProviders()])
     this.imgConfig = imgConfig
     this.genres.all = genres.all
     this.genres.movie = genres.movie
     this.genres.show = genres.show
     this.ratings = ratings
-    console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
+    this.providers = providers
+    console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings && this.providers))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
   }
 
@@ -208,6 +222,31 @@ class TmdbService {
     return ratings
   }
 
+  async #getProviders() {
+    const url = `${TMDB_API_URL}/watch/providers/movie?language=${this.language}&watch_region=${this.region}`
+
+    let providers = await redis.getCache(url)
+    if (providers) return providers
+
+    try {
+      const res = await fetch(url, { headers })
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+      const { results } = await res.json()
+      const names = new Map(results.map(item => [item.provider_id, item.provider_name]))
+
+      providers = new Map(this.providerSubscriptions
+        .filter(id => names.has(id))
+        .map(id => [id, names.get(id)]))
+
+      redis.setCache(url, providers, 60 * 60 * 24)
+    } catch (e) {
+      console.error("Error getting TMDB providers:", e)
+    }
+    return providers
+  }
+
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media
   // type; an omitted rule leaves that param unjudged.
   filterRules(mediaType) {
@@ -219,6 +258,7 @@ class TmdbService {
       lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
+      providers: this.providers,
       ratings: media.certifications ? this.ratings : undefined
     }
   }
@@ -270,6 +310,8 @@ class TmdbService {
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
       streamingNow: query?.streaming,
+      allProviders: this.providers,
+      withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
       lookback: this.lookback(query?.months),
       lookbackMax: this.lookbackMax,
       inEnglish: query?.english
@@ -322,7 +364,8 @@ class TmdbService {
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
       certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,
-      with_watch_monetization_types: query?.streaming ? media.monetization : ''
+      with_watch_monetization_types: query?.wp ? 'flatrate' : query?.streaming ? media.monetization : '',
+      with_watch_providers: Array.isArray(query?.wp) ? query.wp.join('|') : query?.wp
     }
 
     for (const [key, value] of Object.entries(params)) {

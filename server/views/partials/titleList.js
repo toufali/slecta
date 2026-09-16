@@ -1,6 +1,6 @@
 import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
-import { genreText } from '../../../client/src/scripts/utils/genres.js'
+import { namesText } from '../../../client/src/scripts/utils/names.js'
 import { searchForm } from './searchList.js'
 
 const sortingFields = data => data.allSorting.reduce((acc, cur) => {
@@ -26,6 +26,18 @@ const genreFields = data => {
   return html
 }
 
+const providerFields = data => {
+  let html = ''
+
+  for (const [id, name] of data.allProviders) html += `
+  <label class='pill'>
+    <input type='checkbox' name='wp' value='${id}' ${data.withProviders?.includes(id.toString()) ? 'checked' : ''}>
+    <span>${name}</span>
+  </label>
+  `
+  return html
+}
+
 const ratingFields = data => data.allRatings.reduce((acc, cur) => {
   // data.withRatings can be a string 'R' or array ['PG-13', 'R']. The includes() function should work on both.
   acc += `
@@ -42,17 +54,19 @@ function listDescription(data, dated) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, ratings, streaming, language
+  let sort, genres, ratings, services, streaming, language
 
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
   if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.inEnglish) language = `<output>in English</output>`
-  if (data.withGenres) genres = `<label>with genre <output>${genreText(data.withGenres, data.allGenres)}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${namesText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
+  // Not on Top Rated: the ranked index cannot filter by provider, so the claim would be false there
+  if (data.withProviders && data.sortBy !== 'score') services = `<label>on <output>${namesText(data.withProviders, data.allProviders)}</output></label>`
 
   const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  return conjunctionFmt.format([streaming, language, sort, genres, ratings, lookback].filter(item => item))
+  return conjunctionFmt.format([streaming, services, language, sort, genres, ratings, lookback].filter(item => item))
 }
 
 const COPY = {
@@ -115,11 +129,8 @@ export const titleList = data => {
       </label>
     </fieldset>
     <fieldset>
-      <h3>Availability:</h3>
-      <label class='pill'>
-        <input type='checkbox' name='streaming' ${data.streamingNow ? 'checked' : ''}>
-        <span>Streaming now</span>
-      </label>
+      <h3>Streaming services:</h3>
+      ${providerFields(data)}
     </fieldset>
     <fieldset>
       <button class='primary' type='submit'>APPLY</button>

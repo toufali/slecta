@@ -1,5 +1,5 @@
 import { monthsText } from '../utils/months.js'
-import { genreText } from '../utils/genres.js'
+import { namesText } from '../utils/names.js'
 import { debounce } from '../utils/time.js'
 import { runSearch } from '../utils/search.js'
 
@@ -204,6 +204,10 @@ async function handleSubmit(e) {
   if (e) e.preventDefault()
 
   const params = new URLSearchParams(new FormData(e.target))
+  const services = params.getAll('wp').join('|')
+
+  // The server reads this to render the next visit's first paint already filtered
+  document.cookie = `wp=${services}; path=/; samesite=lax; max-age=${services ? 31536000 : 0}`
 
   handlePanel()
 
@@ -226,6 +230,7 @@ async function getData(params) {
 
   const json = await res.json()
   json.allGenres = new Map(json.allGenres)
+  json.allProviders = new Map(json.allProviders)
 
   return json
 }
@@ -265,17 +270,18 @@ function renderlistDescription(data) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, ratings, streaming, language
+  let sort, genres, ratings, services, language
 
   sort = `<label>${noun} sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
-  if (data.withGenres) genres = `<label>with genre <output>${genreText(data.withGenres, data.allGenres)}</output></label>`
+  if (data.withGenres) genres = `<label>with genre <output>${namesText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
-  if (data.streamingNow) streaming = `<label>are <output>streaming now</output></label>`
+  // Not on Top Rated: the ranked index cannot filter by provider, so the claim would be false there
+  if (data.withProviders && data.sortBy !== 'score') services = `<label>on <output>${namesText(data.withProviders, data.allProviders)}</output></label>`
   if (data.inEnglish) language = `<output>in English</output>`
 
   const lookbackText = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, streaming, language, lookbackText].filter(item => item))
+  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, services, language, lookbackText].filter(item => item))
   window.scrollTo(0, 0)
 }
 

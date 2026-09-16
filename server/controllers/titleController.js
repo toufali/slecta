@@ -52,6 +52,15 @@ async function list(ctx, media) {
 // names it, so nothing downstream has to work out which catalogue it is serving.
 export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
+
+  // The saved services are a preference, not a request: a stale id is dropped, never a 400. The
+  // URL wins when it names its own, so a shared link renders the same list for everyone.
+  if (!ctx.query.wp) {
+    const saved = ctx.cookies.get('wp')?.split('|').filter(id => tmdb.filterRules(mediaType).providers?.has(+id))
+
+    if (saved?.length) ctx.query = { ...ctx.query, wp: saved }
+  }
+
   const data = await list(ctx, media)
 
   // Built here rather than in `list`: the API shares that and would carry an href to its own path
@@ -93,6 +102,7 @@ export const getList = mediaType => async ctx => {
   const data = await list(ctx, MEDIA[mediaType])
 
   data.allGenres = Array.from(data.allGenres.entries()) // can't send type Map via JSON :(
+  data.allProviders = Array.from(data.allProviders.entries())
 
   ctx.set('Cache-Control', CACHE_CONTROL)
 
