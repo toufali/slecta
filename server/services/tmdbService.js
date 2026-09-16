@@ -244,7 +244,8 @@ class TmdbService {
     } catch (e) {
       console.error("Error getting TMDB providers:", e)
     }
-    return providers
+    // Empty rather than undefined, so a provider outage costs the picker, not every list page
+    return providers ?? new Map()
   }
 
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media

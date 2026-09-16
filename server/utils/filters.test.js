@@ -154,7 +154,7 @@ test('a vote override may narrow the catalogue but not widen it', () => {
 
 test('a service must be one the picker offers', () => {
   assert.deepEqual(invalidFilters({ wp: ['8', '337'] }, MOVIE), [])
-  for (const wp of ['999', 'abc', '8.5']) {
+  for (const wp of ['999', 'abc', '8.5', '08']) {
     assert.deepEqual(invalidFilters({ wp }, MOVIE), ['wp'], wp)
   }
 })
