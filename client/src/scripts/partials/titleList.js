@@ -114,6 +114,16 @@ function handlePanel() {
 function handlePopstate(e) {
   if (Boolean(e.state?.filterPanel) === filterPanel.inert) togglePanel()
   if (Boolean(e.state?.searchPanel) === searchPanel.inert) togglePanel(searchPanel, searchBtn)
+
+  // Retained DOM does not survive a reload between traversals; the entry's URL is the truth
+  if (e.state?.searchPanel) {
+    const title = new URLSearchParams(location.search).get('title') ?? ''
+
+    if (searchInput.value !== title) {
+      searchInput.value = title
+      runSearch(searchInput, resultList)
+    }
+  }
 }
 
 function handleLookback() {
