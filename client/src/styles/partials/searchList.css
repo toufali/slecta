@@ -2,11 +2,7 @@ search{
   display: flex;
   flex-direction: column;
   gap: var(--padding-md);
-  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
-  margin-bottom: var(--padding-md);
-  padding: var(--padding-lg) var(--padding-md);
-  border-radius: var(--border-radius);
-  box-shadow: 3px 3px 12px -3px black;
+  padding: var(--padding-md);
   align-items: center;
 }
 
