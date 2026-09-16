@@ -8,7 +8,7 @@ import log from '../utils/logger.js'
 
 // Bump when the row shape changes, then run the job by hand: the deploy runs the checks only, so
 // until the nightly run this key is absent and the ranked list fails outright.
-export const INDEX_VERSION = 2
+export const INDEX_VERSION = 3
 
 export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 
@@ -32,11 +32,15 @@ function matches(row, query, { window, certifications }) {
   const genres = asList(query.wg)?.map(Number)
   const without = asList(query.wog)?.map(Number)
   const ratings = certifications ? asList(query.wr) : undefined
+  const services = asList(query.wp)?.map(Number)
   const minVotes = Number(query.minVotes)
 
   if (genres && !row.genreIds?.some(id => genres.includes(id))) return false
   if (without?.some(id => row.genreIds?.includes(id))) return false
   if (ratings && !ratings.includes(row.certification)) return false
+
+  // Only the flatrate bucket answers: a rental on a picked service is not subscribed-to
+  if (services && !row.flatrate?.some(id => services.includes(id))) return false
 
   // The index is built at the catalogue's own vote floor, so an override can only narrow from there
   if (minVotes && !(row.votes >= minVotes)) return false

@@ -10,7 +10,7 @@ const headers = {
 // Bump when the cached detail shape changes, so a deploy cannot serve objects the views no
 // longer understand. Scoped to detail deliberately: a global version would also discard the
 // IMDb dataset and every score record, which are expensive to rebuild.
-const DETAIL_CACHE_VERSION = 4
+const DETAIL_CACHE_VERSION = 5
 
 // Same idea for the list shape: an entry written before `totalPages`/`totalResults` existed would
 // silently limit the nightly run to page one. Only the rows and those counts are cached — the
@@ -421,6 +421,10 @@ class TmdbService {
     const json = await res.json()
     let providers = json['watch/providers'].results[this.region]
 
+    // Kept apart from the flattened list below, which mixes rent and buy into "available":
+    // subscription filtering needs to know the difference
+    const flatrate = providers?.flatrate?.map(item => item.provider_id) ?? []
+
     if (providers) {
       // reshape, reduce, and mutate data
       const providerPriority = this.providerPriority.toReversed()
@@ -458,6 +462,7 @@ class TmdbService {
       language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
+      flatrate,
       backdropUrl,
       ytTrailerId: ytTrailer?.key
     }

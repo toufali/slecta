@@ -233,6 +233,7 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
     votes: title.tmdbScoreCount,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
+    flatrate: detail.flatrate,
     originalLanguage: title.originalLanguage,
     score: avgScore
   }

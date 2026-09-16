@@ -387,12 +387,12 @@ test('the stored field order is unchanged for both catalogues', async () => {
   assert.deepEqual(Object.keys(await tmdb.getMovieDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'rating', 'cast', 'director', 'runtime',
-    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'flatrate', 'backdropUrl', 'ytTrailerId'
   ])
   assert.deepEqual(Object.keys(await tmdb.getTvShowDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'cast', 'creator', 'rating', 'seasons',
-    'language', 'genres', 'providers', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'flatrate', 'backdropUrl', 'ytTrailerId'
   ])
 })
 
