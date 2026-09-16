@@ -1,13 +1,25 @@
-export async function searchTitles(title) {
-  const params = new URLSearchParams({ title })
-  const res = await fetch(`/api/v1/search/?${params}`)
+export async function runSearch(input, list) {
+  const title = input.value
 
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (title.length < 2) return list.replaceChildren()
 
-  return res.json()
+  try {
+    const params = new URLSearchParams({ title })
+    const res = await fetch(`/api/v1/search/?${params}`)
+
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+
+    const results = await res.json()
+
+    // Render only when the input still holds the awaited query, so a slow response cannot
+    // overwrite a newer search or repopulate a cleared list
+    if (input.value === title) renderResults(list, results)
+  } catch (e) {
+    console.error(e)
+  }
 }
 
-export function renderResults(list, results) {
+function renderResults(list, results) {
   list.innerHTML = results.map((item, i) => `
   <li>
     <a href="/${item.mediaType === 'tv' ? 'shows' : 'movies'}/${item.id}">

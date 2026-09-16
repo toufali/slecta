@@ -1,7 +1,7 @@
 import { monthsText } from '../utils/months.js'
 import { genreText } from '../utils/genres.js'
 import { debounce } from '../utils/time.js'
-import { searchTitles, renderResults } from '../utils/search.js'
+import { runSearch } from '../utils/search.js'
 
 const list = document.querySelector('.title-list')
 const listDescription = document.querySelector('.list-description')
@@ -63,7 +63,7 @@ function restoreSearch(title) {
 
   if (title) {
     searchInput.value = title
-    handleSearchInput({ target: searchInput })
+    handleSearchInput()
   }
 }
 
@@ -75,29 +75,20 @@ function handleSearch(e) {
   else {
     history.pushState({ searchPanel: true }, '')
     // A retained query re-syncs the fresh entry's URL, so a later restore matches what is shown
-    if (searchInput.value) handleSearchInput({ target: searchInput })
+    if (searchInput.value) handleSearchInput()
     searchInput.focus()
   }
 }
 
 // The query rides the pushed entry's URL, so back from a tapped result can restore this search
-async function handleSearchInput(e) {
-  const title = e.target.value
+function handleSearchInput() {
   const url = new URL(location)
 
-  if (title) url.searchParams.set('title', title)
+  if (searchInput.value) url.searchParams.set('title', searchInput.value)
   else url.searchParams.delete('title')
   history.replaceState(history.state, '', url)
 
-  if (title.length < 2) return resultList.replaceChildren()
-
-  try {
-    const results = await searchTitles(title)
-
-    if (searchInput.value === title) renderResults(resultList, results)
-  } catch (e) {
-    console.error(e)
-  }
+  runSearch(searchInput, resultList)
 }
 
 function handleDescription(e) {
