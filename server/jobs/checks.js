@@ -86,10 +86,15 @@ export async function checkRankedIndex() {
 
     if (rows === undefined) unreadable.push(segment)
     else if (rows) continue
-    // A version bump deploys before any run publishes the new key. The previous generation proves
-    // the pipeline works, so this warns for the manual run rather than failing the deploy.
-    else if (await redis.getCache(`index/${segment}/v${INDEX_VERSION - 1}`)) awaiting.push(segment)
-    else missing.push(segment)
+    else {
+      // A version bump deploys before any run publishes the new key. The previous generation
+      // proves the pipeline works, so this warns for the manual run rather than failing the deploy.
+      const prior = await redis.getCache(`index/${segment}/v${INDEX_VERSION - 1}`)
+
+      if (prior === undefined) unreadable.push(segment)
+      else if (prior) awaiting.push(segment)
+      else missing.push(segment)
+    }
   }
 
   // Logged apart, since one says run the job and the other says fix Redis

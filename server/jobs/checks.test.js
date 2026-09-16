@@ -237,6 +237,9 @@ test('the checks fail whenever a ranked list cannot be served', async () => {
     redis.getCache = async key => key.endsWith(`v${INDEX_VERSION - 1}`) ? [{ id: 1 }] : null
     assert.equal((await checkRankedIndex()).ok, true, 'awaiting a republish is not a failed deploy')
 
+    redis.getCache = async key => key.endsWith(`v${INDEX_VERSION}`) ? null : undefined
+    assert.deepEqual((await checkRankedIndex()).unreadable, ['movies', 'shows'], 'a failed fallback read says fix Redis, not run the job')
+
     // Elsewhere an outage must not read as absent data; here both mean the list will not serve, and
     // passing would let a flaky read hide a generation nobody published
     redis.getCache = async () => undefined
