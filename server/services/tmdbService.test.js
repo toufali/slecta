@@ -468,6 +468,8 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
 
   assert.deepEqual(detail.included, [1899, 8])
   assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 350, 1899].sort())
+  // The canonical id carries the reader-facing name, not the variant's
+  assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')
 
   captureDetail()
   assert.deepEqual((await tmdb.getMovieDetail(14)).included, [], 'no US providers means nothing included, not a crash')

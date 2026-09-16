@@ -455,6 +455,9 @@ class TmdbService {
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
+          // The canonical id takes its reader-facing name too, or a variant-only title would
+          // surface "Netflix Standard with Ads" under Netflix's id
+          item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
           if (this.has(item.provider_id)) return // already in set
           if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
