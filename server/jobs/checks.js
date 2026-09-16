@@ -68,12 +68,13 @@ const MAX_FAILED_RATE = { warn: 0.1, alert: 0.5 }
 const MAX_UNSCORED_RATE = { warn: 0.1, alert: 0.5 }
 
 /**
- * Whether a ranked list can be served. Run at deploy, so a row-shape bump fails the build rather than
- * leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
+ * Whether a ranked list can be served. Run at deploy, so a list nobody published fails the build
+ * rather than leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
  *
- * Fails closed on an unreadable Redis as well as an absent key. The two are distinguished elsewhere
- * so a blip cannot discard data, but here they are the same answer: the list will not serve. Passing
- * on an outage would also let a flaky read hide a generation nobody published.
+ * One deliberate pass while unservable: a version bump deploys before any run publishes the new key,
+ * and the previous generation proves the pipeline works, so that state warns for the manual run.
+ * Fails closed on an unreadable Redis: passing on an outage would let a flaky read hide a
+ * generation nobody published.
  * @return {{ok: boolean, missing: string[], unreadable: string[]}}
  */
 export async function checkRankedIndex() {
