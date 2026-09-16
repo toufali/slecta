@@ -1,7 +1,12 @@
 export async function runSearch(input, list) {
   const title = input.value
 
-  if (title.length < 2) return list.replaceChildren()
+  if (title.length < 2) {
+    list.classList.remove('loading')
+    return list.replaceChildren()
+  }
+
+  list.classList.add('loading')
 
   try {
     const params = new URLSearchParams({ title })
@@ -13,7 +18,10 @@ export async function runSearch(input, list) {
 
     // Render only when the input still holds the awaited query, so a slow response cannot
     // overwrite a newer search or repopulate a cleared list
-    if (input.value === title) renderResults(list, results)
+    if (input.value !== title) return
+
+    renderResults(list, results)
+    list.classList.remove('loading')
   } catch (e) {
     console.error(e)
   }

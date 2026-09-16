@@ -90,10 +90,14 @@ search:has(input:invalid) ~ .no-results{
   display: none;
 }
 
+/* An in-flight or failed request is not "no results" either */
+.result-list.loading ~ .no-results{
+  display: none;
+}
+
 .no-results{
   padding: var(--padding-md);
   text-align: center;
-  /* The delay outlasts the debounce and a typical fetch, so a loading gap never flashes it */
   opacity: 0;
-  animation: fade-in .3s 1s forwards;
+  animation: fade-in .3s forwards;
 }
