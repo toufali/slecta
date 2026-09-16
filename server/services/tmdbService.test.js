@@ -80,7 +80,7 @@ const ROW = {
 
 // init is not run in this file, so supply only the fields the row mapping reads. Set once: the
 // tests above never reach the mapping, so nothing there depends on these being absent.
-tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
+tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'], logo_sizes: ['w45'] }
 tmdb.genres = { movie: new Map([[28, 'Action']]), show: new Map([[28, 'Action & Adventure']]) }
 tmdb.ratings = ['PG-13', 'R']
 
@@ -446,4 +446,27 @@ test('selected services ask discover for flatrate on those providers, with the r
     assert.match(decodeURIComponent(url), /watch_region=US/)
     assert.match(decodeURIComponent(url), /with_watch_monetization_types=flatrate(&|$)/)
   }
+})
+
+// The bucket lookup is what keeps a rental off a subscriber's Top Rated list
+test('the detail keeps flatrate ids apart from the flattened availability', async () => {
+  captureDetail({
+    'watch/providers': {
+      results: {
+        US: {
+          flatrate: [{ provider_id: 1899, logo_path: '/x.png' }],
+          rent: [{ provider_id: 350, logo_path: '/y.png' }],
+          buy: [{ provider_id: 2, logo_path: '/z.png' }]
+        }
+      }
+    }
+  })
+
+  const detail = await tmdb.getMovieDetail(13)
+
+  assert.deepEqual(detail.flatrate, [1899])
+  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 350, 1899].sort())
+
+  captureDetail()
+  assert.deepEqual((await tmdb.getMovieDetail(14)).flatrate, [], 'no US providers means no flatrate, not a crash')
 })
