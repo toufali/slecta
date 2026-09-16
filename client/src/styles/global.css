@@ -83,7 +83,7 @@ header.primary .logo{
   display: block;
   height: 50px;
   margin-bottom: var(--padding-sm);
-  mix-blend-mode: color-dodge;
+  mix-blend-mode: hard-light;
 }
 
 nav.primary{
