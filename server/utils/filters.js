@@ -4,10 +4,11 @@
 
 // Only the panel's own form is accepted: one param repeated per value, which TMDB reads as OR.
 // Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
-const MULTI = new Set(['wg', 'wog', 'wr'])
+const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
 
-// Digits only: `Number()` also takes `0x1b` and `1e2`, which pass a genre lookup but match nothing at TMDB.
-const isDigits = value => /^\d+$/.test(value)
+// Canonical digits only: `Number()` also takes `0x1b`, `1e2` and `08`, which pass an id lookup but
+// round-trip wrong — `08` filters the list while its box renders unchecked.
+const isDigits = value => /^[1-9]\d*$/.test(value)
 
 const isGenre = (value, { genres }) => isDigits(value) && genres.has(+value)
 
@@ -26,6 +27,7 @@ const CHECKS = {
   streaming: value => value === 'on',
   wg: isGenre,
   wog: isGenre,
+  wp: (value, { providers }) => isDigits(value) && providers.has(+value),
   // TV certifications are a separate vocabulary (TV-MA…) the TV route never fetches or sends,
   // so with no list supplied `wr` goes unjudged rather than held to the film list.
   wr: (value, { ratings }) => !ratings || ratings.some(rating => rating.certification === value)

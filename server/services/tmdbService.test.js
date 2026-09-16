@@ -431,3 +431,19 @@ test('a cached list is reshaped on the way out, not served as it was stored', as
     redis.getCache = realGetCache
   }
 })
+
+// A title available only to rent must not pass as available on a subscribed service
+test('selected services ask discover for flatrate on those providers, with the region attached', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies({ wp: ['8', '337'] })
+  await tmdb.getTvShows({ wp: '8' })
+
+  assert.match(decodeURIComponent(seen[0]), /with_watch_providers=8\|337/)
+  assert.match(decodeURIComponent(seen[1]), /with_watch_providers=8/)
+
+  for (const url of seen) {
+    assert.match(decodeURIComponent(url), /watch_region=US/)
+    assert.match(decodeURIComponent(url), /with_watch_monetization_types=flatrate(&|$)/)
+  }
+})

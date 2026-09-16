@@ -10,6 +10,7 @@ const MOVIE = {
   lookbackMax: 12,
   sorts: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   genres: new Map([[27, 'Horror'], [878, 'Science Fiction']]),
+  providers: new Map([[8, 'Netflix'], [337, 'Disney+']]),
   ratings: MOVIE_RATINGS
 }
 const SHOW = {
@@ -149,4 +150,11 @@ test('a vote override may narrow the catalogue but not widen it', () => {
   }
   assert.deepEqual(invalidFilters({ minVotes: '25' }, MOVIE), [])
   assert.deepEqual(invalidFilters({ minVotes: '5000' }, MOVIE), [])
+})
+
+test('a service must be one the picker offers', () => {
+  assert.deepEqual(invalidFilters({ wp: ['8', '337'] }, MOVIE), [])
+  for (const wp of ['999', 'abc', '8.5', '08']) {
+    assert.deepEqual(invalidFilters({ wp }, MOVIE), ['wp'], wp)
+  }
 })

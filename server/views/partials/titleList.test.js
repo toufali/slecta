@@ -5,6 +5,7 @@ import { titleList } from './titleList.js'
 const movie = over => ({
   movies: [],
   allGenres: new Map([[28, 'Action']]),
+  allProviders: new Map([[8, 'Netflix']]),
   allRatings: [{ certification: 'R', meaning: 'restricted' }],
   allSorting: [{ name: 'Most Recent', value: 'primary_release_date.desc' }],
   sortBy: 'primary_release_date.desc',
@@ -99,4 +100,20 @@ test('each panel carries its own close button, and ships inert', () => {
   // Hidden by opacity alone, a closed panel kept every control in the tab order
   assert.match(titleList(movie()), /<div class='panel filter-panel' inert>/)
   assert.match(titleList(movie()), /<div class='panel search-panel' inert>/)
+})
+
+test('the services fieldset lists the curated providers and echoes the selection', () => {
+  for (const data of [movie, tv]) {
+    assert.match(titleList(data()), /Streaming on:/)
+    assert.doesNotMatch(titleList(data()), /Streaming now/)
+    assert.match(titleList(data({ withProviders: ['8'] })), /name='wp' value='8' checked/)
+    assert.doesNotMatch(titleList(data()), /name='wp' value='8' checked/)
+  }
+})
+
+test('the description claims a service only where the list can honour it', () => {
+  const sorts = [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Top Rated', value: 'score' }]
+
+  assert.match(titleList(movie({ withProviders: ['8'] })), /on <output>Netflix<\/output>/)
+  assert.doesNotMatch(titleList(movie({ allSorting: sorts, sortBy: 'score', withProviders: ['8'] })), /on <output>Netflix<\/output>/)
 })

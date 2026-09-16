@@ -113,6 +113,18 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
+  // The picker offers top subscriptions, not TMDB's US list of 294 storefronts, channels and
+  // tiers. Labelled for readers rather than with TMDB's tier names ("Peacock Premium").
+  providers = new Map([
+    [8, 'Netflix'],
+    [9, 'Prime Video'],
+    [337, 'Disney+'],
+    [1899, 'HBO Max'],
+    [15, 'Hulu'],
+    [350, 'Apple TV'],
+    [2303, 'Paramount+'], // the Premium tier carries the catalogue; Essential adds almost nothing
+    [386, 'Peacock'],
+  ])
   imgConfig
   genres = {}
   ratings
@@ -219,6 +231,7 @@ class TmdbService {
       lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
+      providers: this.providers,
       ratings: media.certifications ? this.ratings : undefined
     }
   }
@@ -270,6 +283,8 @@ class TmdbService {
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
       streamingNow: query?.streaming,
+      allProviders: this.providers,
+      withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
       lookback: this.lookback(query?.months),
       lookbackMax: this.lookbackMax,
       inEnglish: query?.english
@@ -322,7 +337,8 @@ class TmdbService {
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
       certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,
-      with_watch_monetization_types: query?.streaming ? media.monetization : ''
+      with_watch_monetization_types: query?.wp ? 'flatrate' : query?.streaming ? media.monetization : '',
+      with_watch_providers: Array.isArray(query?.wp) ? query.wp.join('|') : query?.wp
     }
 
     for (const [key, value] of Object.entries(params)) {
