@@ -31,8 +31,8 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   // The window is recorded, since every page of one walk has to be bounded by the same day
   tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
-  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }], flatrate: [8] })
-  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', seasons: 1, cast: 'A Name', providers: [{ provider_id: 8 }], flatrate: [8] })
+  tmdb.getMovieDetail = async id => ({ tmdbId: id, title: `movie ${id}`, rating: 'PG-13', providers: [{ provider_id: 8 }], included: [8] })
+  tmdb.getTvShowDetail = async id => ({ tmdbId: id, title: `show ${id}`, rating: 'TV-14', seasons: 1, cast: 'A Name', providers: [{ provider_id: 8 }], included: [8] })
   scoreService.getScore = async (key, data) => {
     scored.push(key)
     passed.push(data)
@@ -293,7 +293,7 @@ test('the run publishes a score index a card could be rendered from', async () =
       votes: 900,
       certification: 'PG-13',
       providers: [8],
-      flatrate: [8],
+      included: [8],
       originalLanguage: 'en',
       score: 70
     }])

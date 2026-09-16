@@ -121,9 +121,28 @@ class TmdbService {
     [1899, 'HBO Max'],
     [15, 'Hulu'],
     [350, 'Apple TV'],
-    [2303, 'Paramount+'], // the Premium tier carries the catalogue; Essential adds almost nothing
+    [2303, 'Paramount+'],
     [386, 'Peacock'],
   ])
+  // Plan tiers and resale channels collapse to the service a reader would name
+  providerAlias = new Map([
+    [175, 8], // Netflix Kids
+    [1796, 8], // Netflix Standard with Ads
+    [613, 9], // Prime Video Free with Ads
+    [2100, 9], // Prime Video with Ads
+    [1825, 1899], // HBO Max Amazon Channel
+    [2243, 350], // Apple TV Amazon Channel
+    [2616, 2303], // Paramount Plus Essential
+    [582, 2303], // Paramount+ Amazon Channel
+    [633, 2303], // Paramount+ Roku Premium Channel
+    [387, 386], // Peacock Premium Plus
+    [2553, 386], // Peacock Premium Plus Amazon Channel
+  ])
+
+  canonicalProvider = id => this.providerAlias.get(id) ?? id
+
+  // Discover matches TMDB's own ids, so a picked service has to be asked for with its variants
+  expandProvider = id => [id, ...[...this.providerAlias].filter(([, parent]) => parent === +id).map(([variant]) => variant)]
   imgConfig
   genres = {}
   ratings
@@ -336,8 +355,8 @@ class TmdbService {
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
       certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,
-      with_watch_monetization_types: query?.wp ? 'flatrate' : query?.streaming ? media.monetization : '',
-      with_watch_providers: Array.isArray(query?.wp) ? query.wp.join('|') : query?.wp
+      with_watch_monetization_types: query?.wp ? 'flatrate|free|ads' : query?.streaming ? media.monetization : '',
+      with_watch_providers: query?.wp ? [query.wp].flat().flatMap(this.expandProvider).join('|') : undefined
     }
 
     for (const [key, value] of Object.entries(params)) {
@@ -421,8 +440,10 @@ class TmdbService {
     let providers = json['watch/providers'].results[this.region]
 
     // Kept apart from the flattened list below, which mixes rent and buy into "available":
-    // subscription filtering needs to know the difference
-    const flatrate = providers?.flatrate?.map(item => item.provider_id) ?? []
+    // canonical ids of every service the title costs nothing extra on
+    const included = [...new Set(['flatrate', 'free', 'ads']
+      .flatMap(bucket => providers?.[bucket] ?? [])
+      .map(item => this.canonicalProvider(item.provider_id)))]
 
     if (providers) {
       // reshape, reduce, and mutate data
@@ -433,6 +454,7 @@ class TmdbService {
         .flat()
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
+          item.provider_id = thisClass.canonicalProvider(item.provider_id)
           if (this.has(item.provider_id)) return // already in set
           if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
@@ -461,7 +483,7 @@ class TmdbService {
       language: languageName(json.original_language),
       genres: json.genres.map(genre => genre.name).join(', '),
       providers,
-      flatrate,
+      included,
       backdropUrl,
       ytTrailerId: ytTrailer?.key
     }

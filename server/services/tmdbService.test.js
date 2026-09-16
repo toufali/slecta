@@ -387,12 +387,12 @@ test('the stored field order is unchanged for both catalogues', async () => {
   assert.deepEqual(Object.keys(await tmdb.getMovieDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'rating', 'cast', 'director', 'runtime',
-    'language', 'genres', 'providers', 'flatrate', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'included', 'backdropUrl', 'ytTrailerId'
   ])
   assert.deepEqual(Object.keys(await tmdb.getTvShowDetail(7)), [
     'tmdbId', 'imdbId', 'wikiId', 'title', 'overview', 'releaseDate',
     'cast', 'creator', 'rating', 'seasons',
-    'language', 'genres', 'providers', 'flatrate', 'backdropUrl', 'ytTrailerId'
+    'language', 'genres', 'providers', 'included', 'backdropUrl', 'ytTrailerId'
   ])
 })
 
@@ -433,28 +433,30 @@ test('a cached list is reshaped on the way out, not served as it was stored', as
 })
 
 // A title available only to rent must not pass as available on a subscribed service
-test('selected services ask discover for flatrate on those providers, with the region attached', async () => {
+test('selected services ask discover for no-extra-cost types, expanded to their variants', async () => {
   const seen = captureUrl()
 
   await tmdb.getMovies({ wp: ['8', '337'] })
-  await tmdb.getTvShows({ wp: '8' })
+  await tmdb.getTvShows({ wp: '337' })
 
-  assert.match(decodeURIComponent(seen[0]), /with_watch_providers=8\|337/)
-  assert.match(decodeURIComponent(seen[1]), /with_watch_providers=8/)
+  // Netflix expands to its Kids and with-Ads plans, which TMDB tags as their own providers
+  assert.match(decodeURIComponent(seen[0]), /with_watch_providers=8\|175\|1796\|337/)
+  assert.match(decodeURIComponent(seen[1]), /with_watch_providers=337(&|$)/)
 
   for (const url of seen) {
     assert.match(decodeURIComponent(url), /watch_region=US/)
-    assert.match(decodeURIComponent(url), /with_watch_monetization_types=flatrate(&|$)/)
+    assert.match(decodeURIComponent(url), /with_watch_monetization_types=flatrate\|free\|ads(&|$)/)
   }
 })
 
 // The bucket lookup is what keeps a rental off a subscriber's Top Rated list
-test('the detail keeps flatrate ids apart from the flattened availability', async () => {
+test('the detail keeps no-extra-cost ids apart from the flattened availability, canonicalised', async () => {
   captureDetail({
     'watch/providers': {
       results: {
         US: {
           flatrate: [{ provider_id: 1899, logo_path: '/x.png' }],
+          ads: [{ provider_id: 1796, logo_path: '/w.png' }], // Netflix Standard with Ads reads as Netflix
           rent: [{ provider_id: 350, logo_path: '/y.png' }],
           buy: [{ provider_id: 2, logo_path: '/z.png' }]
         }
@@ -464,9 +466,9 @@ test('the detail keeps flatrate ids apart from the flattened availability', asyn
 
   const detail = await tmdb.getMovieDetail(13)
 
-  assert.deepEqual(detail.flatrate, [1899])
-  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 350, 1899].sort())
+  assert.deepEqual(detail.included, [1899, 8])
+  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 350, 1899].sort())
 
   captureDetail()
-  assert.deepEqual((await tmdb.getMovieDetail(14)).flatrate, [], 'no US providers means no flatrate, not a crash')
+  assert.deepEqual((await tmdb.getMovieDetail(14)).included, [], 'no US providers means nothing included, not a crash')
 })

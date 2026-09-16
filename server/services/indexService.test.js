@@ -143,11 +143,11 @@ test('the streaming filter drops a title no provider carries', async () => {
 })
 
 // The Widow's Bay case: available on a picked service to rent, ranked into its subscriber's list
-test('a service filter reads the flatrate bucket, never the flattened availability', async () => {
+test('a service filter reads what costs nothing extra, never the flattened availability', async () => {
   const rows = [
-    row({ id: 1, title: 'subscribed', providers: [1899], flatrate: [1899] }),
-    row({ id: 2, title: 'rentable there', providers: [1899], flatrate: [350] }),
-    row({ id: 3, title: 'elsewhere', providers: [8], flatrate: [8] })
+    row({ id: 1, title: 'subscribed', providers: [1899], included: [1899] }),
+    row({ id: 2, title: 'rentable there', providers: [1899], included: [350] }),
+    row({ id: 3, title: 'elsewhere', providers: [8], included: [8] })
   ]
 
   assert.deepEqual(titles(await listing(rows, { wp: '1899' })), ['subscribed'])

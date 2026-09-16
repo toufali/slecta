@@ -39,8 +39,8 @@ function matches(row, query, { window, certifications }) {
   if (without?.some(id => row.genreIds?.includes(id))) return false
   if (ratings && !ratings.includes(row.certification)) return false
 
-  // Only the flatrate bucket answers: a rental on a picked service is not subscribed-to
-  if (services && !row.flatrate?.some(id => services.includes(id))) return false
+  // Only what costs nothing extra answers: a rental on a picked service is not included
+  if (services && !row.included?.some(id => services.includes(id))) return false
 
   // The index is built at the catalogue's own vote floor, so an override can only narrow from there
   if (minVotes && !(row.votes >= minVotes)) return false
