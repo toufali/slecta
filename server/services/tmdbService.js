@@ -113,8 +113,7 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
-  // The picker offers top subscriptions, not TMDB's US list of 294 storefronts, channels and
-  // tiers. Labelled for readers rather than with TMDB's tier names ("Peacock Premium").
+  // Top subscriptions only, labelled for readers rather than with TMDB's tier names
   providers = new Map([
     [8, 'Netflix'],
     [9, 'Prime Video'],

@@ -53,8 +53,7 @@ async function list(ctx, media) {
 export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
 
-  // The saved services are a preference, not a request: a stale id is dropped, never a 400. The
-  // URL wins when it names its own, so a shared link renders the same list for everyone.
+  // A preference, not a request: a stale id drops silently, and a URL naming its own services wins
   if (!ctx.query.wp) {
     const saved = ctx.cookies.get('wp')?.split('|').filter(id => tmdb.filterRules(mediaType).providers?.has(+id))
 

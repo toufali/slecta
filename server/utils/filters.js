@@ -6,8 +6,7 @@
 // Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
 const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
 
-// Canonical digits only: `Number()` also takes `0x1b`, `1e2` and `08`, which pass an id lookup but
-// round-trip wrong — `08` filters the list while its box renders unchecked.
+// Canonical digits only: `Number()` also takes `0x1b`, `1e2` and `08`, which filter while rendering unchecked
 const isDigits = value => /^[1-9]\d*$/.test(value)
 
 const isGenre = (value, { genres }) => isDigits(value) && genres.has(+value)
