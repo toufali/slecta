@@ -78,19 +78,25 @@ const MAX_UNSCORED_RATE = { warn: 0.1, alert: 0.5 }
  */
 export async function checkRankedIndex() {
   const missing = []
+  const awaiting = []
   const unreadable = []
 
   for (const segment of ['movies', 'shows']) {
     const rows = await redis.getCache(indexKey(segment))
 
     if (rows === undefined) unreadable.push(segment)
-    else if (!rows) missing.push(segment)
+    else if (rows) continue
+    // A version bump deploys before any run publishes the new key. The previous generation proves
+    // the pipeline works, so this warns for the manual run rather than failing the deploy.
+    else if (await redis.getCache(`index/${segment}/v${INDEX_VERSION - 1}`)) awaiting.push(segment)
+    else missing.push(segment)
   }
 
   // Logged apart, since one says run the job and the other says fix Redis
   if (missing.length) log.error('Ranked list missing, run the scoring job', { missing, version: INDEX_VERSION })
+  if (awaiting.length) log.warn('Ranked list awaiting republish after a version bump, run the scoring job', { awaiting, version: INDEX_VERSION })
   if (unreadable.length) log.error('Ranked list could not be read', { unreadable, version: INDEX_VERSION })
-  if (!missing.length && !unreadable.length) log.info('Ranked list present', { version: INDEX_VERSION })
+  if (!missing.length && !unreadable.length && !awaiting.length) log.info('Ranked list present', { version: INDEX_VERSION })
 
   return { ok: !missing.length && !unreadable.length, missing, unreadable }
 }

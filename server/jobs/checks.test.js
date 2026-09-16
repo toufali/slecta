@@ -231,6 +231,12 @@ test('the checks fail whenever a ranked list cannot be served', async () => {
     redis.getCache = async () => [{ id: 1 }]
     assert.equal((await checkRankedIndex()).ok, true)
 
+    // A bump deploys before any run publishes the new key; the previous generation proves the
+    // pipeline works, so the deploy passes and the manual run is a warning away
+    const { INDEX_VERSION } = await import('../services/indexService.js')
+    redis.getCache = async key => key.endsWith(`v${INDEX_VERSION - 1}`) ? [{ id: 1 }] : null
+    assert.equal((await checkRankedIndex()).ok, true, 'awaiting a republish is not a failed deploy')
+
     // Elsewhere an outage must not read as absent data; here both mean the list will not serve, and
     // passing would let a flaky read hide a generation nobody published
     redis.getCache = async () => undefined
