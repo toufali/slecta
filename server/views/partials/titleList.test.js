@@ -104,7 +104,7 @@ test('each panel carries its own close button, and ships inert', () => {
 
 test('the services fieldset lists the curated providers and echoes the selection', () => {
   for (const data of [movie, tv]) {
-    assert.match(titleList(data()), /Streaming services:/)
+    assert.match(titleList(data()), /Streaming on:/)
     assert.doesNotMatch(titleList(data()), /Streaming now/)
     assert.match(titleList(data({ withProviders: ['8'] })), /name='wp' value='8' checked/)
     assert.doesNotMatch(titleList(data()), /name='wp' value='8' checked/)

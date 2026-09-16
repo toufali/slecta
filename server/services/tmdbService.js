@@ -113,32 +113,30 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
-  // The picker offers subscriptions, not TMDB's full provider list of storefronts and aggregators.
-  // Ids are curated; names come from the provider endpoint, since they drift (Max did).
-  providerSubscriptions = [
-    8, // Netflix
-    9, // Amazon Prime Video
-    337, // Disney+
-    1899, // Max
-    15, // Hulu
-    350, // Apple TV+
-    531, // Paramount+
-    386, // Peacock
-  ]
+  // The picker offers top subscriptions, not TMDB's US list of 294 storefronts, channels and
+  // tiers. Labelled for readers rather than with TMDB's tier names ("Peacock Premium").
+  providers = new Map([
+    [8, 'Netflix'],
+    [9, 'Prime Video'],
+    [337, 'Disney+'],
+    [1899, 'HBO Max'],
+    [15, 'Hulu'],
+    [350, 'Apple TV'],
+    [2303, 'Paramount+'], // the Premium tier carries the catalogue; Essential adds almost nothing
+    [386, 'Peacock'],
+  ])
   imgConfig
   genres = {}
   ratings
-  providers
 
   async init() {
-    const [imgConfig, genres, ratings, providers] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings(), this.#getProviders()])
+    const [imgConfig, genres, ratings] = await Promise.all([this.#getImgConfig(), this.#getGenres(), this.#getRatings()])
     this.imgConfig = imgConfig
     this.genres.all = genres.all
     this.genres.movie = genres.movie
     this.genres.show = genres.show
     this.ratings = ratings
-    this.providers = providers
-    console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings && this.providers))
+    console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
   }
 
@@ -220,32 +218,6 @@ class TmdbService {
       console.error("Error getting TMDB certifications (ratings):", e)
     }
     return ratings
-  }
-
-  async #getProviders() {
-    const url = `${TMDB_API_URL}/watch/providers/movie?language=${this.language}&watch_region=${this.region}`
-
-    let providers = await redis.getCache(url)
-    if (providers) return providers
-
-    try {
-      const res = await fetch(url, { headers })
-
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-
-      const { results } = await res.json()
-      const names = new Map(results.map(item => [item.provider_id, item.provider_name]))
-
-      providers = new Map(this.providerSubscriptions
-        .filter(id => names.has(id))
-        .map(id => [id, names.get(id)]))
-
-      redis.setCache(url, providers, 60 * 60 * 24)
-    } catch (e) {
-      console.error("Error getting TMDB providers:", e)
-    }
-    // Empty rather than undefined, so a provider outage costs the picker, not every list page
-    return providers ?? new Map()
   }
 
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media

@@ -129,7 +129,7 @@ export const titleList = data => {
       </label>
     </fieldset>
     <fieldset>
-      <h3>Streaming services:</h3>
+      <h3>Streaming on:</h3>
       ${providerFields(data)}
     </fieldset>
     <fieldset>
