@@ -1,5 +1,7 @@
 import { monthsText } from '../utils/months.js'
 import { genreText } from '../utils/genres.js'
+import { debounce } from '../utils/time.js'
+import { runSearch } from '../utils/search.js'
 
 const list = document.querySelector('.title-list')
 const listDescription = document.querySelector('.list-description')
@@ -10,6 +12,11 @@ const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
 const more = document.querySelector('.more')
 const panelClose = document.querySelector('.filter-panel .close')
+const searchPanel = document.querySelector('.search-panel')
+const searchBtn = document.querySelector('.list-actions .search')
+const searchInput = searchPanel.querySelector('input[type="search"]')
+const searchClose = searchPanel.querySelector('.close')
+const resultList = searchPanel.querySelector('.result-list')
 
 const segment = new URL(filterForm.action).pathname.split('/').pop()
 const { noun, dated } = {
@@ -26,12 +33,67 @@ export default function init() {
   lookback.addEventListener('input', handleLookback)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', handlePanel)
+  searchBtn.addEventListener('click', handleSearch)
+  searchClose.addEventListener('click', handleSearch)
+  // Keep this half synchronous: the URL must land on the overlay's entry before a quick close traverses away
+  searchInput.addEventListener('input', handleSearchInput)
+  searchInput.addEventListener('input', debounce(() => runSearch(searchInput, resultList)))
   window.addEventListener('popstate', handlePopstate)
 
-  // A reload restores the pushed entry, but the panel ships closed
+  // A reload restores the pushed entry, but the panels ship closed
   if (history.state?.filterPanel) togglePanel()
 
+  const title = new URLSearchParams(location.search).get('title')
+  if (title || history.state?.searchPanel) restoreSearch(title)
+
   renderScores()
+}
+
+// A typed or shared URL arrives without the overlay's entry; synthesise one so close lands on the list
+function restoreSearch(title) {
+  if (!history.state?.searchPanel) {
+    const entry = location.href
+    const base = new URL(location)
+
+    base.searchParams.delete('title')
+    history.replaceState(null, '', base)
+    history.pushState({ searchPanel: true }, '', entry)
+  }
+
+  togglePanel(searchPanel, searchBtn)
+
+  if (title) {
+    searchInput.value = title
+    handleSearchInput()
+    runSearch(searchInput, resultList)
+  }
+}
+
+function handleSearch(e) {
+  e.preventDefault()
+  togglePanel(searchPanel, searchBtn)
+
+  if (searchPanel.inert) history.back()
+  else {
+    history.pushState({ searchPanel: true }, '')
+    // Re-sync a retained query onto the fresh entry, so a later restore matches what is shown
+    if (searchInput.value) {
+      handleSearchInput()
+      runSearch(searchInput, resultList)
+    }
+    searchInput.focus()
+  }
+}
+
+// The query rides the pushed entry's URL, so back from a tapped result can restore this search
+function handleSearchInput() {
+  const url = new URL(location)
+
+  resultList.classList.add('loading')
+
+  if (searchInput.value) url.searchParams.set('title', searchInput.value)
+  else url.searchParams.delete('title')
+  history.replaceState(history.state, '', url)
 }
 
 function handleDescription(e) {
@@ -46,9 +108,20 @@ function handlePanel() {
   else history.pushState({ filterPanel: true }, '')
 }
 
-// Match the entry being traversed to, so Forward reopens the panel and Back closes it
+// Match the entry being traversed to, so Forward reopens a panel and Back closes it
 function handlePopstate(e) {
   if (Boolean(e.state?.filterPanel) === filterPanel.inert) togglePanel()
+  if (Boolean(e.state?.searchPanel) === searchPanel.inert) togglePanel(searchPanel, searchBtn)
+
+  // Retained DOM does not survive a reload; the entry's URL is the truth
+  if (e.state?.searchPanel) {
+    const title = new URLSearchParams(location.search).get('title') ?? ''
+
+    if (searchInput.value !== title) {
+      searchInput.value = title
+      runSearch(searchInput, resultList)
+    }
+  }
 }
 
 function handleLookback() {
@@ -56,11 +129,11 @@ function handleLookback() {
   lookback.ariaValueText = lookbackOutput.textContent
 }
 
-function togglePanel() {
-  if (filterPanel.contains(document.activeElement)) filterBtn.focus()
+function togglePanel(panel = filterPanel, btn = filterBtn) {
+  if (panel.contains(document.activeElement)) btn.focus()
 
-  filterPanel.inert = !filterPanel.inert
-  filterPanel.scroll(0, 0)
+  panel.inert = !panel.inert
+  panel.scroll(0, 0)
 }
 
 async function handleMore(e) {

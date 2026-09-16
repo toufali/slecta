@@ -1,16 +1,12 @@
-[data-partial="searchList"] search{
+search{
   display: flex;
   flex-direction: column;
   gap: var(--padding-md);
-  background: linear-gradient(45deg, var(--blue-30), var(--blue-10));
-  margin-bottom: var(--padding-md);
-  padding: var(--padding-lg) var(--padding-md);
-  border-radius: var(--border-radius);
-  box-shadow: 3px 3px 12px -3px black;
+  padding: var(--padding-md);
   align-items: center;
 }
 
-[data-partial="searchList"] h1 {
+search h1 {
   font: var(--h3-font);
   color: var(--blue-90);
   margin: 0;
@@ -89,6 +85,19 @@
   display: none;
 }
 
+/* minlength marks empty and one-char input invalid: no search ran */
+search:has(input:invalid) ~ .no-results{
+  display: none;
+}
+
+/* An in-flight or failed request is not "no results" either */
+.result-list.loading ~ .no-results{
+  display: none;
+}
+
 .no-results{
   padding: var(--padding-md);
+  text-align: center;
+  opacity: 0;
+  animation: fade-in .3s forwards;
 }
