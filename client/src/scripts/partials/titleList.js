@@ -35,9 +35,10 @@ export default function init() {
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
   searchClose.addEventListener('click', handleSearch)
-  // Marked at the keystroke, not at the debounced fetch, so the gap between them is not "no results"
-  searchInput.addEventListener('input', () => resultList.classList.add('loading'))
-  searchInput.addEventListener('input', debounce(handleSearchInput))
+  // Synchronous at the keystroke: the loading mark covers the debounce gap, and the URL lands on
+  // the overlay's own entry before a quick close can traverse away from it
+  searchInput.addEventListener('input', handleSearchInput)
+  searchInput.addEventListener('input', debounce(() => runSearch(searchInput, resultList)))
   window.addEventListener('popstate', handlePopstate)
 
   // A reload restores the pushed entry, but the panels ship closed
@@ -66,6 +67,7 @@ function restoreSearch(title) {
   if (title) {
     searchInput.value = title
     handleSearchInput()
+    runSearch(searchInput, resultList)
   }
 }
 
@@ -77,7 +79,10 @@ function handleSearch(e) {
   else {
     history.pushState({ searchPanel: true }, '')
     // A retained query re-syncs the fresh entry's URL, so a later restore matches what is shown
-    if (searchInput.value) handleSearchInput()
+    if (searchInput.value) {
+      handleSearchInput()
+      runSearch(searchInput, resultList)
+    }
     searchInput.focus()
   }
 }
@@ -86,11 +91,11 @@ function handleSearch(e) {
 function handleSearchInput() {
   const url = new URL(location)
 
+  resultList.classList.add('loading')
+
   if (searchInput.value) url.searchParams.set('title', searchInput.value)
   else url.searchParams.delete('title')
   history.replaceState(history.state, '', url)
-
-  runSearch(searchInput, resultList)
 }
 
 function handleDescription(e) {
