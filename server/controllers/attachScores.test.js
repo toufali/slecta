@@ -49,6 +49,7 @@ test('the segment reaches the key', async () => {
 })
 
 // A miss reads as null and a Redis outage as undefined. Neither may leave a `score` key behind:
+// only a present record with no aggregate is a completed answer, and it says so without a score.
 // the badge renders a placeholder for an absent score and the string "undefined" for a present one.
 test('a title with no cached score keeps no score key at all', async () => {
   // A record no source could score is present and truthy, and still has no aggregate
@@ -57,7 +58,7 @@ test('a title with no cached score keeps no score key at all', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1 }, { id: 2 }, { id: 3 }])
+  assert.deepEqual(items, [{ id: 1 }, { id: 2 }, { id: 3, noScore: true }])
 })
 
 // Settled rather than all: one unreadable record must not reject the whole list

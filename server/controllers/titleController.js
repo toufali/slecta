@@ -83,6 +83,7 @@ export const showDetail = mediaType => async ctx => {
 
   data.score = aggregate(score)
   data.lowConfidence = lowConfidence(score)
+  data.noScore = Boolean(score) && data.score === undefined
   data.quotes = quotes
 
   if (data.cacheHit) ctx.set('x-server-cache-hit', 'true')

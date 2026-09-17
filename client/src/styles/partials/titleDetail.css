@@ -89,19 +89,22 @@ score-badge{
 }
 
 /* Switcher: shares the facts row when wide, stacks to its own line when narrow */
-.details .low-confidence {
+.details .low-confidence,
+.details .no-score {
   flex-grow: 1;
   flex-basis: calc((40rem - 100%) * 999);
   font: var(--small-font);
   color: var(--gray-70);
 }
 
-.details .low-confidence::before {
+.details .low-confidence::before,
+.details .no-score::before {
   content: none;
 }
 
 @container (min-width: 40rem) {
-  .details .low-confidence {
+  .details .low-confidence,
+.details .no-score {
     text-align: right;
   }
 }
