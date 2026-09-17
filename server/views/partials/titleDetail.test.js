@@ -107,9 +107,15 @@ test('providers group by cost, and rent-or-buy is curated to the top storefronts
 })
 
 test('a title with no provider in either group falls back, with no group headers', () => {
+  // Available only on an uncurated service reads the same as unavailable, by decision
+  const uncurated = titleDetail(data({ providers: [{ provider_id: 34, provider_name: 'MGM Plus', logoUrl: '/m.png' }], included: [34] }))
+
+  assert.match(uncurated, /Not yet on major streaming services/)
+  assert.doesNotMatch(uncurated, /MGM/)
+
   const rendered = titleDetail(data({ providers: [], included: [] }))
 
-  assert.match(rendered, /Not yet available/)
+  assert.match(rendered, /Not yet on major streaming services/)
   assert.doesNotMatch(rendered, /Included with:|Rent or buy:/)
 })
 

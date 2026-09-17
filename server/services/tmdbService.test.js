@@ -459,7 +459,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
           flatrate: [
             { provider_id: 1825, provider_name: 'HBO Max Amazon Channel', logo_path: '/channel.png' },
             { provider_id: 1899, provider_name: 'HBO Max', logo_path: '/x.png' },
-            // Outside the alias map, "Plus" and "+" must read as one brand
+            // Uncurated ids pass through for the index; the detail view allow-lists what displays
             { provider_id: 583, provider_name: 'MGM+ Amazon Channel', logo_path: '/mgmc.png' },
             { provider_id: 635, provider_name: 'MGM Plus Roku Premium Channel', logo_path: '/mgmr.png' },
             { provider_id: 34, provider_name: 'MGM Plus', logo_path: '/mgm.png' }
@@ -478,7 +478,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
   const detail = await tmdb.getMovieDetail(13)
 
   assert.deepEqual(detail.included, [1899, 583, 635, 34, 8, 257])
-  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 34, 257, 350, 1899].sort())
+  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 34, 257, 350, 583, 635, 1899].sort())
   // The plain name, not the variant's
   assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')
   assert.match(detail.providers.find(item => item.provider_id === 1899).logoUrl, /\/x\.png$/)
