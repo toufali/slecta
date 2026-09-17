@@ -119,7 +119,14 @@ export async function checkProviderMaps() {
   let total = 0
 
   for (const segment of ['movies', 'shows']) {
-    const rows = await redis.getCache(indexKey(segment)) ?? []
+    const rows = await redis.getCache(indexKey(segment))
+
+    // No judgement without both published lists: an unavailable one would read as every curated
+    // id dead, and a lone one skews the drift denominator
+    if (!rows?.length) {
+      log.warn('Provider maps unchecked, a ranked list is unavailable', { segment })
+      return { deadIds: [], drifting: [] }
+    }
 
     total += rows.length
     for (const row of rows) {

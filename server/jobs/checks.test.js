@@ -397,6 +397,10 @@ test('the provider maps are held against what the run published', async () => {
     // The split-surface case: an untracked id lands on most titles at once
     redis.getCache = async () => healthyRows.map(row => ({ ...row, providers: [...row.providers, 9999] }))
     assert.deepEqual((await checkProviderMaps()).drifting, [9999])
+
+    // An unavailable list is no judgement on the maps
+    redis.getCache = async key => key.includes('movies') ? healthyRows : undefined
+    assert.deepEqual(await checkProviderMaps(), { deadIds: [], drifting: [] })
   } finally {
     redis.getCache = real
   }
