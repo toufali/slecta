@@ -455,7 +455,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
     'watch/providers': {
       results: {
         US: {
-          // The channel variant listed first: the service's own entry must still front the logo
+          // The channel variant listed first: the service's own logo must still win
           flatrate: [{ provider_id: 1825, logo_path: '/channel.png' }, { provider_id: 1899, logo_path: '/x.png' }],
           ads: [{ provider_id: 1796, logo_path: '/w.png' }], // Netflix Standard with Ads reads as Netflix
           rent: [{ provider_id: 350, logo_path: '/y.png' }],
@@ -469,7 +469,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
 
   assert.deepEqual(detail.included, [1899, 8])
   assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 350, 1899].sort())
-  // The canonical id carries the reader-facing name, not the variant's
+  // The plain name, not the variant's
   assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')
   assert.match(detail.providers.find(item => item.provider_id === 1899).logoUrl, /\/x\.png$/)
 

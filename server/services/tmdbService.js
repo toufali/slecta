@@ -113,7 +113,7 @@ class TmdbService {
   providerHidden = [
     3, // Google Play Movies
   ]
-  // Top subscriptions only, labelled for readers rather than with TMDB's tier names
+  // Top subscriptions only, with plain names instead of TMDB's tier names like "Peacock Premium"
   providers = new Map([
     [8, 'Netflix'],
     [9, 'Prime Video'],
@@ -124,7 +124,7 @@ class TmdbService {
     [2303, 'Paramount+'],
     [386, 'Peacock'],
   ])
-  // Plan tiers and resale channels collapse to the service a reader would name
+  // Ad plans and channel-store listings ("HBO Max Amazon Channel") count as the service itself
   providerAlias = new Map([
     [175, 8], // Netflix Kids
     [1796, 8], // Netflix Standard with Ads
@@ -439,8 +439,8 @@ class TmdbService {
     const json = await res.json()
     let providers = json['watch/providers'].results[this.region]
 
-    // Kept apart from the flattened list below, which mixes rent and buy into "available":
-    // canonical ids of every service the title costs nothing extra on
+    // The services where watching costs nothing extra, kept apart from the full list below,
+    // which also holds rent and buy
     const included = [...new Set(['flatrate', 'free', 'ads']
       .flatMap(bucket => providers?.[bucket] ?? [])
       .map(item => this.canonicalProvider(item.provider_id)))]
@@ -452,13 +452,12 @@ class TmdbService {
 
       providers = Object.values(providers)
         .flat()
-        // Parents before variants, so a resale channel's artwork never fronts the service
+        // A service's own entry first, so its logo wins over a channel-store variant's
         .sort((a, b) => thisClass.providerAlias.has(a.provider_id) - thisClass.providerAlias.has(b.provider_id))
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
-          // The canonical id takes its reader-facing name too, or a variant-only title would
-          // surface "Netflix Standard with Ads" under Netflix's id
+          // Rename too, or a title only on the ad plan would still read "Netflix Standard with Ads"
           item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
           if (this.has(item.provider_id)) return // already in set
           if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
