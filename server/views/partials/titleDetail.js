@@ -1,5 +1,6 @@
 import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
 import { reviewQuote } from '../../../client/src/scripts/components/reviewQuote.js'
+import tmdb from '../../services/tmdbService.js'
 
 function ytTrailer(id) {
   if (!id) return ''
@@ -19,21 +20,12 @@ function ytTrailer(id) {
   `
 }
 
-// Rent and buy listings are curated to the top storefronts; every mainstream rentable title is on
-// these, so the withheld tail costs nothing
-const STOREFRONTS = new Set([
-  10, // Amazon Video
-  2, // Apple TV Store
-  7, // Fandango at Home
-  192, // YouTube
-])
-
 const providerList = items =>
   `<ul>${items.map(item => `<li><img src='${item.logoUrl}' alt='${item.provider_name} logo'> <span>${item.provider_name}</span></li>`).join('')}</ul>`
 
 function providers(data) {
   const included = data.providers?.filter(item => data.included?.includes(item.provider_id)) ?? []
-  const rentBuy = data.providers?.filter(item => !data.included?.includes(item.provider_id) && STOREFRONTS.has(item.provider_id)) ?? []
+  const rentBuy = data.providers?.filter(item => !data.included?.includes(item.provider_id) && tmdb.storefronts.has(item.provider_id)) ?? []
 
   if (!included.length && !rentBuy.length) return '<p>No providers found</p>'
 

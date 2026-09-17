@@ -102,6 +102,7 @@ export const getList = mediaType => async ctx => {
 
   data.allGenres = Array.from(data.allGenres.entries()) // can't send type Map via JSON :(
   data.allProviders = Array.from(data.allProviders.entries())
+  data.allStorefronts = Array.from(data.allStorefronts.entries())
 
   ctx.set('Cache-Control', CACHE_CONTROL)
 

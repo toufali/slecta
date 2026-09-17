@@ -39,8 +39,9 @@ function matches(row, query, { window, certifications }) {
   if (without?.some(id => row.genreIds?.includes(id))) return false
   if (ratings && !ratings.includes(row.certification)) return false
 
-  // Matches only services where the title costs nothing extra — rentable there does not count
-  if (services && !row.included?.some(id => services.includes(id))) return false
+  // A subscription pick matches only where the title costs nothing extra; a storefront pick
+  // matches any availability there, which for a storefront is rent or buy
+  if (services && !services.some(id => row.included?.includes(id) || (tmdb.storefronts.has(id) && row.providers?.includes(id)))) return false
 
   // The index is built at the catalogue's own vote floor, so an override can only narrow from there
   if (minVotes && !(row.votes >= minVotes)) return false

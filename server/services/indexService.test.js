@@ -335,3 +335,12 @@ test('a re-rank stores nothing when there is nothing to move', async () => {
 
   assert.deepEqual(written, [])
 })
+
+test('a storefront pick matches any availability there', async () => {
+  const rows = [
+    row({ id: 1, title: 'rentable', providers: [7], included: [] }),
+    row({ id: 2, title: 'other storefront', providers: [10], included: [] })
+  ]
+
+  assert.deepEqual(titles(await listing(rows, { wp: '7' })), ['rentable'])
+})
