@@ -34,8 +34,7 @@ export const ENGLISH = 'en'
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
-// The alias map only knows the picker's services; every other brand ("MGM Plus", "MGM+ Amazon
-// Channel", "MGM Plus Roku Premium Channel") still listed each resale channel as its own provider
+// Brands outside the alias map still listed every resale channel and ad plan as its own provider
 const VARIANT_SUFFIX = /\s+((amazon|apple tv|roku premium) channel|(standard )?with ads)$/i
 const brandName = name => name.toLowerCase().replace(VARIANT_SUFFIX, '').replace(/\s*\bplus\b/, '+').trim()
 
@@ -117,7 +116,7 @@ class TmdbService {
   ]
   providerHidden = [
     3, // Google Play Movies
-    // Live-TV bundles: carriage of cable channels, not a destination a reader would seek a title on
+    // Live-TV bundles resell cable channels rather than carry titles
     257, // fuboTV
     2383, // Philo
     2528, // YouTube TV
@@ -481,7 +480,7 @@ class TmdbService {
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
           // Rename too, or a title only on the ad plan would still read "Netflix Standard with Ads"
           item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
-          if (this.has(brandName(item.provider_name))) return // the brand is already listed
+          if (this.has(brandName(item.provider_name))) return
           if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
           item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path

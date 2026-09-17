@@ -459,7 +459,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
           flatrate: [
             { provider_id: 1825, provider_name: 'HBO Max Amazon Channel', logo_path: '/channel.png' },
             { provider_id: 1899, provider_name: 'HBO Max', logo_path: '/x.png' },
-            // A brand outside the alias map dedupes by name, "Plus" and "+" reading as one brand
+            // Outside the alias map, "Plus" and "+" must read as one brand
             { provider_id: 583, provider_name: 'MGM+ Amazon Channel', logo_path: '/mgmc.png' },
             { provider_id: 635, provider_name: 'MGM Plus Roku Premium Channel', logo_path: '/mgmr.png' },
             { provider_id: 34, provider_name: 'MGM Plus', logo_path: '/mgm.png' }
