@@ -77,6 +77,10 @@ h1 {
   border-bottom: 2px solid var(--blue-10);
   padding-bottom: var(--padding-sm);
   margin: 0 0 var(--padding-sm);
+}
+
+/* Clearance for the badge floating over the corner, only while one is there */
+header:has(score-badge) h1 {
   padding-right: 100px;
 }
 
