@@ -19,14 +19,26 @@ function ytTrailer(id) {
   `
 }
 
-function providers(items) {
-  if (!items) return 'No providers found'
+// Rent and buy listings are curated to the top storefronts; every mainstream rentable title is on
+// these, so the withheld tail costs nothing
+const STOREFRONTS = new Set([
+  10, // Amazon Video
+  2, // Apple TV Store
+  7, // Fandango at Home
+  192, // YouTube
+])
 
-  const limit = 6
+const providerList = items =>
+  `<ul>${items.map(item => `<li><img src='${item.logoUrl}' alt='${item.provider_name} logo'> <span>${item.provider_name}</span></li>`).join('')}</ul>`
 
-  return items.map(item => `<li><img src='${item.logoUrl}' alt='${item.provider_name} logo'> <span>${item.provider_name}</span></li>`)
-    .slice(0, limit)
-    .join('')
+function providers(data) {
+  const included = data.providers?.filter(item => data.included?.includes(item.provider_id)) ?? []
+  const rentBuy = data.providers?.filter(item => !data.included?.includes(item.provider_id) && STOREFRONTS.has(item.provider_id)) ?? []
+
+  if (!included.length && !rentBuy.length) return '<p>No providers found</p>'
+
+  return `${included.length ? `<p><label>Included with:</label></p>${providerList(included)}` : ''}
+    ${rentBuy.length ? `<p><label>Rent or buy:</label></p>${providerList(rentBuy)}` : ''}`
 }
 
 export const titleDetail = data => `
@@ -51,8 +63,7 @@ export const titleDetail = data => `
   ${!data.runtime ? '' : `<p><label>Running time:</label><span>${data.runtime} min</span></p>`}
   <p><label>Language:</label><span>${data.language}</span></p>
   <div class='providers'>
-    <p><label>Available on:</label></p>
-    <ul>${providers(data.providers)}</ul>
+    ${providers(data)}
   </div>
 </article>
 `

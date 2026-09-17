@@ -154,16 +154,18 @@ p:has(span:empty) {
   overflow: hidden;
 }
 
-.providers > p {
-  display: inline-block;
+.providers {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--padding-sm) var(--padding-md);
+  align-items: baseline;
 }
 
 .providers ul {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   gap: var(--padding-md);
   list-style: none;
-  margin-top: var(--padding-sm);
 }
 
 .providers li {
