@@ -114,6 +114,7 @@ class TmdbService {
     188, // YouTube Premium
     207, // Roku Channel    
   ]
+  // Applied at display, never here at ingestion: index rows need the complete availability
   providerHidden = [
     3, // Google Play Movies
     // Live-TV bundles resell cable channels rather than carry titles
@@ -481,7 +482,6 @@ class TmdbService {
           // Rename too, or a title only on the ad plan would still read "Netflix Standard with Ads"
           item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
           if (this.has(brandName(item.provider_name))) return
-          if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
           item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
           this.add(brandName(item.provider_name))
