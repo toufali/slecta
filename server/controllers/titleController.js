@@ -53,7 +53,7 @@ async function list(ctx, media) {
 export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
 
-  // Saved services fill in only when the URL names none, and an id that no longer exists is ignored, not a 400
+  // The cookie never overrides an explicit URL, and a dead cookie id degrades instead of erroring
   if (!ctx.query.wp) {
     const saved = ctx.cookies.get('wp')?.split('|').filter(id => tmdb.filterRules(mediaType).providers?.has(+id))
 
