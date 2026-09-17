@@ -452,6 +452,8 @@ class TmdbService {
 
       providers = Object.values(providers)
         .flat()
+        // Parents before variants, so a resale channel's artwork never fronts the service
+        .sort((a, b) => thisClass.providerAlias.has(a.provider_id) - thisClass.providerAlias.has(b.provider_id))
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
