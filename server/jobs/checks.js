@@ -68,13 +68,10 @@ const MAX_FAILED_RATE = { warn: 0.1, alert: 0.5 }
 const MAX_UNSCORED_RATE = { warn: 0.1, alert: 0.5 }
 
 /**
- * Whether a ranked list can be served. Run at deploy, so a list nobody published fails the build
- * rather than leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
- *
- * One state passes without a servable list: a version bump deploys before the run that publishes
- * the new key. The previous generation shows the pipeline works, so that logs a warning naming
- * the manual run instead of failing the deploy. An unreadable Redis still fails: passing on an
- * outage would let a flaky read hide a list nobody published.
+ * Run at deploy: an unpublished ranked list should fail the build, not 503 Top Rated until someone
+ * notices. Exception: right after a version bump the new key cannot exist yet, so a present
+ * previous generation passes with a warning. An unreadable Redis still fails — passing on an
+ * outage could hide a list nobody published.
  * @return {{ok: boolean, missing: string[], unreadable: string[]}}
  */
 export async function checkRankedIndex() {
