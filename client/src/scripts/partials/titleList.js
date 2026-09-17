@@ -250,11 +250,18 @@ async function renderScores(cards = document.querySelectorAll('title-card')) {
   for (const card of cards) {
     const scoreBadge = card.shadowRoot.querySelector('score-badge')
 
-    if (scoreBadge.score === undefined) {
+    // Absent when the record already answered "no score"
+    if (scoreBadge && scoreBadge.score === undefined) {
       scoreBadge.classList.add('loading')
 
       try {
         const score = await fetch(`/api/v1/${segment}/${card.id}/score`).then(res => res.json())
+
+        // An answered fetch with no aggregate is the answer; unanswered keeps the retry hook
+        if (score.avgScore === undefined && score.answered) {
+          scoreBadge.remove()
+          continue
+        }
 
         scoreBadge.lowConfidence = score.lowConfidence
         scoreBadge.score = score.avgScore

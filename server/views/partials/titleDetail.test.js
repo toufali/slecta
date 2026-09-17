@@ -112,3 +112,20 @@ test('a title with no provider in either group falls back, with no group headers
   assert.match(rendered, /Not yet available/)
   assert.doesNotMatch(rendered, /Included with:|Rent or buy:/)
 })
+
+test('a completed no-score answer drops the badge and says No score yet', () => {
+  const answered = titleDetail(data({ noScore: true }))
+  const waiting = titleDetail(data())
+
+  assert.doesNotMatch(answered, /<score-badge/)
+  assert.match(answered, /<li class='no-score'>No score yet\.<\/li>/)
+  assert.match(waiting, /<score-badge/)
+  assert.match(waiting, /<li class='no-score' hidden>/)
+})
+
+test('a card with a completed no-score answer renders no badge', () => {
+  const row = { id: 1, title: 'A Film', genres: [], releaseDate: '2026-01-01', posterThumb: '', detailPath: '/movies/1' }
+
+  assert.doesNotMatch(titleCard({ ...row, noScore: true }), /<score-badge/)
+  assert.match(titleCard(row), /<score-badge/)
+})

@@ -12,7 +12,8 @@ const segment = location.pathname.split('/')[1]
 
 export default async function init() {
   if (trailer) playBtn.addEventListener('click', playTrailer)
-  if (scoreBadge.score === undefined) getScore()
+  // Absent when the record already answered "no score"
+  if (scoreBadge && scoreBadge.score === undefined) getScore()
   if (!quotes.childElementCount) getQuotes()
 }
 
@@ -27,6 +28,13 @@ async function getScore() {
   scoreBadge.classList.add('loading')
 
   const score = await fetch(`/api/v1/${segment}/${article.id}/score`).then(res => res.json())
+
+  // An answered fetch with no aggregate is the answer; unanswered keeps the retry hook
+  if (score.avgScore === undefined && score.answered) {
+    scoreBadge.remove()
+    document.querySelector('.no-score').hidden = false
+    return
+  }
 
   // The line ships hidden rather than absent, so a badge filled in here can explain itself too
   document.querySelector('.low-confidence').hidden = !score.lowConfidence
