@@ -455,7 +455,7 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
     'watch/providers': {
       results: {
         US: {
-          // Channel variants listed first: the service's own name and logo must still win
+          // Variants deliberately listed before their services
           flatrate: [
             { provider_id: 1825, provider_name: 'HBO Max Amazon Channel', logo_path: '/channel.png' },
             { provider_id: 1899, provider_name: 'HBO Max', logo_path: '/x.png' },
@@ -478,7 +478,6 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
   const detail = await tmdb.getMovieDetail(13)
 
   assert.deepEqual(detail.included, [1899, 583, 635, 34, 8, 257])
-  // fuboTV stays: hiding happens at display, and the index rows need the complete availability
   assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 34, 257, 350, 1899].sort())
   // The plain name, not the variant's
   assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')

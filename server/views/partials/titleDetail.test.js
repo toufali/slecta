@@ -103,7 +103,6 @@ test('providers group by cost, and rent-or-buy is curated to the top storefronts
 
   assert.match(rendered, /Included with:<\/label><\/p><ul><li><img src='\/n\.png'/)
   assert.match(rendered, /Rent or buy:<\/label><\/p><ul><li><img src='\/a\.png'/)
-  // Uncurated storefronts and live-TV bundles are display-hidden
   assert.doesNotMatch(rendered, /Microsoft|fubo/)
 })
 
