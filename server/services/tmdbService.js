@@ -34,6 +34,10 @@ export const ENGLISH = 'en'
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
+// Brands outside the alias map still listed every resale channel and ad plan as its own provider
+const VARIANT_SUFFIX = /\s+((amazon|apple tv|roku premium) channel|(standard )?with ads)$/i
+const brandName = name => name.toLowerCase().replace(VARIANT_SUFFIX, '').replace(/\s*\bplus\b/, '+').trim()
+
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -110,8 +114,15 @@ class TmdbService {
     188, // YouTube Premium
     207, // Roku Channel    
   ]
+  // Applied at display, never here at ingestion: index rows need the complete availability
   providerHidden = [
     3, // Google Play Movies
+    // Live-TV bundles resell cable channels rather than carry titles
+    257, // fuboTV
+    2383, // Philo
+    2528, // YouTube TV
+    299, // Sling TV Orange and Blue
+    486, // Spectrum On Demand
   ]
   // Top subscriptions only, with plain names instead of TMDB's tier names like "Peacock Premium"
   providers = new Map([
@@ -463,18 +474,17 @@ class TmdbService {
 
       providers = Object.values(providers)
         .flat()
-        // A service's own entry first, so its logo wins over a channel-store variant's
-        .sort((a, b) => thisClass.providerAlias.has(a.provider_id) - thisClass.providerAlias.has(b.provider_id))
+        // A service's own entry first, so its name and logo win over a resale channel's
+        .sort((a, b) => (thisClass.providerAlias.has(a.provider_id) || VARIANT_SUFFIX.test(a.provider_name)) - (thisClass.providerAlias.has(b.provider_id) || VARIANT_SUFFIX.test(b.provider_name)))
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
           // Rename too, or a title only on the ad plan would still read "Netflix Standard with Ads"
           item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
-          if (this.has(item.provider_id)) return // already in set
-          if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
+          if (this.has(brandName(item.provider_name))) return
 
           item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
-          this.add(item.provider_id)
+          this.add(brandName(item.provider_name))
           return true
         }, new Set())
         .sort((a, b) => {

@@ -24,10 +24,11 @@ const providerList = items =>
   `<ul>${items.map(item => `<li><img src='${item.logoUrl}' alt='${item.provider_name} logo'> <span>${item.provider_name}</span></li>`).join('')}</ul>`
 
 function providers(data) {
-  const included = data.providers?.filter(item => data.included?.includes(item.provider_id)) ?? []
-  const rentBuy = data.providers?.filter(item => !data.included?.includes(item.provider_id) && tmdb.storefronts.has(item.provider_id)) ?? []
+  const visible = data.providers?.filter(item => !tmdb.providerHidden.includes(item.provider_id)) ?? []
+  const included = visible.filter(item => data.included?.includes(item.provider_id))
+  const rentBuy = visible.filter(item => !data.included?.includes(item.provider_id) && tmdb.storefronts.has(item.provider_id))
 
-  if (!included.length && !rentBuy.length) return '<p>No providers found</p>'
+  if (!included.length && !rentBuy.length) return '<p>Not yet available to stream, rent, or buy</p>'
 
   return `${included.length ? `<p><label>Included with:</label></p>${providerList(included)}` : ''}
     ${rentBuy.length ? `<p><label>Rent or buy:</label></p>${providerList(rentBuy)}` : ''}`

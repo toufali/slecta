@@ -96,16 +96,19 @@ test('providers group by cost, and rent-or-buy is curated to the top storefronts
     providers: [
       { provider_id: 8, provider_name: 'Netflix', logoUrl: '/n.png' },
       { provider_id: 10, provider_name: 'Amazon Video', logoUrl: '/a.png' },
-      { provider_id: 68, provider_name: 'Microsoft Store', logoUrl: '/m.png' }
+      { provider_id: 68, provider_name: 'Microsoft Store', logoUrl: '/m.png' },
+      { provider_id: 257, provider_name: 'fuboTV', logoUrl: '/f.png' }
     ]
   }))
 
   assert.match(rendered, /Included with:<\/label><\/p><ul><li><img src='\/n\.png'/)
   assert.match(rendered, /Rent or buy:<\/label><\/p><ul><li><img src='\/a\.png'/)
-  assert.doesNotMatch(rendered, /Microsoft/)
+  assert.doesNotMatch(rendered, /Microsoft|fubo/)
 })
 
-test('a title with no provider in either group says so', () => {
-  assert.match(titleDetail(data({ providers: [], included: [] })), /No providers found/)
-  assert.doesNotMatch(titleDetail(data({ providers: [], included: [] })), /Included with:|Rent or buy:/)
+test('a title with no provider in either group falls back, with no group headers', () => {
+  const rendered = titleDetail(data({ providers: [], included: [] }))
+
+  assert.match(rendered, /Not yet available/)
+  assert.doesNotMatch(rendered, /Included with:|Rent or buy:/)
 })
