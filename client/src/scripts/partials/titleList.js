@@ -257,8 +257,8 @@ async function renderScores(cards = document.querySelectorAll('title-card')) {
       try {
         const score = await fetch(`/api/v1/${segment}/${card.id}/score`).then(res => res.json())
 
-        // A completed fetch with no aggregate is the answer, not a wait
-        if (score.avgScore === undefined) {
+        // An answered fetch with no aggregate is the answer; unanswered keeps the retry hook
+        if (score.avgScore === undefined && score.answered) {
           scoreBadge.remove()
           continue
         }

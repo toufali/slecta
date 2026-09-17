@@ -29,8 +29,8 @@ async function getScore() {
 
   const score = await fetch(`/api/v1/${segment}/${article.id}/score`).then(res => res.json())
 
-  // A completed fetch with no aggregate is the answer, not a wait
-  if (score.avgScore === undefined) {
+  // An answered fetch with no aggregate is the answer; unanswered keeps the retry hook
+  if (score.avgScore === undefined && score.answered) {
     scoreBadge.remove()
     document.querySelector('.no-score').hidden = false
     return

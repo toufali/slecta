@@ -14,8 +14,8 @@ export async function attachScores(items, segment) {
     if (value !== undefined) {
       items[i].score = value
       items[i].lowConfidence = lowConfidence(score.value)
-    } else if (score.value) {
-      // A record with no usable aggregate is a completed answer; no record means not asked yet
+    } else if (score.value?.answered) {
+      // Only a record every source answered is a completed no-score; a retry record keeps the badge
       items[i].noScore = true
     }
   })

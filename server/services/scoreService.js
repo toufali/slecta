@@ -256,7 +256,8 @@ class ScoreService {
     // A thinner result is a bad night only while a source we lost could not be read. Once one
     // answers, it is the world that changed and the record has to follow.
     const guarded = lost.some(source => outcomes[source] === UNREACHABLE)
-    const candidate = { ...score, fetchedAt: Date.now() }
+    // `answered` persists: a reader must tell a settled empty record from one awaiting its retry
+    const candidate = { ...score, answered, fetchedAt: Date.now() }
 
     // Conditional when guarded, so a live record keeps its own clock while a record that vanished
     // is rebuilt rather than left absent
