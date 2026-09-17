@@ -36,8 +36,8 @@ const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(cod
 
 // The alias map only knows the picker's services; every other brand ("MGM Plus", "MGM+ Amazon
 // Channel", "MGM Plus Roku Premium Channel") still listed each resale channel as its own provider
-const RESALE_SUFFIX = /\s+(amazon channel|apple tv channel|roku premium channel)$/i
-const brandName = name => name.toLowerCase().replace(RESALE_SUFFIX, '').replace(/\s*\bplus\b/, '+').trim()
+const VARIANT_SUFFIX = /\s+((amazon|apple tv|roku premium) channel|(standard )?with ads)$/i
+const brandName = name => name.toLowerCase().replace(VARIANT_SUFFIX, '').replace(/\s*\bplus\b/, '+').trim()
 
 const CATALOGUE = {
   movie: {
@@ -475,7 +475,7 @@ class TmdbService {
       providers = Object.values(providers)
         .flat()
         // A service's own entry first, so its name and logo win over a resale channel's
-        .sort((a, b) => (thisClass.providerAlias.has(a.provider_id) || RESALE_SUFFIX.test(a.provider_name)) - (thisClass.providerAlias.has(b.provider_id) || RESALE_SUFFIX.test(b.provider_name)))
+        .sort((a, b) => (thisClass.providerAlias.has(a.provider_id) || VARIANT_SUFFIX.test(a.provider_name)) - (thisClass.providerAlias.has(b.provider_id) || VARIANT_SUFFIX.test(b.provider_name)))
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
