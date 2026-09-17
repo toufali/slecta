@@ -455,11 +455,18 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
     'watch/providers': {
       results: {
         US: {
-          // The channel variant listed first: the service's own logo must still win
-          flatrate: [{ provider_id: 1825, logo_path: '/channel.png' }, { provider_id: 1899, logo_path: '/x.png' }],
-          ads: [{ provider_id: 1796, logo_path: '/w.png' }], // Netflix Standard with Ads reads as Netflix
-          rent: [{ provider_id: 350, logo_path: '/y.png' }],
-          buy: [{ provider_id: 2, logo_path: '/z.png' }]
+          // Channel variants listed first: the service's own name and logo must still win
+          flatrate: [
+            { provider_id: 1825, provider_name: 'HBO Max Amazon Channel', logo_path: '/channel.png' },
+            { provider_id: 1899, provider_name: 'HBO Max', logo_path: '/x.png' },
+            // A brand outside the alias map dedupes by name, "Plus" and "+" reading as one brand
+            { provider_id: 583, provider_name: 'MGM+ Amazon Channel', logo_path: '/mgmc.png' },
+            { provider_id: 635, provider_name: 'MGM Plus Roku Premium Channel', logo_path: '/mgmr.png' },
+            { provider_id: 34, provider_name: 'MGM Plus', logo_path: '/mgm.png' }
+          ],
+          ads: [{ provider_id: 1796, provider_name: 'Netflix Standard with Ads', logo_path: '/w.png' }],
+          rent: [{ provider_id: 350, provider_name: 'Apple TV', logo_path: '/y.png' }],
+          buy: [{ provider_id: 2, provider_name: 'Apple TV Store', logo_path: '/z.png' }]
         }
       }
     }
@@ -467,11 +474,12 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
 
   const detail = await tmdb.getMovieDetail(13)
 
-  assert.deepEqual(detail.included, [1899, 8])
-  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 350, 1899].sort())
+  assert.deepEqual(detail.included, [1899, 583, 635, 34, 8])
+  assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 34, 350, 1899].sort())
   // The plain name, not the variant's
   assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')
   assert.match(detail.providers.find(item => item.provider_id === 1899).logoUrl, /\/x\.png$/)
+  assert.equal(detail.providers.find(item => item.provider_id === 34).provider_name, 'MGM Plus')
 
   captureDetail()
   assert.deepEqual((await tmdb.getMovieDetail(14)).included, [], 'no US providers means nothing included, not a crash')

@@ -34,6 +34,11 @@ export const ENGLISH = 'en'
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
 const languageName = code => code === 'cn' ? 'Cantonese' : LANGUAGE_NAMES.of(code)
 
+// The alias map only knows the picker's services; every other brand ("MGM Plus", "MGM+ Amazon
+// Channel", "MGM Plus Roku Premium Channel") still listed each resale channel as its own provider
+const RESALE_SUFFIX = /\s+(amazon channel|apple tv channel|roku premium channel)$/i
+const brandName = name => name.toLowerCase().replace(RESALE_SUFFIX, '').replace(/\s*\bplus\b/, '+').trim()
+
 const CATALOGUE = {
   movie: {
     segment: 'movies',
@@ -463,18 +468,18 @@ class TmdbService {
 
       providers = Object.values(providers)
         .flat()
-        // A service's own entry first, so its logo wins over a channel-store variant's
-        .sort((a, b) => thisClass.providerAlias.has(a.provider_id) - thisClass.providerAlias.has(b.provider_id))
+        // A service's own entry first, so its name and logo win over a resale channel's
+        .sort((a, b) => (thisClass.providerAlias.has(a.provider_id) || RESALE_SUFFIX.test(a.provider_name)) - (thisClass.providerAlias.has(b.provider_id) || RESALE_SUFFIX.test(b.provider_name)))
         .filter(function (item) {
           if (!item.provider_id) return // not a valid provider if no ID
           item.provider_id = thisClass.canonicalProvider(item.provider_id)
           // Rename too, or a title only on the ad plan would still read "Netflix Standard with Ads"
           item.provider_name = thisClass.providers.get(item.provider_id) ?? item.provider_name
-          if (this.has(item.provider_id)) return // already in set
+          if (this.has(brandName(item.provider_name))) return // the brand is already listed
           if (thisClass.providerHidden.includes(item.provider_id)) return // hide obsolete providers
 
           item.logoUrl = thisClass.imgConfig.secure_base_url + thisClass.imgConfig.logo_sizes[0] + item.logo_path
-          this.add(item.provider_id)
+          this.add(brandName(item.provider_name))
           return true
         }, new Set())
         .sort((a, b) => {
