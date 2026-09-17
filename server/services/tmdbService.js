@@ -117,6 +117,12 @@ class TmdbService {
   ]
   providerHidden = [
     3, // Google Play Movies
+    // Live-TV bundles: carriage of cable channels, not a destination a reader would seek a title on
+    257, // fuboTV
+    2383, // Philo
+    2528, // YouTube TV
+    299, // Sling TV Orange and Blue
+    486, // Spectrum On Demand
   ]
   // Top subscriptions only, with plain names instead of TMDB's tier names like "Peacock Premium"
   providers = new Map([

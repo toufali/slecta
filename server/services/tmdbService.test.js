@@ -464,7 +464,11 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
             { provider_id: 635, provider_name: 'MGM Plus Roku Premium Channel', logo_path: '/mgmr.png' },
             { provider_id: 34, provider_name: 'MGM Plus', logo_path: '/mgm.png' }
           ],
-          ads: [{ provider_id: 1796, provider_name: 'Netflix Standard with Ads', logo_path: '/w.png' }],
+          ads: [
+            { provider_id: 1796, provider_name: 'Netflix Standard with Ads', logo_path: '/w.png' },
+            // A live-TV bundle is hidden from display but stays a harmless id in `included`
+            { provider_id: 257, provider_name: 'fuboTV', logo_path: '/f.png' }
+          ],
           rent: [{ provider_id: 350, provider_name: 'Apple TV', logo_path: '/y.png' }],
           buy: [{ provider_id: 2, provider_name: 'Apple TV Store', logo_path: '/z.png' }]
         }
@@ -474,12 +478,13 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
 
   const detail = await tmdb.getMovieDetail(13)
 
-  assert.deepEqual(detail.included, [1899, 583, 635, 34, 8])
+  assert.deepEqual(detail.included, [1899, 583, 635, 34, 8, 257])
   assert.deepEqual(detail.providers.map(item => item.provider_id).sort(), [2, 8, 34, 350, 1899].sort())
   // The plain name, not the variant's
   assert.equal(detail.providers.find(item => item.provider_id === 8).provider_name, 'Netflix')
   assert.match(detail.providers.find(item => item.provider_id === 1899).logoUrl, /\/x\.png$/)
   assert.equal(detail.providers.find(item => item.provider_id === 34).provider_name, 'MGM Plus')
+  assert.equal(detail.providers.some(item => item.provider_id === 257), false)
 
   captureDetail()
   assert.deepEqual((await tmdb.getMovieDetail(14)).included, [], 'no US providers means nothing included, not a crash')
