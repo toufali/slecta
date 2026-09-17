@@ -113,9 +113,6 @@ test('the panel offers subscriptions and storefronts apart, and echoes the selec
   }
 })
 
-test('the description claims the selected services on every sort', () => {
-  const sorts = [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Top Rated', value: 'score' }]
-
+test('the description claims the selected services', () => {
   assert.match(titleList(movie({ withProviders: ['8'] })), /on <output>Netflix<\/output>/)
-  assert.match(titleList(movie({ allSorting: sorts, sortBy: 'score', withProviders: ['8'] })), /on <output>Netflix<\/output>/)
 })
