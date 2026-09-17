@@ -6,7 +6,7 @@ import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import { indexKey, byRank } from '../services/indexService.js'
 import log from '../utils/logger.js'
-import { checkReferenceTitles, checkRunCoverage } from './checks.js'
+import { checkProviderMaps, checkReferenceTitles, checkRunCoverage } from './checks.js'
 
 // Spacing sets the request rate, so this only has to keep each host's queue fed through a stall
 const TITLES_IN_FLIGHT = 8
@@ -64,6 +64,8 @@ export async function cacheScores() {
 
   const coverage = checkRunCoverage(stats, imdbRefreshed)
   const reference = await checkReferenceTitles()
+
+  await checkProviderMaps()
 
   log.info('cacheScores job complete', { stats, coverageOk: coverage.ok, referenceOk: reference.ok })
 

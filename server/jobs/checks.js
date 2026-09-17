@@ -102,6 +102,52 @@ export async function checkRankedIndex() {
   return { ok: !missing.length && !unreadable.length, missing, unreadable }
 }
 
+// The share of rows an untracked provider must reach to warn: TMDB splitting a surface lands its
+// replacement everywhere at once, while a niche service stays a sliver. Judgement, not measurement.
+const DRIFT_SHARE = 0.25
+
+/**
+ * The provider maps degrade silently: a dead picker id filters to nothing, and a split surface
+ * (Paramount+ became two tier ids) goes untracked. The walk saw every title's providers, so hold
+ * the maps against what it published. Warnings only — a human curates the maps.
+ * @return {{deadIds: number[], drifting: number[]}}
+ */
+export async function checkProviderMaps() {
+  const curated = new Set([...tmdb.providers.keys(), ...tmdb.storefronts.keys(), ...tmdb.providerHidden])
+  const counts = new Map()
+  const included = new Set()
+  let total = 0
+
+  for (const segment of ['movies', 'shows']) {
+    const rows = await redis.getCache(indexKey(segment))
+
+    // No judgement without both published lists: an unavailable one would read as every curated
+    // id dead, and a lone one skews the drift denominator
+    if (!rows?.length) {
+      log.warn('Provider maps unchecked, a ranked list is unavailable', { segment })
+      return { deadIds: [], drifting: [] }
+    }
+
+    total += rows.length
+    for (const row of rows) {
+      for (const id of row.providers ?? []) counts.set(id, (counts.get(id) ?? 0) + 1)
+      for (const id of row.included ?? []) included.add(id)
+    }
+  }
+
+  const deadIds = [
+    ...[...tmdb.providers.keys()].filter(id => !included.has(id)),
+    ...[...tmdb.storefronts.keys()].filter(id => !counts.has(id))
+  ]
+  const drifting = [...counts.keys()].filter(id => !curated.has(id) && counts.get(id) / total > DRIFT_SHARE)
+
+  if (deadIds.length) log.warn('Curated services no title carries — an id may have died', { deadIds })
+  if (drifting.length) log.warn('Untracked providers across a large share of titles — TMDB may have split a surface', { drifting })
+  if (!deadIds.length && !drifting.length) log.info('Provider maps agree with the catalogue', { providers: counts.size })
+
+  return { deadIds, drifting }
+}
+
 /** Score known titles and compare every source against its expected value. */
 export async function checkReferenceTitles() {
   const failures = []

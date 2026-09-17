@@ -373,3 +373,35 @@ test('a shortfall is logged against the boundary it crossed', () => {
 
   assert.deepEqual([floor.tier, floor.min], ['alert', 0.05])
 })
+
+test('the provider maps are held against what the run published', async () => {
+  const { checkProviderMaps } = await import('./checks.js')
+  const { default: redis } = await import('../services/redisService.js')
+  const { default: tmdb } = await import('../services/tmdbService.js')
+  const real = redis.getCache
+
+  // Every picker service included somewhere, every storefront carried, nothing untracked at scale
+  const carryAll = { providers: [...tmdb.providers.keys(), ...tmdb.storefronts.keys()], included: [...tmdb.providers.keys()] }
+  // One niche row in five: expected, and a sliver rather than drift
+  const healthyRows = [carryAll, carryAll, carryAll, carryAll, { providers: [34], included: [34] }]
+
+  try {
+    redis.getCache = async () => healthyRows
+    const healthy = await checkProviderMaps()
+    assert.deepEqual([healthy.deadIds, healthy.drifting], [[], []])
+
+    // The 531 case: a picker id no title's included list carries any more
+    redis.getCache = async () => healthyRows.map(row => ({ ...row, included: row.included.filter(id => id !== 2303) }))
+    assert.deepEqual((await checkProviderMaps()).deadIds, [2303])
+
+    // The split-surface case: an untracked id lands on most titles at once
+    redis.getCache = async () => healthyRows.map(row => ({ ...row, providers: [...row.providers, 9999] }))
+    assert.deepEqual((await checkProviderMaps()).drifting, [9999])
+
+    // An unavailable list is no judgement on the maps
+    redis.getCache = async key => key.includes('movies') ? healthyRows : undefined
+    assert.deepEqual(await checkProviderMaps(), { deadIds: [], drifting: [] })
+  } finally {
+    redis.getCache = real
+  }
+})
