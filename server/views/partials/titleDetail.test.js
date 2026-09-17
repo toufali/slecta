@@ -105,7 +105,7 @@ test('providers group by cost, and rent-or-buy is curated to the top storefronts
   assert.doesNotMatch(rendered, /Microsoft/)
 })
 
-test('a title with no provider in either group says so, in a reader's words', () => {
+test('a title with no provider in either group says so, in plain words', () => {
   assert.match(titleDetail(data({ providers: [], included: [] })), /Not yet available to stream, rent, or buy/)
   assert.doesNotMatch(titleDetail(data({ providers: [], included: [] })), /Included with:|Rent or buy:/)
 })
