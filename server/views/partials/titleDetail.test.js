@@ -85,3 +85,23 @@ test('the rows follow the record: a film gets a director, a show gets a creator 
 test('one season is not worth a row', () => {
   assert.doesNotMatch(titleDetail(data({ seasons: 1 })), /Seasons/)
 })
+
+test('providers group by cost, and rent-or-buy is curated to the top storefronts', () => {
+  const rendered = titleDetail(data({
+    included: [8],
+    providers: [
+      { provider_id: 8, provider_name: 'Netflix', logoUrl: '/n.png' },
+      { provider_id: 10, provider_name: 'Amazon Video', logoUrl: '/a.png' },
+      { provider_id: 68, provider_name: 'Microsoft Store', logoUrl: '/m.png' }
+    ]
+  }))
+
+  assert.match(rendered, /Included with:<\/label><\/p><ul><li><img src='\/n\.png'/)
+  assert.match(rendered, /Rent or buy:<\/label><\/p><ul><li><img src='\/a\.png'/)
+  assert.doesNotMatch(rendered, /Microsoft/)
+})
+
+test('a title with no provider in either group says so', () => {
+  assert.match(titleDetail(data({ providers: [], included: [] })), /No providers found/)
+  assert.doesNotMatch(titleDetail(data({ providers: [], included: [] })), /Included with:|Rent or buy:/)
+})
