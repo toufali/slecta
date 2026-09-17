@@ -124,6 +124,13 @@ class TmdbService {
     [2303, 'Paramount+'],
     [386, 'Peacock'],
   ])
+  // Rent and buy storefronts, curated the same way: every mainstream rentable title is on these
+  storefronts = new Map([
+    [10, 'Amazon Video'],
+    [2, 'Apple TV Store'],
+    [7, 'Fandango at Home'],
+    [192, 'YouTube'],
+  ])
   // Ad plans and channel-store listings ("HBO Max Amazon Channel") count as the service itself
   providerAlias = new Map([
     [175, 8], // Netflix Kids
@@ -249,7 +256,8 @@ class TmdbService {
       lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
       genres: this.genres[media.genreKey],
-      providers: this.providers,
+      // One vocabulary for validation: a picked id may name a subscription or a storefront
+      providers: new Map([...this.providers, ...this.storefronts]),
       ratings: media.certifications ? this.ratings : undefined
     }
   }
@@ -302,6 +310,7 @@ class TmdbService {
       sortBy: query?.sort || sorts[0].value,
       streamingNow: query?.streaming,
       allProviders: this.providers,
+      allStorefronts: this.storefronts,
       withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
       lookback: this.lookback(query?.months),
       lookbackMax: this.lookbackMax,
@@ -355,7 +364,9 @@ class TmdbService {
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
       certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,
-      with_watch_monetization_types: query?.wp ? 'flatrate|free|ads' : query?.streaming ? media.monetization : '',
+      // A storefront pick needs the paid types too; TMDB's ids keep the surfaces apart, so a
+      // subscription id still cannot match a rental
+      with_watch_monetization_types: query?.wp ? ([query.wp].flat().some(id => this.storefronts.has(+id)) ? media.monetization : 'flatrate|free|ads') : query?.streaming ? media.monetization : '',
       with_watch_providers: query?.wp ? [query.wp].flat().flatMap(this.expandProvider).join('|') : undefined
     }
 

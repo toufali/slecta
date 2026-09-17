@@ -476,3 +476,13 @@ test('the detail keeps no-extra-cost ids apart from the flattened availability, 
   captureDetail()
   assert.deepEqual((await tmdb.getMovieDetail(14)).included, [], 'no US providers means nothing included, not a crash')
 })
+
+test('a storefront pick asks discover for the paid types too, and the vocabulary accepts it', async () => {
+  const seen = captureUrl()
+
+  await tmdb.getMovies({ wp: ['8', '7'] })
+
+  assert.match(decodeURIComponent(seen[0]), /with_watch_monetization_types=buy\|free\|flatrate\|rent\|ads&/)
+  assert.match(decodeURIComponent(seen[0]), /with_watch_providers=8\|175\|1796\|7/)
+  assert.equal(tmdb.filterRules('movie').providers.has(7), true)
+})

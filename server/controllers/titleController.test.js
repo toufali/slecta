@@ -17,7 +17,7 @@ const { default: index } = await import('../services/indexService.js')
 // shape, so every wire out of the controller is recorded and named.
 function recordCalls() {
   const calls = []
-  const rows = segment => ({ [segment]: [{ id: 1 }], allGenres: new Map([[28, 'Action']]), allProviders: new Map([[8, 'Netflix']]) })
+  const rows = segment => ({ [segment]: [{ id: 1 }], allGenres: new Map([[28, 'Action']]), allProviders: new Map([[8, 'Netflix']]), allStorefronts: new Map([[7, 'Fandango at Home']]) })
 
   index.getList = async mediaType => { calls.push([`index:${mediaType}`]); return rows(mediaType === 'movie' ? 'movies' : 'shows') }
   tmdb.getMovies = async () => { calls.push(['list:movie']); return rows('movies') }
@@ -192,7 +192,7 @@ test('a record with no score is not marked', async () => {
 // The wiring is one line per catalogue, and serving the wrong view would change no response shape
 test('each list page renders through the shared view with its own catalogue', async () => {
   recordCalls()
-  const shape = { allGenres: new Map(), allProviders: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 }
+  const shape = { allGenres: new Map(), allProviders: new Map(), allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 }
   tmdb.getMovies = async () => ({ movies: [], allRatings: [{ certification: 'R', meaning: 'r' }], ...shape })
   tmdb.getTvShows = async () => ({ shows: [], ...shape })
 
@@ -236,7 +236,7 @@ test('the page applies the saved services when the URL names none, and drops a s
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
 
   const ctx = context()
   ctx.cookies.get = () => '8|999'
@@ -248,7 +248,7 @@ test('services named in the URL win over the cookie', async () => {
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
 
   const ctx = context()
   ctx.query = { wp: '337' }

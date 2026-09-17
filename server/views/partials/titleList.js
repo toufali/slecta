@@ -26,10 +26,10 @@ const genreFields = data => {
   return html
 }
 
-const providerFields = data => {
+const providerFields = (options, data) => {
   let html = ''
 
-  for (const [id, name] of data.allProviders) html += `
+  for (const [id, name] of options) html += `
   <label class='pill'>
     <input type='checkbox' name='wp' value='${id}' ${data.withProviders?.includes(id.toString()) ? 'checked' : ''}>
     <span>${name}</span>
@@ -61,7 +61,7 @@ function listDescription(data, dated) {
   if (data.inEnglish) language = `<output>in English</output>`
   if (data.withGenres) genres = `<label>with genre <output>${namesText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
-  if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, data.allProviders)}</output></label>`
+  if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
 
   const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
@@ -128,8 +128,12 @@ export const titleList = data => {
       </label>
     </fieldset>
     <fieldset>
-      <h3>Streaming on:</h3>
-      ${providerFields(data)}
+      <h3>Included with:</h3>
+      ${providerFields(data.allProviders, data)}
+    </fieldset>
+    <fieldset>
+      <h3>Rent or buy:</h3>
+      ${providerFields(data.allStorefronts, data)}
     </fieldset>
     <fieldset>
       <button class='primary' type='submit'>APPLY</button>

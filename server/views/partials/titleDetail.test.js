@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { titleDetail } from './titleDetail.js'
+for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', 'GCP_SEARCH_ENGINE']) {
+  process.env[key] ??= 'test'
+}
+
+const { titleDetail } = await import('./titleDetail.js')
 import { scoreBadge } from '../../../client/src/scripts/components/scoreBadge.js'
 import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 
