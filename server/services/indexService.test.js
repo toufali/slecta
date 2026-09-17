@@ -142,6 +142,19 @@ test('the streaming filter drops a title no provider carries', async () => {
   assert.deepEqual(titles(data), ['streaming'])
 })
 
+// The Widow's Bay case: available on a picked service to rent, ranked into its subscriber's list
+test('a service filter reads what costs nothing extra, never the flattened availability', async () => {
+  const rows = [
+    row({ id: 1, title: 'subscribed', providers: [1899], included: [1899] }),
+    row({ id: 2, title: 'rentable there', providers: [1899], included: [350] }),
+    row({ id: 3, title: 'elsewhere', providers: [8], included: [8] })
+  ]
+
+  assert.deepEqual(titles(await listing(rows, { wp: '1899' })), ['subscribed'])
+  assert.deepEqual(titles(await listing(rows, { wp: ['1899', '8'] })), ['subscribed', 'elsewhere'])
+  assert.deepEqual(titles(await listing(rows, { wp: '' })), ['subscribed', 'rentable there', 'elsewhere'])
+})
+
 // Changing the sort must not change what a filter means, so every parameter discover is sent has
 // to hold here too
 test('an excluded genre is dropped', async () => {

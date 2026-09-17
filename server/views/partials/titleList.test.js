@@ -111,9 +111,9 @@ test('the services fieldset lists the curated providers and echoes the selection
   }
 })
 
-test('the description claims a service only where the list can honour it', () => {
+test('the description claims the selected services on every sort', () => {
   const sorts = [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Top Rated', value: 'score' }]
 
   assert.match(titleList(movie({ withProviders: ['8'] })), /on <output>Netflix<\/output>/)
-  assert.doesNotMatch(titleList(movie({ allSorting: sorts, sortBy: 'score', withProviders: ['8'] })), /on <output>Netflix<\/output>/)
+  assert.match(titleList(movie({ allSorting: sorts, sortBy: 'score', withProviders: ['8'] })), /on <output>Netflix<\/output>/)
 })

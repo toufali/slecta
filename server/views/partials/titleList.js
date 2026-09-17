@@ -61,8 +61,7 @@ function listDescription(data, dated) {
   if (data.inEnglish) language = `<output>in English</output>`
   if (data.withGenres) genres = `<label>with genre <output>${namesText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
-  // Not on Top Rated: the ranked index cannot filter by provider, so the claim would be false there
-  if (data.withProviders && data.sortBy !== 'score') services = `<label>on <output>${namesText(data.withProviders, data.allProviders)}</output></label>`
+  if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, data.allProviders)}</output></label>`
 
   const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 

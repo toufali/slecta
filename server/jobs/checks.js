@@ -68,29 +68,36 @@ const MAX_FAILED_RATE = { warn: 0.1, alert: 0.5 }
 const MAX_UNSCORED_RATE = { warn: 0.1, alert: 0.5 }
 
 /**
- * Whether a ranked list can be served. Run at deploy, so a row-shape bump fails the build rather than
- * leaving Top Rated to 503 until someone notices — the deploy does not rewrite the rows.
- *
- * Fails closed on an unreadable Redis as well as an absent key. The two are distinguished elsewhere
- * so a blip cannot discard data, but here they are the same answer: the list will not serve. Passing
- * on an outage would also let a flaky read hide a generation nobody published.
+ * Run at deploy: an unpublished ranked list should fail the build, not 503 Top Rated until someone
+ * notices. Exception: right after a version bump the new key cannot exist yet, so a present
+ * previous generation passes with a warning. An unreadable Redis still fails — passing on an
+ * outage could hide a list nobody published.
  * @return {{ok: boolean, missing: string[], unreadable: string[]}}
  */
 export async function checkRankedIndex() {
   const missing = []
+  const awaiting = []
   const unreadable = []
 
   for (const segment of ['movies', 'shows']) {
     const rows = await redis.getCache(indexKey(segment))
 
     if (rows === undefined) unreadable.push(segment)
-    else if (!rows) missing.push(segment)
+    else if (rows) continue
+    else {
+      const prior = await redis.getCache(`index/${segment}/v${INDEX_VERSION - 1}`)
+
+      if (prior === undefined) unreadable.push(segment)
+      else if (prior) awaiting.push(segment)
+      else missing.push(segment)
+    }
   }
 
   // Logged apart, since one says run the job and the other says fix Redis
   if (missing.length) log.error('Ranked list missing, run the scoring job', { missing, version: INDEX_VERSION })
+  if (awaiting.length) log.warn('Ranked list awaiting republish after a version bump, run the scoring job', { awaiting, version: INDEX_VERSION })
   if (unreadable.length) log.error('Ranked list could not be read', { unreadable, version: INDEX_VERSION })
-  if (!missing.length && !unreadable.length) log.info('Ranked list present', { version: INDEX_VERSION })
+  if (!missing.length && !unreadable.length && !awaiting.length) log.info('Ranked list present', { version: INDEX_VERSION })
 
   return { ok: !missing.length && !unreadable.length, missing, unreadable }
 }
