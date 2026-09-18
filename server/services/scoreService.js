@@ -50,9 +50,10 @@ const PERCENT_SOURCES = {
   rtCritic: { midpoint: 50.9, spread: 19.2 }
 }
 
-// The half-rater pulls a perfect share off the boundary, harder the thinner the sample
+// The half-rater pulls a perfect share off the boundary, harder the thinner the sample. With no
+// sample to smooth by, the observed share stands as is rather than collapsing to the midpoint.
 function shareToRating(share, samples, { midpoint, spread }) {
-  const adjustedShare = (share / 100 * samples + 0.5) / (samples + 1)
+  const adjustedShare = samples ? (share / 100 * samples + 0.5) / (samples + 1) : share / 100
 
   return Math.min(100, Math.max(0, midpoint + spread * inverseNormal(adjustedShare)))
 }

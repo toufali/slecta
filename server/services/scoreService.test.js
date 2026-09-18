@@ -206,6 +206,10 @@ test('a percentage source converts to the rating its share implies', () => {
   assert.equal(aggregate(record), 85, 'the unconverted mean reads 90')
 })
 
+test('a share with no readable sample converts as observed, not to the midpoint', () => {
+  assert.equal(aggregate({ scores: { rtAudience: 95 } }), 85)
+})
+
 // inverseNormal(1) is infinite, so a perfect share rests on the clamp until a thin sample pulls it off the boundary
 test('a perfect share converts lower the thinner its sample', () => {
   const perfect = samples => aggregate({ scores: { rtAudience: 100 }, counts: { rtAudience: samples } })
@@ -281,9 +285,9 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   // Wikidata carried both slugs, so no probe was needed and no source was retried
   assert.equal(calls.count, 3)
 
-  // The converted components mean 52.9
+  // The converted components mean 59.1
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
-  assert.equal(aggregate(score), 53)
+  assert.equal(aggregate(score), 59)
 })
 
 // Each component's weight comes from the sample its score came from, so the count is stored with it
@@ -1260,7 +1264,7 @@ test('a run resolving fewer outlets leaves the record untouched and still return
     assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
     // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
     assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-    assert.equal(aggregate(score.kept), 67, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(aggregate(score.kept), 74, 'the record it preserved, for a caller that must not publish tonight')
     assert.equal(score.cached, true, 'a refusal is not a persistence failure')
   } finally {
     redis.getCache = realGetCache
@@ -1411,7 +1415,7 @@ test('a declined write reports the record that declined it', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(aggregate(score.kept), 72, 'the value that won, not the one the comparison saw')
+    assert.equal(aggregate(score.kept), 85, 'the value that won, not the one the comparison saw')
   } finally {
     redis.getCache = realGetCache
   }

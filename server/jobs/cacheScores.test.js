@@ -658,7 +658,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     const { stats: [stats] } = await cacheScores()
     const [row] = writes.get(MOVIE_INDEX)
 
-    assert.equal(row.score, 68, 'the row carries the stored score')
+    assert.equal(row.score, 76, 'the row carries the stored score')
     // Coverage still measures tonight's attempt, which is what detects a source going down
     assert.deepEqual(stats.outcomes, {
       imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }
