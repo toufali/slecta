@@ -4,7 +4,7 @@ const figure = document.querySelector('figure')
 const trailer = figure.querySelector('iframe')
 const playBtn = figure.querySelector('button')
 const article = document.querySelector('article')
-const backBtn = article.querySelector('.back')
+const backBtn = document.querySelector('.back')
 const scoreBadge = document.querySelector('score-badge')
 const quotes = article.querySelector('.quotes')
 
