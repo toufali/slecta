@@ -194,7 +194,24 @@ test('a thin component still pulls, but less than a well-sampled one', () => {
 test('components thin in equal measure return the plain mean', () => {
   const record = { scores: { rtCritic: 60, metacritic: 80 }, counts: { rtCritic: 8, metacritic: 3 } }
 
-  assert.equal(aggregate(record), 70)
+  assert.equal(aggregate(record), 68)
+})
+
+test('a percentage source converts to the rating its share implies', () => {
+  const record = {
+    scores: { imdb: 84, metacritic: 88, rtCritic: 94, rtAudience: 96 },
+    counts: { imdb: 494_949, metacritic: 63, rtCritic: 510, rtAudience: 33_104 }
+  }
+
+  assert.equal(aggregate(record), 85, 'the unconverted mean reads 90')
+})
+
+// inverseNormal(1) is infinite, so a perfect share rests on the clamp until a thin sample pulls it off the boundary
+test('a perfect share converts lower the thinner its sample', () => {
+  const perfect = samples => aggregate({ scores: { rtAudience: 100 }, counts: { rtAudience: samples } })
+
+  assert.equal(perfect(30), 94)
+  assert.equal(perfect(1_708), 100)
 })
 
 // Half the TV catalogue has only a band, so a floor has to count for something
@@ -264,9 +281,9 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   // Wikidata carried both slugs, so no probe was needed and no source was retried
   assert.equal(calls.count, 3)
 
-  // (52 + 50 + 85) / 3 is 62.3
+  // The converted components mean 52.9
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
-  assert.equal(aggregate(score), 62)
+  assert.equal(aggregate(score), 53)
 })
 
 // Each component's weight comes from the sample its score came from, so the count is stored with it
@@ -1243,7 +1260,7 @@ test('a run resolving fewer outlets leaves the record untouched and still return
     assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
     // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
     assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-    assert.equal(aggregate(score.kept), 80, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(aggregate(score.kept), 67, 'the record it preserved, for a caller that must not publish tonight')
     assert.equal(score.cached, true, 'a refusal is not a persistence failure')
   } finally {
     redis.getCache = realGetCache
@@ -1394,7 +1411,7 @@ test('a declined write reports the record that declined it', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(aggregate(score.kept), 91, 'the value that won, not the one the comparison saw')
+    assert.equal(aggregate(score.kept), 72, 'the value that won, not the one the comparison saw')
   } finally {
     redis.getCache = realGetCache
   }

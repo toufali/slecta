@@ -37,10 +37,10 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
     scored.push(key)
     passed.push(data)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
-    return Object.defineProperty({ scores: { imdb: 70, rtCritic: 70 } }, 'cached', { value: true })
+    return Object.defineProperty({ scores: { imdb: 70, metacritic: 70 } }, 'cached', { value: true })
   }
   // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
-  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, rtCritic: 70 } })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, metacritic: 70 } })
 
   return { scored, passed, windows, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
@@ -658,7 +658,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     const { stats: [stats] } = await cacheScores()
     const [row] = writes.get(MOVIE_INDEX)
 
-    assert.equal(row.score, 82, 'the row carries the stored score')
+    assert.equal(row.score, 68, 'the row carries the stored score')
     // Coverage still measures tonight's attempt, which is what detects a source going down
     assert.deepEqual(stats.outcomes, {
       imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }

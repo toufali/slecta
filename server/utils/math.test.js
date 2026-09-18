@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { average, toCount, toFloor, toScore } from './math.js'
+import { average, inverseNormal, toCount, toFloor, toScore } from './math.js'
 
 test('average ignores non-finite values', () => {
   assert.equal(average([80, 90]), 85)
@@ -59,4 +59,16 @@ test('toFloor rejects a band with no lower bound', () => {
   assert.equal(toFloor('Fewer than 50 Ratings'), undefined)
   assert.equal(toFloor(undefined), undefined)
   assert.equal(toFloor('Ratings'), undefined)
+})
+
+test('inverseNormal matches known quantiles', () => {
+  assert.equal(inverseNormal(0.5), 0)
+  assert.ok(Math.abs(inverseNormal(0.975) - 1.959964) < 1e-6)
+  assert.ok(Math.abs(inverseNormal(0.025) + 1.959964) < 1e-6)
+  assert.ok(Math.abs(inverseNormal(0.99) - 2.326348) < 1e-6)
+})
+
+test('inverseNormal is defined only between the boundaries', () => {
+  assert.equal(inverseNormal(0), -Infinity)
+  assert.equal(inverseNormal(1), Infinity)
 })
