@@ -46,6 +46,7 @@ export const mainView = data => `
   <main>
     ${data.partial(data.content)}
   </main>
+  <button class='back pill' hidden>Back to results</button>
   <footer>
     <a href='/about'>About Slecta</a>
   </footer>

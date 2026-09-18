@@ -4,13 +4,25 @@ const figure = document.querySelector('figure')
 const trailer = figure.querySelector('iframe')
 const playBtn = figure.querySelector('button')
 const article = document.querySelector('article')
+const backBtn = document.querySelector('.back')
 const scoreBadge = document.querySelector('score-badge')
 const quotes = article.querySelector('.quotes')
+
+// A list page behind the reader means back restores their results; anywhere else it would leave the site
+const LIST_PATHS = ['/', '/movies', '/shows', '/search']
 
 // /movies/603 and /shows/42 differ only here
 const segment = location.pathname.split('/')[1]
 
 export default async function init() {
+  const referrer = document.referrer && new URL(document.referrer)
+
+  // A new tab keeps the referrer but has no entry to go back to
+  if (referrer && referrer.origin === location.origin && LIST_PATHS.includes(referrer.pathname) && history.length > 1) {
+    backBtn.hidden = false
+    backBtn.addEventListener('click', () => history.back())
+  }
+
   if (trailer) playBtn.addEventListener('click', playTrailer)
   // Absent when the record already answered "no score"
   if (scoreBadge && scoreBadge.score === undefined) getScore()
