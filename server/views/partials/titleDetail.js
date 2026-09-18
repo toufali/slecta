@@ -59,8 +59,8 @@ export const titleDetail = data => `
   <div class='providers'>
     ${providers(data)}
   </div>
-  <button class='back pill' hidden>Back to results</button>
 </article>
+<button class='back pill' hidden>Back to results</button>
 `
 
 titleDetail.styles = '/styles/partials/titleDetail.css'

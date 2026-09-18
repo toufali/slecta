@@ -1,14 +1,18 @@
 main {
+  position: relative;
   background: var(--blue-30);
   border-radius: var(--border-radius);
   box-shadow: 0 0 12px black;
-  overflow: hidden;
+  /* Clearance for the back button hanging below the panel */
+  margin-bottom: calc(40px + var(--padding-lg));
 }
 
 figure {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
+  /* The figure clips its own top corners now that the panel no longer clips overflow */
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
   overflow: hidden;
 }
 
@@ -69,9 +73,10 @@ article {
 }
 
 .back {
-  display: block;
-  width: fit-content;
-  margin: var(--padding-lg) auto 0;
+  position: absolute;
+  top: calc(100% + var(--padding-lg));
+  left: 50%;
+  translate: -50%;
 }
 
 /* The global button reset sets display, which beats the browser's [hidden] rule */
