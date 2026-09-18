@@ -60,7 +60,6 @@ export const titleDetail = data => `
     ${providers(data)}
   </div>
 </article>
-<button class='back pill' hidden>Back to results</button>
 `
 
 titleDetail.styles = '/styles/partials/titleDetail.css'

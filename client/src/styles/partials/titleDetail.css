@@ -1,18 +1,14 @@
 main {
-  position: relative;
   background: var(--blue-30);
   border-radius: var(--border-radius);
   box-shadow: 0 0 12px black;
-  /* Clearance for the back button hanging below the panel */
-  margin-bottom: calc(40px + var(--padding-lg));
+  overflow: hidden;
 }
 
 figure {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  /* The figure clips its own top corners now that the panel no longer clips overflow */
-  border-radius: var(--border-radius) var(--border-radius) 0 0;
   overflow: hidden;
 }
 
@@ -70,29 +66,6 @@ figure[data-trailer-active] iframe[src] {
 article {
   padding: var(--padding-lg);
   container-type: inline-size;
-}
-
-.back {
-  position: absolute;
-  top: calc(100% + var(--padding-lg));
-  left: 50%;
-  translate: -50%;
-}
-
-/* The global button reset sets display, which beats the browser's [hidden] rule */
-.back[hidden] {
-  display: none;
-}
-
-.back::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-left: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-  margin-right: var(--padding-sm);
 }
 
 header{
