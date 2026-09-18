@@ -37,6 +37,7 @@ function providers(data) {
 export const titleDetail = data => `
 <figure>${data.backdropUrl ? `<img src='${data.backdropUrl}' alt=''>` : ''}${ytTrailer(data.ytTrailerId)}</figure>
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
+  <button class='back' hidden>Back to results</button>
   <header>
     <h1>${data.title}</h1>
     ${data.noScore ? '' : scoreBadge(data.score, data.lowConfidence)}

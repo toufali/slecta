@@ -68,6 +68,31 @@ article {
   container-type: inline-size;
 }
 
+.back {
+  color: var(--blue-90);
+  margin-bottom: var(--padding-md);
+}
+
+/* The global button reset sets display, which beats the browser's [hidden] rule */
+.back[hidden] {
+  display: none;
+}
+
+.back::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-right: var(--padding-sm);
+}
+
+.back:hover {
+  filter: brightness(1.3);
+}
+
 header{
   position: relative;
   margin-bottom: var(--padding-lg);
