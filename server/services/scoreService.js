@@ -1,4 +1,4 @@
-import { average, toCount, toFloor, toScore } from '../utils/math.js'
+import { average, inverseNormal, toCount, toFloor, toScore } from '../utils/math.js'
 import { slugify } from '../utils/slug.js'
 import { space } from '../utils/throttle.js'
 import redis, { WRITTEN, DECLINED, FAILED } from './redisService.js'
@@ -37,11 +37,26 @@ const HEADERS = { 'user-agent': USER_AGENT }
 // Samples at which a component reaches half weight, and ~90% at nine times it. Each is a ninth of
 // that source's dispersion knee, measured for rtAudience and metacritic and inferred for the rest.
 // rtAudience counts the ratings the score was computed from, so its knee is in ratings too.
-const HALF_CONFIDENCE = { imdb: 1111, rtAudience: 291, rtCritic: 8, metacritic: 3 }
+const HALF_WEIGHT_SAMPLES = { imdb: 1111, rtAudience: 291, rtCritic: 8, metacritic: 3 }
 
 // Total component weight below which a score is shown but marked as not settled — half a component's
-// worth of evidence, which IMDb alone reaches at its own half-confidence sample
+// worth of evidence, which IMDb alone reaches at its own half-weight sample
 const MIN_CONFIDENCE = 0.5
+
+// RT reports the share of raters above a like threshold, not a mean rating: `midpoint` is the
+// rating an even split implies, `spread` the rating points per standard deviation of the share
+const PERCENT_SOURCES = {
+  rtAudience: { midpoint: 55.9, spread: 17.8 },
+  rtCritic: { midpoint: 50.9, spread: 19.2 }
+}
+
+// The half-rater pulls a perfect share off the boundary, harder the thinner the sample. With no
+// sample to smooth by, the observed share stands as is rather than collapsing to the midpoint.
+function shareToRating(share, samples, { midpoint, spread }) {
+  const adjustedShare = samples ? (share / 100 * samples + 0.5) / (samples + 1) : share / 100
+
+  return Math.min(100, Math.max(0, midpoint + spread * inverseNormal(adjustedShare)))
+}
 
 // One row per source: which host answers for it, and where that host's page puts its numbers. A new
 // source is a row here plus a weighting constant above, not an edit in four parallel literals.
@@ -83,21 +98,25 @@ const FIRST_SEASON = '/s01'
 // the two can never disagree about how well sampled a record is.
 function weigh(record) {
   const scores = record?.scores ?? {}
+  const ratings = []
   let weighted = 0
   let total = 0
 
   for (const [source, value] of Object.entries(scores)) {
     // A floor stands in where RT bands a count instead of publishing it, and under-states it
     const samples = record.counts?.[source] ?? record.floors?.[source] ?? 0
-    const half = HALF_CONFIDENCE[source]
+    const percent = PERCENT_SOURCES[source]
+    const rating = percent ? shareToRating(value, samples, percent) : value
+    const half = HALF_WEIGHT_SAMPLES[source]
     // A source with no constant carries full weight, so adding one cannot silently drop it
     const weight = half === undefined ? 1 : samples / (samples + half)
 
-    weighted += weight * value
+    ratings.push(rating)
+    weighted += weight * rating
     total += weight
   }
 
-  return { scores, weighted, total }
+  return { scores, ratings, weighted, total }
 }
 
 /**
@@ -105,10 +124,10 @@ function weigh(record) {
  * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
  */
 export function aggregate(record) {
-  const { scores, weighted, total } = weigh(record)
+  const { ratings, weighted, total } = weigh(record)
 
   // Nothing carries a usable sample, so nothing is known to be better and the plain mean returns
-  const mean = total ? weighted / total : average(Object.values(scores))
+  const mean = total ? weighted / total : average(ratings)
 
   // Round here, so the number shown and the number sorted on are the same one
   return Number.isFinite(mean) ? Math.round(mean) : undefined

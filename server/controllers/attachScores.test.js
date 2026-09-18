@@ -73,7 +73,7 @@ test('one failed read costs its own badge, not the list', async () => {
 
 // Prove it on the well-sampled case: a mark on every badge would read as decoration
 test('a well-sampled row is not marked', async () => {
-  stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81, rtCritic: 90 }, counts: { imdb: 900_000, rtCritic: 300 } } })
+  stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81, metacritic: 90 }, counts: { imdb: 900_000, metacritic: 300 } } })
   const items = [{ id: 1 }]
 
   await attachScores(items, 'movies')
