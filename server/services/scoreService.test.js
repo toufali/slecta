@@ -225,8 +225,11 @@ test('init reads the stored catalogue average', async () => {
 
   try {
     await scoreService.init()
-
     assert.equal(aggregate(noAudience), 69)
+
+    redis.getCache = async () => null
+    await scoreService.init()
+    assert.equal(aggregate(noAudience), 69, 'a miss keeps the last loaded value')
   } finally {
     redis.getCache = async () => 64
     await scoreService.init()
