@@ -295,7 +295,7 @@ test('the run publishes a score index a card could be rendered from', async () =
       providers: [8],
       included: [8],
       originalLanguage: 'en',
-      score: 69
+      score: 74
     }])
   } finally {
     redis.setCache = realSetCache
@@ -317,7 +317,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const { restore } = stub({ movies })
   const written = new Map()
   const realSetCache = redis.setCache
-  const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 90, [scoreKey('movies', 3)]: 90, [scoreKey('movies', 4)]: 90, [scoreKey('movies', 5)]: 90 }
+  const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 84, [scoreKey('movies', 3)]: 84, [scoreKey('movies', 4)]: 84, [scoreKey('movies', 5)]: 84 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
   scoreService.getScoreFromCache = async key => ({ scores: { imdb: scores[key] }, counts: { imdb: 500_000 } })
@@ -326,7 +326,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
     await cacheScores()
 
     assert.deepEqual(written.get(MOVIE_INDEX).map(entry => [entry.score, entry.votes, entry.id]),
-      [[96, 900, 2], [96, 500, 3], [96, 500, 4], [96, 500, 5], [83, 100, 1]])
+      [[94, 900, 2], [94, 500, 3], [94, 500, 4], [94, 500, 5], [88, 100, 1]])
   } finally {
     redis.setCache = realSetCache
     restore()
@@ -533,7 +533,7 @@ test('a short catalogue walk keeps the rows it could not confirm, and duplicates
     assert.equal(stats.indexFailed, false)
     assert.equal(rows.length, 55, '54 walked plus the one title the short walk never reached')
     assert.equal(rows.filter(row => row.id === 100).length, 1, 'a walked title is refreshed, not carried too')
-    assert.equal(rows.find(row => row.id === 100).score, 69, 'and refreshed from storage, not carried')
+    assert.equal(rows.find(row => row.id === 100).score, 74, 'and refreshed from storage, not carried')
   } finally {
     redis.getCache = realGetCache
     redis.setCache = realSetCache
@@ -601,7 +601,7 @@ test('a carried row takes its score from the record, not from the previous index
     await cacheScores()
     const carried = written.get(MOVIE_INDEX).find(row => row.id === 99)
 
-    assert.equal(carried.score, 49)
+    assert.equal(carried.score, 53)
     assert.equal(carried.originalLanguage, 'fr', 'a carried row keeps the fields the walk did not resupply')
   } finally {
     redis.getCache = realGetCache
@@ -724,7 +724,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     const { stats: [stats] } = await cacheScores()
     const [row] = writes.get(MOVIE_INDEX)
 
-    assert.equal(row.score, 78, 'the row carries the stored score')
+    assert.equal(row.score, 83, 'the row carries the stored score')
     // Coverage still measures tonight's attempt, which is what detects a source going down
     assert.deepEqual(stats.outcomes, {
       imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }

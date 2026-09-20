@@ -53,10 +53,12 @@ const PERCENT_SOURCES = {
 // Votes at which a title's own score gets half the weight against the catalogue average
 const HALF_WEIGHT_VOTES = 3000
 
-// 1st and 99th percentile of a sample spanning all-time titles, and the displayed range they map
-// onto. Anchored on that sample rather than the 12-month catalogue, so nothing drifts as the
-// window rolls.
-const SCALE_FROM = [22, 90.7]
+// The shrunk range mapped onto the displayed one. Committed rather than recomputed from the rolling
+// catalogue, so nothing drifts as the window moves. The low anchor is the 1st percentile of an
+// all-time sample; the high one is chosen, not measured, to put a handful of titles a year above 90.
+const SCALE_FROM = [22, 86]
+
+// The top is a cap, the bottom only where that percentile lands: a worse title still reaches 0.
 const SCALE_TO = [5, 97]
 
 // The stored average is the one the published index was built with; a run parks its own mean
@@ -172,7 +174,7 @@ export function aggregate(record) {
   const stretched = toLow + (shrunk - fromLow) * (toHigh - toLow) / (fromHigh - fromLow)
 
   // Round here, so the number shown and the number sorted on are the same one
-  return Math.round(Math.min(100, Math.max(0, stretched)))
+  return Math.round(Math.min(toHigh, Math.max(0, stretched)))
 }
 
 /**
