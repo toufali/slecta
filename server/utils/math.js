@@ -53,15 +53,17 @@ export function toFloor(value) {
 }
 
 /**
- * How far from average a percentile sits on a bell curve, in standard deviations.
- * inverseNormal(0.5) is 0, dead average; inverseNormal(0.94) is about 1.55, the point with
- * 94% of the population below it. No exact formula exists, so this is Acklam's approximation:
- * a ratio of two polynomials imitates the curve through the middle of the range, a second pair
- * handles the tails. The coefficients are the published constants of that fit — universal
- * numbers, not derived from our data — and truncating them would only cost precision.
+ * How far from average a percentile sits on a bell curve, in standard deviations — what
+ * statistics calls the probit, or the normal quantile function. inverseNormal(0.5) is 0, dead
+ * average; inverseNormal(0.94) is about 1.55, the point with 94% of the population below it.
+ * No exact formula exists, so this is Acklam's approximation: a ratio of two polynomials
+ * imitates the curve through the middle of the range, a second pair handles the tails.
  * @param {number} p percentile as a fraction, exclusive of 0 and 1
  * @return {number}
  */
+// The four polynomials' coefficients, highest power first. Published by Acklam with the
+// algorithm, universal rather than derived from our data, and truncating them costs precision:
+// https://web.archive.org/web/20151030215612/http://home.online.no/~pjacklam/notes/invnorm/
 const CENTRAL_NUMERATOR = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239]
 const CENTRAL_DENOMINATOR = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572, 1]
 const TAIL_NUMERATOR = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783]
