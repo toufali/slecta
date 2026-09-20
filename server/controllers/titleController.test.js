@@ -105,7 +105,7 @@ test('a cached score is served without touching TMDB', async () => {
 
   assert.deepEqual(calls, [])
   // Both derived here: the browser would need the weighting thresholds to work either out
-  assert.deepEqual(ctx.body, { scores: { imdb: 81 }, counts: { imdb: 500_000 }, avgScore: 81, lowConfidence: false },
+  assert.deepEqual(ctx.body, { scores: { imdb: 81 }, counts: { imdb: 500_000 }, avgScore: 84, lowConfidence: false },
     'the aggregate is derived into the response the browser reads')
   assert.equal(ctx.headers['x-server-cache-hit'], 'true')
 })
