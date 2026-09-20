@@ -37,10 +37,10 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
     scored.push(key)
     passed.push(data)
     // `cached` is non-enumerable on the real record, and its absence counts as a failed write
-    return Object.defineProperty({ scores: { imdb: 70, metacritic: 70 } }, 'cached', { value: true })
+    return Object.defineProperty({ scores: { imdb: 70, metacritic: 70 }, counts: { imdb: 500_000 } }, 'cached', { value: true })
   }
   // The index reads storage, not tonight's attempt: a test wanting them to differ overrides this
-  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, metacritic: 70 } })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 70, metacritic: 70 }, counts: { imdb: 500_000 } })
 
   return { scored, passed, windows, restore: () => originals.forEach(([target, name, value]) => { target[name] = value }) }
 }
@@ -320,13 +320,35 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 90, [scoreKey('movies', 3)]: 90, [scoreKey('movies', 4)]: 90, [scoreKey('movies', 5)]: 90 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
-  scoreService.getScoreFromCache = async key => ({ scores: { imdb: scores[key] } })
+  scoreService.getScoreFromCache = async key => ({ scores: { imdb: scores[key] }, counts: { imdb: 500_000 } })
 
   try {
     await cacheScores()
 
     assert.deepEqual(written.get(MOVIE_INDEX).map(entry => [entry.score, entry.votes, entry.id]),
       [[90, 900, 2], [90, 500, 3], [90, 500, 4], [90, 500, 5], [80, 100, 1]])
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// Stored for the next boot rather than applied now, so one run shrinks toward one anchor
+test('the run stores tonight\u2019s catalogue average', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 1)
+    ? { scores: { imdb: 80 }, counts: { imdb: 500_000 } }
+    : { scores: { imdb: 60 }, counts: { imdb: 500_000 } }
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.get('catalogueAverage'), 70)
   } finally {
     redis.setCache = realSetCache
     restore()
@@ -528,8 +550,8 @@ test('a carried row takes its score from the record, not from the previous index
     ? [{ id: 99, score: 88, votes: 1, originalLanguage: 'fr' }]
     : realGetCache(key)
   scoreService.getScoreFromCache = async key => key === scoreKey('movies', 99)
-    ? { scores: { metacritic: 55 } }
-    : { scores: { imdb: 70 } }
+    ? { scores: { imdb: 55 }, counts: { imdb: 500_000 } }
+    : { scores: { imdb: 70 }, counts: { imdb: 500_000 } }
 
   try {
     await cacheScores()
@@ -652,7 +674,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     return fresh
   }
   // The write was refused, so the richer record is what the key still holds
-  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 } })
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 88, metacritic: 76, rtCritic: 80, rtAudience: 84 }, counts: { imdb: 500_000, metacritic: 40, rtCritic: 200, rtAudience: 5_000 } })
 
   try {
     const { stats: [stats] } = await cacheScores()

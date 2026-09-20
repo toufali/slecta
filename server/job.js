@@ -21,6 +21,7 @@ try {
   if (!await redis.init()) throw new Error('Redis unavailable, skipping the run')
 
   await tmdb.init()
+  await scoreService.init()
 
   // Only the batch has the volume to be worth spacing
   scoreService.throttleMs = HOST_INTERVAL

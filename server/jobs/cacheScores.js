@@ -1,7 +1,7 @@
 // Refreshes the IMDb dataset, warms score caches across both full catalogues, then verifies.
 
 import tmdb from '../services/tmdbService.js'
-import scoreService, { aggregate, scoreKey, SCORE_TTL } from '../services/scoreService.js'
+import scoreService, { aggregate, scoreKey, sourceMean, SCORE_TTL } from '../services/scoreService.js'
 import imdb from '../services/imdbService.js'
 import redis, { WRITTEN } from '../services/redisService.js'
 import { indexKey, byRank } from '../services/indexService.js'
@@ -50,10 +50,13 @@ export async function cacheScores() {
   if (movieList.reason) log.error('TMDB movie list lookup failed', { error: movieList.reason })
   if (showList.reason) log.error('TMDB show list lookup failed', { error: showList.reason })
 
+  // What tonight's scores shrink toward, averaged over both catalogues
+  const catalogueMeans = { sum: 0, count: 0 }
+
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
   const scored = await Promise.allSettled([
-    cacheScoresFor('movie', movieList.value ?? noTitles),
-    cacheScoresFor('tv', showList.value ?? noTitles)
+    cacheScoresFor('movie', movieList.value ?? noTitles, catalogueMeans),
+    cacheScoresFor('tv', showList.value ?? noTitles, catalogueMeans)
   ])
 
   for (const result of scored) {
@@ -61,6 +64,8 @@ export async function cacheScores() {
   }
 
   const stats = scored.map(result => result.value).filter(Boolean)
+
+  if (catalogueMeans.count) await scoreService.storeCatalogueAverage(catalogueMeans.sum / catalogueMeans.count)
 
   const coverage = checkRunCoverage(stats, imdbRefreshed)
   const reference = await checkReferenceTitles()
@@ -147,7 +152,7 @@ async function carryRows(mediaType, previous, carry) {
   return rows.filter(Boolean)
 }
 
-async function cacheScoresFor(mediaType, { titles, complete }) {
+async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
   // Ids whose stored record was read, whatever it held. Anything else is a title we cannot speak for
@@ -156,7 +161,7 @@ async function cacheScoresFor(mediaType, { titles, complete }) {
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
   await pool(titles, TITLES_IN_FLIGHT, async title => {
     try {
-      const entry = await scoreTitle(mediaType, title, stats, confirmed)
+      const entry = await scoreTitle(mediaType, title, stats, confirmed, catalogueMeans)
 
       if (entry) rows.push(entry)
     } catch (e) {
@@ -170,7 +175,7 @@ async function cacheScoresFor(mediaType, { titles, complete }) {
   return stats
 }
 
-async function scoreTitle(mediaType, title, stats, confirmed) {
+async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans) {
   const key = scoreKey(SEGMENT[mediaType], title.id)
 
   // Null means TMDB has no such title; a throw means the lookup failed. Both count as one failure.
@@ -223,6 +228,9 @@ async function scoreTitle(mediaType, title, stats, confirmed) {
 
   // Unscorable titles would sort as NaN
   if (avgScore === undefined) return
+
+  catalogueMeans.sum += sourceMean(row)
+  catalogueMeans.count++
 
   // `score` ranks and the rest filter; the badge is read from the record, never from the row. Ids
   // over names and paths over URLs, since imgConfig and the genre map rebuild those.

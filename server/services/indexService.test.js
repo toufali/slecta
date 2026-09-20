@@ -256,7 +256,7 @@ test('a re-rank moves the one row whose record was rewritten', async () => {
   const writes = []
   const reads = []
 
-  redis.getCache = async key => { reads.push(key); return { scores: { metacritic: 92 }, counts: { metacritic: 12 } } }
+  redis.getCache = async key => { reads.push(key); return { scores: { imdb: 92 }, counts: { imdb: 500_000 } } }
   redis.updateCache = async (key, transform) => { writes.push({ key, rows: transform(stored) }); return WRITTEN }
 
   try {
@@ -324,7 +324,7 @@ test('a re-rank stores nothing when there is nothing to move', async () => {
     record = null // expired between the write and this read
     await index.rerank('movie', 1)
 
-    record = { scores: { imdb: 87 }, counts: { imdb: 5000 } } // the rewrite kept the same number
+    record = { scores: { imdb: 87 }, counts: { imdb: 500_000 } } // the rewrite kept the same number
     await index.rerank('movie', 1)
 
     await index.rerank('movie', 99) // a title outside the window has no row
