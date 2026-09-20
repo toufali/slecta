@@ -53,8 +53,11 @@ export function toFloor(value) {
 }
 
 /**
- * Inverse of the standard normal CDF: the z-score below which a share of a
- * normal population falls. Acklam's rational approximation, |error| < 1.2e-9.
+ * Inverse of the standard normal CDF: the z-score below which a given share of a normal
+ * population falls — inverseNormal(0.94) is about 1.55, the 94th percentile sitting 1.55
+ * standard deviations above the mean. No closed form exists, so this is Acklam's
+ * approximation: a ratio of two polynomials fits the middle of the range, a second pair the
+ * tails. The coefficients are the published constants of that fit, good to |error| < 1.2e-9.
  * @param {number} p probability, exclusive of 0 and 1
  * @return {number}
  */
