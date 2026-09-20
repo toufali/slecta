@@ -333,22 +333,22 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   }
 })
 
-// Stored for the next boot rather than applied now, so one run shrinks toward one anchor
-test('the run activates its own anchor and parks tonight\u2019s mean for the next one', async () => {
+// Stored only after both indexes published, so rows and badges cannot read two different values
+test('the run stores the average it scored with, and parks tonight\u2019s mean for the next one', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
-  const { restore } = stub({ movies, totalResults: 2 })
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, shows, totalResults: 2 })
   const written = new Map()
   const realSetCache = redis.setCache
+  const scores = { [scoreKey('movies', 1)]: 80, [scoreKey('movies', 2)]: 60, [scoreKey('shows', 9)]: 70 }
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
-  scoreService.getScoreFromCache = async key => key === scoreKey('movies', 1)
-    ? { scores: { imdb: 80 }, counts: { imdb: 500_000 } }
-    : { scores: { imdb: 60 }, counts: { imdb: 500_000 } }
+  scoreService.getScoreFromCache = async key => ({ scores: { imdb: scores[key] }, counts: { imdb: 500_000 } })
 
   try {
     await cacheScores()
 
-    assert.equal(written.get('catalogueAverage'), 64, 'the anchor this index was built with')
+    assert.equal(written.get('catalogueAverage'), 64, 'the average this run scored with')
     assert.equal(written.get('catalogueAverage/next'), 70)
   } finally {
     redis.setCache = realSetCache
@@ -356,8 +356,8 @@ test('the run activates its own anchor and parks tonight\u2019s mean for the nex
   }
 })
 
-// One catalogue alone would drag the anchor toward its own average
-test('an incomplete walk leaves the stored anchor alone', async () => {
+// One catalogue alone would drag the stored average toward its own
+test('an incomplete walk leaves the stored average alone', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies, totalResults: 40 })
   const written = new Map()
@@ -371,6 +371,30 @@ test('an incomplete walk leaves the stored anchor alone', async () => {
 
     assert.equal(written.has('catalogueAverage'), false)
     assert.equal(written.has('catalogueAverage/next'), false)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// An index that failed to publish keeps yesterday's rows, so the average they were built with stays too
+test('a failed index publish leaves the stored average alone', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalResults: 1 })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => {
+    if (key === MOVIE_INDEX) return FAILED
+    written.set(key, value)
+    return WRITTEN
+  }
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 80 }, counts: { imdb: 500_000 } })
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.has('catalogueAverage'), false)
   } finally {
     redis.setCache = realSetCache
     restore()

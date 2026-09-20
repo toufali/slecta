@@ -53,10 +53,12 @@ const PERCENT_SOURCES = {
 // Votes at which a title's own score gets half the weight against the catalogue average
 const HALF_WEIGHT_VOTES = 3000
 
-// The active anchor is the one the published index was built with; a run's own mean is parked
-// under the next key and promoted by the run that uses it, so badges and rows never disagree
+// The stored average is the one the published index was built with; a run parks its own mean
+// under the next key, and the run that scores with it is the one that stores it. Badges and
+// index rows therefore always read one value.
 const CATALOGUE_AVERAGE_KEY = 'catalogueAverage'
 const NEXT_CATALOGUE_AVERAGE_KEY = 'catalogueAverage/next'
+const REFRESH_AVERAGE_MS = 60 * 60 * 1000
 // The committed value only seeds a cache holding no stored average yet
 let catalogueAverage = 64
 
@@ -230,10 +232,15 @@ class ScoreService {
   // to be spaced against.
   throttleMs = 0
 
+  #refreshTimer
+
   async init() {
     const stored = await redis.getCache(CATALOGUE_AVERAGE_KEY)
 
     if (Number.isFinite(stored)) catalogueAverage = stored
+
+    // A warm instance outliving the nightly run would keep scoring against the old average
+    this.#refreshTimer ??= setInterval(() => this.init(), REFRESH_AVERAGE_MS).unref()
   }
 
   // The nightly run advances to the parked mean and scores everything against it
@@ -244,12 +251,15 @@ class ScoreService {
     else await this.init()
   }
 
-  // After the index is published: activate the anchor it was built with, park tonight's mean
   async storeCatalogueAverage(tonightMean) {
     if (!Number.isFinite(tonightMean)) return
 
-    await redis.setCache(CATALOGUE_AVERAGE_KEY, catalogueAverage, SCORE_TTL)
-    await redis.setCache(NEXT_CATALOGUE_AVERAGE_KEY, tonightMean, SCORE_TTL)
+    const active = await redis.setCache(CATALOGUE_AVERAGE_KEY, catalogueAverage, SCORE_TTL)
+    const next = await redis.setCache(NEXT_CATALOGUE_AVERAGE_KEY, tonightMean, SCORE_TTL)
+
+    if (active !== WRITTEN || next !== WRITTEN) {
+      log.warn('Catalogue average not stored', { active, next })
+    }
   }
 
   async getScoreFromCache(key) {

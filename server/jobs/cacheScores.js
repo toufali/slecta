@@ -50,7 +50,7 @@ export async function cacheScores() {
   if (movieList.reason) log.error('TMDB movie list lookup failed', { error: movieList.reason })
   if (showList.reason) log.error('TMDB show list lookup failed', { error: showList.reason })
 
-  // What tonight's scores shrink toward, averaged over both catalogues
+  // What the next run's scores shrink toward, averaged over both catalogues
   const catalogueMeans = { sum: 0, count: 0 }
 
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
@@ -65,10 +65,11 @@ export async function cacheScores() {
 
   const stats = scored.map(result => result.value).filter(Boolean)
 
-  // A partial catalogue would skew the anchor toward whichever half survived
-  const walksComplete = movieList.value?.complete && showList.value?.complete
+  // A partial catalogue or an unpublished index would skew the average toward whichever half survived
+  const runHealthy = movieList.value?.complete && showList.value?.complete
+    && stats.length === 2 && stats.every(stat => !stat.indexFailed)
 
-  if (walksComplete && catalogueMeans.count) await scoreService.storeCatalogueAverage(catalogueMeans.sum / catalogueMeans.count)
+  if (runHealthy && catalogueMeans.count) await scoreService.storeCatalogueAverage(catalogueMeans.sum / catalogueMeans.count)
 
   const coverage = checkRunCoverage(stats, imdbRefreshed)
   const reference = await checkReferenceTitles()
