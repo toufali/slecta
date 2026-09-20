@@ -58,7 +58,6 @@ const HALF_WEIGHT_VOTES = 3000
 // index rows therefore always read one value.
 const CATALOGUE_AVERAGE_KEY = 'catalogueAverage'
 const NEXT_CATALOGUE_AVERAGE_KEY = 'catalogueAverage/next'
-const REFRESH_AVERAGE_MS = 60 * 60 * 1000
 // The committed value only seeds a cache holding no stored average yet
 let catalogueAverage = 64
 
@@ -232,15 +231,10 @@ class ScoreService {
   // to be spaced against.
   throttleMs = 0
 
-  #refreshTimer
-
   async init() {
     const stored = await redis.getCache(CATALOGUE_AVERAGE_KEY)
 
     if (Number.isFinite(stored)) catalogueAverage = stored
-
-    // A warm instance outliving the nightly run would keep scoring against the old average
-    this.#refreshTimer ??= setInterval(() => this.init(), REFRESH_AVERAGE_MS).unref()
   }
 
   async initRun() {
