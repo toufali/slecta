@@ -53,6 +53,12 @@ const PERCENT_SOURCES = {
 // Votes at which a title's own score gets half the weight against the catalogue average
 const HALF_WEIGHT_VOTES = 3000
 
+// 1st and 99th percentile of a sample spanning all-time titles, and the displayed range they map
+// onto. Anchored on that sample rather than the 12-month catalogue, so nothing drifts as the
+// window rolls.
+const SCALE_FROM = [22, 90.7]
+const SCALE_TO = [5, 97]
+
 // The stored average is the one the published index was built with; a run parks its own mean
 // under the next key, and the run that scores with it is the one that stores it. Badges and
 // index rows therefore always read one value.
@@ -144,10 +150,11 @@ export function sourceMean(record) {
 }
 
 /**
- * Aggregate a stored record's components, weighting each by how well sampled it is, then shrink
+ * Aggregate a stored record's components, weighting each by how well sampled it is, shrink
  * toward the catalogue average — harder the fewer people rated it, since a thin audience is
- * usually a self-selected one. Derived rather than stored, so retuning the constants needs no
- * cache version and no cold run.
+ * usually a self-selected one — then stretch onto the displayed range, which shrinkage would
+ * otherwise leave too narrow to distinguish anything. Derived rather than stored, so retuning
+ * the constants needs no cache version and no cold run.
  */
 export function aggregate(record) {
   const mean = sourceMean(record)
@@ -157,9 +164,15 @@ export function aggregate(record) {
   // How many saw it: an audience count from any source, never a critic count
   const votes = record.counts?.imdb ?? record.counts?.rtAudience ?? record.floors?.rtAudience ?? 0
   const ownWeight = votes / (votes + HALF_WEIGHT_VOTES)
+  const shrunk = ownWeight * mean + (1 - ownWeight) * catalogueAverage
+
+  // Order-preserving, so the spread can be retuned without re-reviewing any ranking
+  const [fromLow, fromHigh] = SCALE_FROM
+  const [toLow, toHigh] = SCALE_TO
+  const stretched = toLow + (shrunk - fromLow) * (toHigh - toLow) / (fromHigh - fromLow)
 
   // Round here, so the number shown and the number sorted on are the same one
-  return Math.round(ownWeight * mean + (1 - ownWeight) * catalogueAverage)
+  return Math.round(Math.min(100, Math.max(0, stretched)))
 }
 
 /**
