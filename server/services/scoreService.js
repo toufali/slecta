@@ -50,6 +50,17 @@ const PERCENT_SOURCES = {
   rtCritic: { midpoint: 50.9, spread: 19.2 }
 }
 
+// Votes at which a title's own score gets half the weight against the catalogue average
+const HALF_WEIGHT_VOTES = 3000
+
+// The stored average is the one the published index was built with; a run parks its own mean
+// under the next key, and the run that scores with it is the one that stores it. Badges and
+// index rows therefore always read one value.
+const CATALOGUE_AVERAGE_KEY = 'catalogueAverage'
+const NEXT_CATALOGUE_AVERAGE_KEY = 'catalogueAverage/next'
+// The committed value only seeds a cache holding no stored average yet
+let catalogueAverage = 64
+
 // The half-rater pulls a perfect share off the boundary, harder the thinner the sample; with no
 // sample to smooth by, the observed share stands.
 function shareToRating(share, samples, { midpoint, spread }) {
@@ -120,17 +131,35 @@ function weigh(record) {
 }
 
 /**
- * Aggregate a stored record's components, weighting each by how well sampled it is.
- * Derived rather than stored, so retuning the constants needs no cache version and no cold run.
+ * The weighted mean across a record's components alone, before the audience-size shrink.
+ * The nightly job averages this over the catalogue to recompute what aggregate shrinks toward.
  */
-export function aggregate(record) {
+export function sourceMean(record) {
   const { ratings, weighted, total } = weigh(record)
 
   // Nothing carries a usable sample, so nothing is known to be better and the plain mean returns
   const mean = total ? weighted / total : average(ratings)
 
+  return Number.isFinite(mean) ? mean : undefined
+}
+
+/**
+ * Aggregate a stored record's components, weighting each by how well sampled it is, then shrink
+ * toward the catalogue average — harder the fewer people rated it, since a thin audience is
+ * usually a self-selected one. Derived rather than stored, so retuning the constants needs no
+ * cache version and no cold run.
+ */
+export function aggregate(record) {
+  const mean = sourceMean(record)
+
+  if (mean === undefined) return undefined
+
+  // How many saw it: an audience count from any source, never a critic count
+  const votes = record.counts?.imdb ?? record.counts?.rtAudience ?? record.floors?.rtAudience ?? 0
+  const ownWeight = votes / (votes + HALF_WEIGHT_VOTES)
+
   // Round here, so the number shown and the number sorted on are the same one
-  return Number.isFinite(mean) ? Math.round(mean) : undefined
+  return Math.round(ownWeight * mean + (1 - ownWeight) * catalogueAverage)
 }
 
 /**
@@ -201,6 +230,30 @@ class ScoreService {
   // ms between requests to one host, set by the nightly job. A visitor's single title has nothing
   // to be spaced against.
   throttleMs = 0
+
+  async init() {
+    const stored = await redis.getCache(CATALOGUE_AVERAGE_KEY)
+
+    if (Number.isFinite(stored)) catalogueAverage = stored
+  }
+
+  async initRun() {
+    const next = await redis.getCache(NEXT_CATALOGUE_AVERAGE_KEY)
+
+    if (Number.isFinite(next)) catalogueAverage = next
+    else await this.init()
+  }
+
+  async storeCatalogueAverage(tonightMean) {
+    if (!Number.isFinite(tonightMean)) return
+
+    const active = await redis.setCache(CATALOGUE_AVERAGE_KEY, catalogueAverage, SCORE_TTL)
+    const next = await redis.setCache(NEXT_CATALOGUE_AVERAGE_KEY, tonightMean, SCORE_TTL)
+
+    if (active !== WRITTEN || next !== WRITTEN) {
+      log.warn('Catalogue average not stored', { active, next })
+    }
+  }
 
   async getScoreFromCache(key) {
     return await redis.getCache(key)

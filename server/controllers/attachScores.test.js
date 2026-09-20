@@ -27,19 +27,18 @@ function stubCache(records) {
 }
 
 test('each row gets its own cached badge, keyed by media segment', async () => {
-  const asked = stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81 } }, [scoreKey('movies', 2)]: { scores: { imdb: 64 } } })
+  const asked = stubCache({ [scoreKey('movies', 1)]: { scores: { imdb: 81 }, counts: { imdb: 500_000 } }, [scoreKey('movies', 2)]: { scores: { imdb: 64 }, counts: { imdb: 500_000 } } })
   const items = [{ id: 1 }, { id: 2 }]
 
   await attachScores(items, 'movies')
 
-  // Both marked: neither fixture carries a sample size
-  assert.deepEqual(items, [{ id: 1, score: 81, lowConfidence: true }, { id: 2, score: 64, lowConfidence: true }])
+  assert.deepEqual(items, [{ id: 1, score: 81, lowConfidence: false }, { id: 2, score: 64, lowConfidence: false }])
   assert.deepEqual(asked, [scoreKey('movies', 1), scoreKey('movies', 2)])
 })
 
 // A movie and a show can share a TMDB id, so the segment is load-bearing rather than cosmetic
 test('the segment reaches the key', async () => {
-  const asked = stubCache({ [scoreKey('shows', 1)]: { scores: { imdb: 55 } } })
+  const asked = stubCache({ [scoreKey('shows', 1)]: { scores: { imdb: 55 }, counts: { imdb: 500_000 } } })
   const items = [{ id: 1 }]
 
   await attachScores(items, 'shows')
