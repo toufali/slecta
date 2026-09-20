@@ -53,12 +53,13 @@ export function toFloor(value) {
 }
 
 /**
- * Inverse of the standard normal CDF: the z-score below which a given share of a normal
- * population falls — inverseNormal(0.94) is about 1.55, the 94th percentile sitting 1.55
- * standard deviations above the mean. No closed form exists, so this is Acklam's
- * approximation: a ratio of two polynomials fits the middle of the range, a second pair the
- * tails. The coefficients are the published constants of that fit, good to |error| < 1.2e-9.
- * @param {number} p probability, exclusive of 0 and 1
+ * How far from average a percentile sits on a bell curve, in standard deviations.
+ * inverseNormal(0.5) is 0, dead average; inverseNormal(0.94) is about 1.55, the point with
+ * 94% of the population below it. No exact formula exists, so this is Acklam's approximation:
+ * a ratio of two polynomials imitates the curve through the middle of the range, a second pair
+ * handles the tails. The coefficients are the published constants of that fit — universal
+ * numbers, not derived from our data — and truncating them would only cost precision.
+ * @param {number} p percentile as a fraction, exclusive of 0 and 1
  * @return {number}
  */
 const CENTRAL_NUMERATOR = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239]
