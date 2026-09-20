@@ -65,7 +65,10 @@ export async function cacheScores() {
 
   const stats = scored.map(result => result.value).filter(Boolean)
 
-  if (catalogueMeans.count) await scoreService.storeCatalogueAverage(catalogueMeans.sum / catalogueMeans.count)
+  // A partial catalogue would skew the anchor toward whichever half survived
+  const walksComplete = movieList.value?.complete && showList.value?.complete
+
+  if (walksComplete && catalogueMeans.count) await scoreService.storeCatalogueAverage(catalogueMeans.sum / catalogueMeans.count)
 
   const coverage = checkRunCoverage(stats, imdbRefreshed)
   const reference = await checkReferenceTitles()

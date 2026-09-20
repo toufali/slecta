@@ -53,7 +53,10 @@ const PERCENT_SOURCES = {
 // Votes at which a title's own score gets half the weight against the catalogue average
 const HALF_WEIGHT_VOTES = 3000
 
+// The active anchor is the one the published index was built with; a run's own mean is parked
+// under the next key and promoted by the run that uses it, so badges and rows never disagree
 const CATALOGUE_AVERAGE_KEY = 'catalogueAverage'
+const NEXT_CATALOGUE_AVERAGE_KEY = 'catalogueAverage/next'
 // The committed value only seeds a cache holding no stored average yet
 let catalogueAverage = 64
 
@@ -233,11 +236,20 @@ class ScoreService {
     if (Number.isFinite(stored)) catalogueAverage = stored
   }
 
-  // Written for the next boot, not applied now: one run shrinks every title toward the same anchor
-  async storeCatalogueAverage(value) {
-    if (!Number.isFinite(value)) return
+  // The nightly run advances to the parked mean and scores everything against it
+  async initRun() {
+    const next = await redis.getCache(NEXT_CATALOGUE_AVERAGE_KEY)
 
-    await redis.setCache(CATALOGUE_AVERAGE_KEY, value, SCORE_TTL)
+    if (Number.isFinite(next)) catalogueAverage = next
+    else await this.init()
+  }
+
+  // After the index is published: activate the anchor it was built with, park tonight's mean
+  async storeCatalogueAverage(tonightMean) {
+    if (!Number.isFinite(tonightMean)) return
+
+    await redis.setCache(CATALOGUE_AVERAGE_KEY, catalogueAverage, SCORE_TTL)
+    await redis.setCache(NEXT_CATALOGUE_AVERAGE_KEY, tonightMean, SCORE_TTL)
   }
 
   async getScoreFromCache(key) {

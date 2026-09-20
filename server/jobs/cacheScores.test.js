@@ -334,9 +334,9 @@ test('the index is stored already ranked, ties broken by votes then id', async (
 })
 
 // Stored for the next boot rather than applied now, so one run shrinks toward one anchor
-test('the run stores tonight\u2019s catalogue average', async () => {
+test('the run activates its own anchor and parks tonight\u2019s mean for the next one', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
-  const { restore } = stub({ movies })
+  const { restore } = stub({ movies, totalResults: 2 })
   const written = new Map()
   const realSetCache = redis.setCache
 
@@ -348,7 +348,29 @@ test('the run stores tonight\u2019s catalogue average', async () => {
   try {
     await cacheScores()
 
-    assert.equal(written.get('catalogueAverage'), 70)
+    assert.equal(written.get('catalogueAverage'), 64, 'the anchor this index was built with')
+    assert.equal(written.get('catalogueAverage/next'), 70)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
+// One catalogue alone would drag the anchor toward its own average
+test('an incomplete walk leaves the stored anchor alone', async () => {
+  const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ movies, totalResults: 40 })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  scoreService.getScoreFromCache = async () => ({ scores: { imdb: 80 }, counts: { imdb: 500_000 } })
+
+  try {
+    await cacheScores()
+
+    assert.equal(written.has('catalogueAverage'), false)
+    assert.equal(written.has('catalogueAverage/next'), false)
   } finally {
     redis.setCache = realSetCache
     restore()
