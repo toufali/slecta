@@ -218,7 +218,6 @@ test('a perfect share converts lower the thinner its sample', () => {
   assert.equal(perfect(1_708), 100)
 })
 
-// What the badge shrinks toward comes from the last run, not from a committed constant
 test('init reads the stored catalogue average', async () => {
   const noAudience = { scores: { metacritic: 88 }, counts: { metacritic: 63 } }
 
@@ -238,7 +237,6 @@ test('init reads the stored catalogue average', async () => {
   }
 })
 
-// Fans rating a concert film 92 are not the broad audience the badge claims to estimate
 test('a thin audience shrinks toward the catalogue average', () => {
   const record = { scores: { imdb: 81, rtAudience: 100 }, counts: { imdb: 1_579, rtAudience: 1_708 } }
 

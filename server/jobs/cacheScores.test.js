@@ -333,7 +333,6 @@ test('the index is stored already ranked, ties broken by votes then id', async (
   }
 })
 
-// Stored only after both indexes published, so rows and badges cannot read two different values
 test('the run stores the average it scored with, and parks tonight\u2019s mean for the next one', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }, { page: 1, id: 2, releaseDate: '2026-01-01' }]
   const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
@@ -356,7 +355,6 @@ test('the run stores the average it scored with, and parks tonight\u2019s mean f
   }
 })
 
-// One catalogue alone would drag the stored average toward its own
 test('an incomplete walk leaves the stored average alone', async () => {
   const movies = [{ page: 1, id: 1, releaseDate: '2026-01-01' }]
   const { restore } = stub({ movies, totalResults: 40 })

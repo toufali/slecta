@@ -243,7 +243,6 @@ class ScoreService {
     this.#refreshTimer ??= setInterval(() => this.init(), REFRESH_AVERAGE_MS).unref()
   }
 
-  // The nightly run advances to the parked mean and scores everything against it
   async initRun() {
     const next = await redis.getCache(NEXT_CATALOGUE_AVERAGE_KEY)
 
