@@ -139,17 +139,6 @@ body > main{
   display: none;
 }
 
-.back::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-left: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-  margin-right: var(--padding-sm);
-}
-
 footer{
   position: relative;
   margin-top: var(--padding-lg);

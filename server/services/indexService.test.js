@@ -256,7 +256,7 @@ test('a re-rank moves the one row whose record was rewritten', async () => {
   const writes = []
   const reads = []
 
-  redis.getCache = async key => { reads.push(key); return { scores: { rtCritic: 92 }, counts: { rtCritic: 12 } } }
+  redis.getCache = async key => { reads.push(key); return { scores: { metacritic: 92 }, counts: { metacritic: 12 } } }
   redis.updateCache = async (key, transform) => { writes.push({ key, rows: transform(stored) }); return WRITTEN }
 
   try {
