@@ -57,8 +57,8 @@ const HALF_WEIGHT_VOTES = 3000
 // measured; the high end is chosen to put a few titles a year above 90.
 const SCALE_FROM = [22, 86]
 
-// The top is a cap; the bottom is not, so a worse title still reaches 0
-const SCALE_TO = [5, 97]
+// Both ends are hard bounds, not waypoints
+const SCALE_TO = [1, 99]
 
 // The stored average is the one the published index was built with; a run parks its own mean
 // under the next key, and the run that scores with it is the one that stores it. Badges and
@@ -67,6 +67,10 @@ const CATALOGUE_AVERAGE_KEY = 'catalogueAverage'
 const NEXT_CATALOGUE_AVERAGE_KEY = 'catalogueAverage/next'
 // The committed value only seeds a cache holding no stored average yet
 let catalogueAverage = 64
+
+// How much of the blended mean the critic sources hold; the audience holds the rest
+const CRITIC_SHARE = 0.3
+const AUDIENCE_SOURCES = new Set(['imdb', 'rtAudience'])
 
 // The half-rater pulls a perfect share off the boundary, harder the thinner the sample; with no
 // sample to smooth by, the observed share stands.
@@ -115,12 +119,10 @@ const FIRST_SEASON = '/s01'
 // Weighted sum and total weight, which the score and its confidence are both read off. One loop, so
 // the two can never disagree about how well sampled a record is.
 function weigh(record) {
-  const scores = record?.scores ?? {}
-  const ratings = []
-  let weighted = 0
+  const entries = []
   let total = 0
 
-  for (const [source, value] of Object.entries(scores)) {
+  for (const [source, value] of Object.entries(record?.scores ?? {})) {
     // A floor stands in where RT bands a count instead of publishing it, and under-states it
     const samples = record.counts?.[source] ?? record.floors?.[source] ?? 0
     const percent = PERCENT_SOURCES[source]
@@ -129,12 +131,20 @@ function weigh(record) {
     // A source with no constant carries full weight, so adding one cannot silently drop it
     const weight = half === undefined ? 1 : samples / (samples + half)
 
-    ratings.push(rating)
-    weighted += weight * rating
+    entries.push({ source, rating, samples, weight })
     total += weight
   }
 
-  return { scores, ratings, weighted, total }
+  return { entries, total }
+}
+
+// Weightless entries fall back to the plain mean: nothing is known to be better
+const familyMean = (entries, weightOf) => {
+  const total = entries.reduce((sum, entry) => sum + weightOf(entry), 0)
+
+  if (!total) return average(entries.map(entry => entry.rating))
+
+  return entries.reduce((sum, entry) => sum + weightOf(entry) * entry.rating, 0) / total
 }
 
 /**
@@ -142,12 +152,17 @@ function weigh(record) {
  * The nightly job averages this over the catalogue to recompute what aggregate shrinks toward.
  */
 export function sourceMean(record) {
-  const { ratings, weighted, total } = weigh(record)
+  const { entries } = weigh(record)
+  // Critics weigh by their own sample constants, since 8 reviews is a settled sample; the
+  // audience weighs by raw headcount, since there how many people is the whole question
+  const critics = entries.filter(entry => !AUDIENCE_SOURCES.has(entry.source))
+  const audience = entries.filter(entry => AUDIENCE_SOURCES.has(entry.source))
+  const criticMean = critics.length ? familyMean(critics, entry => entry.weight) : undefined
+  const audienceMean = audience.length ? familyMean(audience, entry => entry.samples) : undefined
 
-  // Nothing carries a usable sample, so nothing is known to be better and the plain mean returns
-  const mean = total ? weighted / total : average(ratings)
+  if (criticMean === undefined || audienceMean === undefined) return criticMean ?? audienceMean
 
-  return Number.isFinite(mean) ? mean : undefined
+  return CRITIC_SHARE * criticMean + (1 - CRITIC_SHARE) * audienceMean
 }
 
 /**
@@ -173,7 +188,7 @@ export function aggregate(record) {
   const stretched = toLow + (shrunk - fromLow) * (toHigh - toLow) / (fromHigh - fromLow)
 
   // Round here, so the number shown and the number sorted on are the same one
-  return Math.round(Math.min(toHigh, Math.max(0, stretched)))
+  return Math.round(Math.min(toHigh, Math.max(toLow, stretched)))
 }
 
 /**
@@ -182,9 +197,11 @@ export function aggregate(record) {
  * qualifying it. False for a record nothing scored, so no caller has to ask that first.
  */
 export function lowConfidence(record) {
-  const { scores, total } = weigh(record)
+  // Read off the summed weights, not the blend: how much evidence exists is a different question
+  // from how to combine it, and a blend's shares always sum to exactly 1
+  const { entries, total } = weigh(record)
 
-  return Object.keys(scores).length > 0 && total < MIN_CONFIDENCE
+  return entries.length > 0 && total < MIN_CONFIDENCE
 }
 
 // Undici holds the connection until a body is read or cancelled, and every path here

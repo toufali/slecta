@@ -326,7 +326,7 @@ test('the index is stored already ranked, ties broken by votes then id', async (
     await cacheScores()
 
     assert.deepEqual(written.get(MOVIE_INDEX).map(entry => [entry.score, entry.votes, entry.id]),
-      [[94, 900, 2], [94, 500, 3], [94, 500, 4], [94, 500, 5], [88, 100, 1]])
+      [[96, 900, 2], [96, 500, 3], [96, 500, 4], [96, 500, 5], [90, 100, 1]])
   } finally {
     redis.setCache = realSetCache
     restore()
@@ -601,7 +601,7 @@ test('a carried row takes its score from the record, not from the previous index
     await cacheScores()
     const carried = written.get(MOVIE_INDEX).find(row => row.id === 99)
 
-    assert.equal(carried.score, 53)
+    assert.equal(carried.score, 52)
     assert.equal(carried.originalLanguage, 'fr', 'a carried row keeps the fields the walk did not resupply')
   } finally {
     redis.getCache = realGetCache
@@ -724,7 +724,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     const { stats: [stats] } = await cacheScores()
     const [row] = writes.get(MOVIE_INDEX)
 
-    assert.equal(row.score, 83, 'the row carries the stored score')
+    assert.equal(row.score, 94, 'the row carries the stored score')
     // Coverage still measures tonight's attempt, which is what detects a source going down
     assert.deepEqual(stats.outcomes, {
       imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }
