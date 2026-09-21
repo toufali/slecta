@@ -1,3 +1,7 @@
+// Green is a shortlisting signal, kept scarce
+const GREEN_FLOOR = 80
+const YELLOW_FLOOR = 64
+
 const html = `
 <style>
   :host{
@@ -166,13 +170,13 @@ if (typeof HTMLElement !== 'undefined') {
       this.#outputEl.textContent = Number.isFinite(this.#score) ? Math.round(this.#score) : ''
 
       switch (true) {
-        case this.#score >= 75:
+        case this.#score >= GREEN_FLOOR:
           this.style.setProperty('--color', 'var(--green-50)')
           break
-        case this.#score >= 60:
+        case this.#score >= YELLOW_FLOOR:
           this.style.setProperty('--color', 'var(--yellow-50)')
           break
-        case this.#score < 60:
+        case this.#score < YELLOW_FLOOR:
           this.style.setProperty('--color', 'var(--red-50)')
           break
       }
