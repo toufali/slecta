@@ -1,6 +1,6 @@
 // Green is a shortlisting signal, kept scarce
 const GREEN_FLOOR = 80
-const YELLOW_FLOOR = 64
+const YELLOW_FLOOR = 65
 
 const html = `
 <style>
