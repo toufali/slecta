@@ -53,12 +53,11 @@ const PERCENT_SOURCES = {
 // Votes at which a title's own score gets half the weight against the catalogue average
 const HALF_WEIGHT_VOTES = 3000
 
-// The shrunk range mapped onto the displayed one. Committed rather than recomputed from the rolling
-// catalogue, so nothing drifts as the window moves. The low anchor is the 1st percentile of an
-// all-time sample; the high one is chosen, not measured, to put a handful of titles a year above 90.
+// Committed rather than recomputed, so nothing drifts as the window rolls. The low end is
+// measured; the high end is chosen to put a few titles a year above 90.
 const SCALE_FROM = [22, 86]
 
-// The top is a cap, the bottom only where that percentile lands: a worse title still reaches 0.
+// The top is a cap; the bottom is not, so a worse title still reaches 0
 const SCALE_TO = [5, 97]
 
 // The stored average is the one the published index was built with; a run parks its own mean
