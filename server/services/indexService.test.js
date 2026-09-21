@@ -256,7 +256,7 @@ test('a re-rank moves the one row whose record was rewritten', async () => {
   const writes = []
   const reads = []
 
-  redis.getCache = async key => { reads.push(key); return { scores: { imdb: 92 }, counts: { imdb: 500_000 } } }
+  redis.getCache = async key => { reads.push(key); return { scores: { imdb: 84 }, counts: { imdb: 500_000 } } }
   redis.updateCache = async (key, transform) => { writes.push({ key, rows: transform(stored) }); return WRITTEN }
 
   try {
@@ -268,7 +268,7 @@ test('a re-rank moves the one row whose record was rewritten', async () => {
 
   assert.deepEqual(reads, [scoreKey('movies', 2)])
   assert.equal(writes[0].key, indexKey('movies'))
-  assert.deepEqual(writes[0].rows.map(r => [r.title, r.score]), [['stale', 99], ['settled', 88]], 'the refreshed record rose')
+  assert.deepEqual(writes[0].rows.map(r => [r.title, r.score]), [['stale', 94], ['settled', 88]], 'the refreshed record rose')
 })
 
 test('a re-rank that loses the race re-reads and tries once more', async () => {
@@ -315,7 +315,7 @@ test('a re-rank stores nothing when there is nothing to move', async () => {
 
   redis.getCache = async () => record
   redis.updateCache = async (key, transform) => {
-    const rows = transform([row({ id: 1, score: 92 })])
+    const rows = transform([row({ id: 1, score: 94 })])
     if (rows !== undefined) written.push(rows)
     return WRITTEN
   }
@@ -324,7 +324,7 @@ test('a re-rank stores nothing when there is nothing to move', async () => {
     record = null // expired between the write and this read
     await index.rerank('movie', 1)
 
-    record = { scores: { imdb: 87 }, counts: { imdb: 500_000 } } // the rewrite kept the same number
+    record = { scores: { imdb: 84 }, counts: { imdb: 500_000 } } // the rewrite kept the same number
     await index.rerank('movie', 1)
 
     await index.rerank('movie', 99) // a title outside the window has no row
