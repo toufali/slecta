@@ -32,7 +32,7 @@ test('each row gets its own cached badge, keyed by media segment', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1, score: 90, lowConfidence: false }, { id: 2, score: 65, lowConfidence: false }])
+  assert.deepEqual(items, [{ id: 1, score: 91, lowConfidence: false }, { id: 2, score: 65, lowConfidence: false }])
   assert.deepEqual(asked, [scoreKey('movies', 1), scoreKey('movies', 2)])
 })
 
@@ -43,7 +43,7 @@ test('the segment reaches the key', async () => {
 
   await attachScores(items, 'shows')
 
-  assert.equal(items[0].score, 53)
+  assert.equal(items[0].score, 52)
   assert.deepEqual(asked, [scoreKey('shows', 1)])
 })
 
@@ -77,7 +77,7 @@ test('a well-sampled row is not marked', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1, score: 96, lowConfidence: false }])
+  assert.deepEqual(items, [{ id: 1, score: 95, lowConfidence: false }])
 })
 
 test('an empty list asks nothing', async () => {

@@ -6,7 +6,7 @@ for (const key of ['TMDB_TOKEN', 'TMDB_API_URL', 'GCP_API_URL', 'GCP_API_KEY', '
   process.env[key] ??= 'test'
 }
 
-const { default: scoreService, aggregate, sourceMean, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL, UNREACHABLE } = await import('./scoreService.js')
+const { default: scoreService, aggregate, lowConfidence, sourceMean, orderCandidates, scoreKey, SCORE_TTL, SCORE_RETRY_TTL, UNREACHABLE } = await import('./scoreService.js')
 const { default: redis, WRITTEN, DECLINED, FAILED } = await import('./redisService.js')
 const { default: log } = await import('../utils/logger.js')
 
@@ -182,12 +182,11 @@ test('a healthy response is not retried', async () => {
 // rather than discarded. Bracketed rather than pinned to exact badges, since retuning a threshold
 // is meant to move those, and the bounds sit far enough out that rounding cannot hide a real change.
 test('a thin component still pulls, but less than a well-sampled one', () => {
-  // Components far apart, and the low one above the clamp floor so movement stays visible
-  const badge = rtAudience => aggregate({ scores: { imdb: 40, rtAudience: 100 }, counts: { imdb: 100_000, rtAudience } })
+  const mean = rtCritic => sourceMean({ scores: { metacritic: 40, rtCritic: 100 }, counts: { metacritic: 300, rtCritic } })
 
-  assert.ok(badge(12) > badge(0), `12 ratings contributed nothing: ${badge(12)} against ${badge(0)} for none`)
-  assert.ok(badge(12) < 40, `12 ratings pulled the badge to ${badge(12)}`)
-  assert.ok(badge(50_000) > 60, `50,000 ratings only reached ${badge(50_000)}`)
+  assert.ok(mean(12) > mean(0), `12 reviews contributed nothing: ${mean(12)} against ${mean(0)} for none`)
+  assert.ok(mean(12) < 65, `12 reviews pulled the mean to ${mean(12)}`)
+  assert.ok(mean(50_000) > 65, `50,000 reviews only reached ${mean(50_000)}`)
 })
 
 // Nothing is known to be better, so discounting them equally leaves the plain mean
@@ -203,7 +202,7 @@ test('a percentage source converts to the rating its share implies', () => {
     counts: { imdb: 494_949, metacritic: 63, rtCritic: 510, rtAudience: 33_104 }
   }
 
-  assert.equal(Math.round(sourceMean(record)), 85, 'the unconverted mean reads 90')
+  assert.equal(Math.round(sourceMean(record)), 84, 'the unconverted mean reads 90')
 })
 
 test('a share with no readable sample converts as observed, not to the midpoint', () => {
@@ -225,11 +224,11 @@ test('init reads the stored catalogue average', async () => {
 
   try {
     await scoreService.init()
-    assert.equal(aggregate(noAudience), 74)
+    assert.equal(aggregate(noAudience), 75)
 
     redis.getCache = async () => null
     await scoreService.init()
-    assert.equal(aggregate(noAudience), 74, 'a miss keeps the last loaded value')
+    assert.equal(aggregate(noAudience), 75, 'a miss keeps the last loaded value')
   } finally {
     redis.getCache = async () => 64
     await scoreService.init()
@@ -240,16 +239,38 @@ test('init reads the stored catalogue average', async () => {
 test('a thin audience shrinks toward the catalogue average', () => {
   const record = { scores: { imdb: 81, rtAudience: 100 }, counts: { imdb: 1_579, rtAudience: 1_708 } }
 
-  assert.equal(aggregate(record), 79)
+  assert.equal(aggregate(record), 80)
 })
 
 test('an RT audience stands in when IMDb carries no votes', () => {
-  assert.equal(aggregate({ scores: { rtAudience: 100 }, counts: { rtAudience: 1_708 } }), 84)
+  assert.equal(aggregate({ scores: { rtAudience: 100 }, counts: { rtAudience: 1_708 } }), 85)
 })
 
-test('the badge stops at the top of the displayed range, and at 0 below it', () => {
-  assert.equal(aggregate({ scores: { imdb: 100 }, counts: { imdb: 5_000_000 } }), 97)
-  assert.equal(aggregate({ scores: { imdb: 0 }, counts: { imdb: 5_000_000 } }), 0)
+test('the badge stops at both ends of the displayed range', () => {
+  assert.equal(aggregate({ scores: { imdb: 100 }, counts: { imdb: 5_000_000 } }), 99)
+  assert.equal(aggregate({ scores: { imdb: 0 }, counts: { imdb: 5_000_000 } }), 1)
+})
+
+// The complaint case: three critic-sized sources must not outvote one broad audience
+test('a broad audience that disagrees with critics carries the score', () => {
+  const record = {
+    scores: { imdb: 72, metacritic: 85, rtCritic: 98, rtAudience: 95 },
+    counts: { imdb: 26_383, metacritic: 21, rtCritic: 151, rtAudience: 1_554 }
+  }
+
+  assert.equal(aggregate(record), 83)
+})
+
+test('a record with no audience counts still scores from critics alone', () => {
+  assert.equal(aggregate({ scores: { metacritic: 88, rtCritic: 90 }, counts: { metacritic: 63, rtCritic: 510 } }), 65)
+})
+
+// A blend's shares sum to 1, so the flag must read the evidence, not the blend
+test('a thin single-source record keeps its low-confidence flag', () => {
+  const thin = { scores: { imdb: 64 }, counts: { imdb: 105 } }
+
+  assert.equal(lowConfidence(thin), true)
+  assert.equal(aggregate(thin), 65)
 })
 
 test('a record with no audience signal at all reads as the catalogue average', () => {
@@ -261,13 +282,13 @@ test('a floor stands in for a count that was only banded', () => {
   const banded = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000 }, floors: { rtAudience: 500 } }
   const none = { scores: { imdb: 70, rtAudience: 95 }, counts: { imdb: 100000 } }
 
-  assert.ok(aggregate(banded) > aggregate(none), 'a banded component still carries weight')
+  assert.ok(sourceMean(banded) > sourceMean(none), 'a banded component still carries weight')
   assert.equal(aggregate(none), 74, 'and without one it is shrunk out entirely')
 })
 
 // Losing the score entirely is worse than weighting it flat, and no sample says nothing about which
-test('a record no component can weight falls back to the plain mean', () => {
-  assert.equal(sourceMean({ scores: { imdb: 60, metacritic: 80 } }), 70)
+test('a record no component can weight falls back to plain family means', () => {
+  assert.equal(sourceMean({ scores: { imdb: 60, metacritic: 80 } }), 66)
 })
 
 // An unmapped source must not vanish from the aggregate the moment it is added. The mapped source
@@ -276,7 +297,7 @@ test('a record no component can weight falls back to the plain mean', () => {
 test('a source with no constant carries full weight', () => {
   const record = { scores: { imdb: 60, letterboxd: 90 }, counts: { imdb: 100, letterboxd: 5 } }
 
-  assert.equal(Math.round(sourceMean(record)), 88, 'the plain mean is 75 and no weight at all gives 60')
+  assert.equal(Math.round(sourceMean(record)), 69, 'letterboxd holds its family alone at full weight')
 })
 
 // Ordering is pure, so the rules can be read straight off the list with no host contacted
@@ -324,7 +345,7 @@ test('the aggregate is a rounded integer, not the raw mean', async () => {
   assert.equal(calls.count, 3)
 
   assert.deepEqual(score.scores, { metacritic: 52, rtCritic: 50, rtAudience: 85 })
-  assert.equal(aggregate(score), 64)
+  assert.equal(aggregate(score), 70)
 })
 
 // Each component's weight comes from the sample its score came from, so the count is stored with it
@@ -1301,7 +1322,7 @@ test('a run resolving fewer outlets leaves the record untouched and still return
     assert.equal(wrote('test/movie/degraded'), undefined, 'no write at all, so the record keeps its own clock')
     // The nightly check compares tonight's values; handing it the stored ones would pass while RT is down
     assert.deepEqual(Object.keys(score.scores), ['metacritic'])
-    assert.equal(aggregate(score.kept), 80, 'the record it preserved, for a caller that must not publish tonight')
+    assert.equal(aggregate(score.kept), 92, 'the record it preserved, for a caller that must not publish tonight')
     assert.equal(score.cached, true, 'a refusal is not a persistence failure')
   } finally {
     redis.getCache = realGetCache
@@ -1443,7 +1464,7 @@ test('a declined write reports the record that declined it', async () => {
   })
 
   let reads = 0
-  const replaced = { scores: { imdb: 95, metacritic: 88, rtCritic: 90, rtAudience: 92 }, counts: { imdb: 600_000, metacritic: 50, rtCritic: 450, rtAudience: 20_000 } }
+  const replaced = { scores: { imdb: 85, metacritic: 88, rtCritic: 90, rtAudience: 92 }, counts: { imdb: 600_000, metacritic: 50, rtCritic: 450, rtAudience: 20_000 } }
 
   redis.getCache = async key => key.startsWith('test/') ? (reads++ === 0 ? RICH : replaced) : null
 
@@ -1452,7 +1473,7 @@ test('a declined write reports the record that declined it', async () => {
       wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
     }, false)
 
-    assert.equal(aggregate(score.kept), 95, 'the value that won, not the one the comparison saw')
+    assert.equal(aggregate(score.kept), 96, 'the value that won, not the one the comparison saw')
   } finally {
     redis.getCache = realGetCache
   }
