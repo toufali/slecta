@@ -76,7 +76,6 @@ fieldset:last-of-type{
   position: sticky;
   bottom: 0;
   border-bottom: none;
-  /* The row spans the panel, so it must not swallow clicks on items visible beside the buttons */
   pointer-events: none;
   display: flex;
   gap: var(--padding-md);

@@ -130,8 +130,7 @@ function handlePopstate(e) {
   }
 }
 
-// Clear the form to its defaults without applying; the reader confirms with apply, which also
-// overwrites the saved set. A native reset would restore the loaded filters, not clear them.
+// Not type=reset: that restores the loaded filters rather than clearing them
 function handleReset() {
   for (const input of filterForm.querySelectorAll('input[type=checkbox]')) input.checked = false
 

@@ -49,8 +49,7 @@ async function list(ctx, media) {
   return data
 }
 
-// Fill each saved filter the URL leaves out, so a returning reader keeps the set they applied. An
-// explicit URL param always wins, and a value the rules reject is dropped rather than 500ing the view.
+// Fill each saved filter the URL omits; a URL value wins, and an invalid saved one is dropped
 function applySavedFilters(ctx, rules) {
   const saved = ctx.cookies.get('filters')
 
@@ -62,7 +61,6 @@ function applySavedFilters(ctx, rules) {
   for (const key of PERSISTED) {
     if (merged[key] !== undefined) continue
 
-    // Per value, so one dead id drops itself rather than the whole saved filter
     const values = savedParams.getAll(key).filter(value => value && CHECKS[key](value, rules))
 
     if (values.length) merged[key] = MULTI.has(key) ? values : values[0]
