@@ -34,6 +34,9 @@ export const CHECKS = {
   wr: (value, { ratings }) => !ratings || ratings.some(rating => rating.certification === value)
 }
 
+// Every filter param, so a URL carrying any of them reads as an explicit request; page is pagination
+export const FILTER_PARAMS = Object.keys(CHECKS).filter(key => key !== 'page')
+
 /**
  * Name the filter params the request cannot honour. Params we do not use are ignored, so
  * tracking parameters and scanner noise still get a page.
