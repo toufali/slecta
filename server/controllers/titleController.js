@@ -4,7 +4,7 @@ import scoreService, { aggregate, lowConfidence, scoreKey } from '../services/sc
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { nextPageHref } from '../utils/nextPage.js'
-import { CHECKS, FILTER_PARAMS, MULTI, PERSISTED } from '../utils/filters.js'
+import { CHECKS, MULTI, PERSISTED } from '../utils/filters.js'
 import { mainView } from '../views/mainView.js'
 import { titleList } from '../views/partials/titleList.js'
 import { titleDetail } from '../views/partials/titleDetail.js'
@@ -51,7 +51,7 @@ async function list(ctx, media) {
 
 // The saved set applies only to a bare visit; a URL carrying any filter is a request to reproduce it
 function applySavedFilters(ctx, rules) {
-  if (FILTER_PARAMS.some(key => ctx.query[key] !== undefined)) return
+  if (PERSISTED.some(key => ctx.query[key] !== undefined)) return
 
   const saved = ctx.cookies.get('filters')
 
