@@ -1,4 +1,5 @@
 import { monthsText } from '../utils/months.js'
+import { newestFirst } from '../utils/sort.js'
 import { namesText } from '../utils/names.js'
 import { debounce } from '../utils/time.js'
 import { runSearch } from '../utils/search.js'
@@ -10,6 +11,8 @@ const filterForm = document.querySelector('form[name="title-filter"]')
 const filterBtn = document.querySelector('.list-actions .filter')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
+const lookbackFs = lookback.closest('fieldset')
+const sortFs = document.querySelector('input[name=sort]').closest('fieldset')
 const more = document.querySelector('.more')
 const panelClose = document.querySelector('.filter-panel .close')
 const searchPanel = document.querySelector('.search-panel')
@@ -31,6 +34,7 @@ export default function init() {
   listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
+  sortFs.addEventListener('change', handleSort)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
@@ -122,6 +126,12 @@ function handlePopstate(e) {
       runSearch(searchInput, resultList)
     }
   }
+}
+
+function handleSort(e) {
+  const hide = newestFirst(e.target.value)
+  lookbackFs.toggleAttribute('disabled', hide)
+  lookbackFs.toggleAttribute('hidden', hide)
 }
 
 function handleLookback() {
@@ -286,7 +296,7 @@ function renderlistDescription(data) {
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
   if (data.inEnglish) language = `<output>in English</output>`
 
-  const lookbackText = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
+  const lookbackText = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
   listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, services, language, lookbackText].filter(item => item))
   window.scrollTo(0, 0)

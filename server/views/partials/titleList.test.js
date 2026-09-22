@@ -8,8 +8,8 @@ const movie = over => ({
   allProviders: new Map([[8, 'Netflix']]),
   allStorefronts: new Map([[7, 'Fandango at Home']]),
   allRatings: [{ certification: 'R', meaning: 'restricted' }],
-  allSorting: [{ name: 'Most Recent', value: 'primary_release_date.desc' }],
-  sortBy: 'primary_release_date.desc',
+  allSorting: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
+  sortBy: 'popularity.desc',
   lookback: 12,
   lookbackMax: 12,
   ...over
@@ -49,6 +49,15 @@ test('the language checkbox reflects the request', () => {
   for (const data of [movie, tv]) {
     assert.match(titleList(data({ inEnglish: 'on' })), /name='english' checked/)
     assert.doesNotMatch(titleList(data()), /name='english' checked/)
+  }
+})
+
+test('newest-first hides the lookback control and its summary clause', () => {
+  for (const sortBy of ['primary_release_date.desc', 'first_air_date.desc']) {
+    const rendered = titleList(movie({ sortBy, allSorting: [{ name: 'Most Recent', value: sortBy }] }))
+
+    assert.match(rendered, /<fieldset disabled hidden>/)
+    assert.doesNotMatch(rendered, /in the last <output>/)
   }
 })
 
