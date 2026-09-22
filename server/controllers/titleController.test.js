@@ -247,20 +247,6 @@ test('the page applies the saved filters when the URL names none, and drops a st
   assert.equal(asked.english, 'on')
 })
 
-test('a URL-only filter suppresses the saved set too, not just persistable ones', async () => {
-  recordCalls()
-  let asked
-  tmdb.providers = new Map([[8, 'Netflix']])
-  tmdb.genres = { movie: new Map([[27, 'Horror']]) }
-  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
-
-  const ctx = context()
-  ctx.query = { wog: '27' }
-  ctx.cookies.get = name => name === 'filters' ? 'wp=8' : undefined
-  await showList('movie')(ctx)
-  assert.equal(asked.wp, undefined, 'a wog-only URL still shuts out the saved services')
-})
-
 test('any filter in the URL suppresses the whole saved set', async () => {
   recordCalls()
   let asked
