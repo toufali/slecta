@@ -247,6 +247,18 @@ test('the page applies the saved filters when the URL names none, and drops a st
   assert.equal(asked.english, 'on')
 })
 
+test('the legacy wp cookie still applies until the reader next applies', async () => {
+  recordCalls()
+  let asked
+  tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
+  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+
+  const ctx = context()
+  ctx.cookies.get = name => name === 'wp' ? '8|337' : undefined
+  await showList('movie')(ctx)
+  assert.deepEqual(asked, ['8', '337'])
+})
+
 test('a filter named in the URL wins over the saved set', async () => {
   recordCalls()
   let asked

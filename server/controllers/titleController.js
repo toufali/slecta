@@ -52,7 +52,10 @@ async function list(ctx, media) {
 // Fill each saved filter the URL leaves out, so a returning reader keeps the set they applied. An
 // explicit URL param always wins, and a value the rules reject is dropped rather than 500ing the view.
 function applySavedFilters(ctx, rules) {
-  const saved = ctx.cookies.get('filters')
+  // The previous release saved only services, pipe-joined, under `wp`; read it until the reader
+  // next applies and the current cookie takes over. Removable once that has rolled out.
+  const legacy = () => ctx.cookies.get('wp')?.split('|').map(id => `wp=${id}`).join('&')
+  const saved = ctx.cookies.get('filters') ?? legacy()
 
   if (!saved) return
 

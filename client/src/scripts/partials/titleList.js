@@ -140,7 +140,7 @@ function handleReset() {
   defaultSort.checked = true
   lookback.value = lookback.max
   lookback.dispatchEvent(new Event('input'))
-  defaultSort.dispatchEvent(new Event('change'))
+  defaultSort.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 function handleSort(e) {

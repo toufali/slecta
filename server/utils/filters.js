@@ -6,8 +6,8 @@
 // Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
 export const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
 
-// Filters worth remembering across visits; page and the internal vote floor are not
-export const PERSISTED = ['sort', 'months', 'english', 'wg', 'wog', 'wr', 'wp']
+// The panel's own filters, remembered across visits. Not `wog` (no control), page, or the vote floor
+export const PERSISTED = ['sort', 'months', 'english', 'wg', 'wr', 'wp']
 
 // Canonical digits only: `Number()` also takes `0x1b`, `1e2` and `08`, which filter while rendering unchecked
 const isDigits = value => /^[1-9]\d*$/.test(value)
