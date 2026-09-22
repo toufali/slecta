@@ -69,6 +69,11 @@ test('each catalogue describes its own date field', () => {
   assert.match(titleList(tv()), /First aired in the last:/)
 })
 
+test('the summary carries its clause count, so the font can scale with it', () => {
+  assert.match(titleList(movie()), /--filters:2'/) // sort and lookback
+  assert.match(titleList(movie({ withGenres: ['1'] })), /--filters:3'/)
+})
+
 test('each catalogue gets its own name and form action', () => {
   assert.match(titleList(movie()), /<h1 class='list-description'[^>]*>Movies /)
   assert.match(titleList(movie()), /action='\/api\/v1\/movies'/)
