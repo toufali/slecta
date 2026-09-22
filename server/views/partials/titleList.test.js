@@ -105,7 +105,7 @@ test('a long genre list reads as three and etc, a short one in full', () => {
   const five = new Map([[1, 'A'], [2, 'B'], [3, 'C'], [4, 'D'], [5, 'E']])
 
   assert.match(titleList(movie({ allGenres: five, withGenres: ['1', '2', '3', '4'] })), /<output>A, B, C, etc<\/output>/)
-  assert.match(titleList(movie({ allGenres: five, withGenres: ['1', '2', '3'] })), /<output>A or B or C<\/output>/)
+  assert.match(titleList(movie({ allGenres: five, withGenres: ['1', '2', '3'] })), /<output>A, B, or C<\/output>/)
 })
 
 // On mobile there is no escape key and no click-outside habit; the visible button is the dismissal

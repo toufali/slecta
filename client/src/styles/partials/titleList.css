@@ -7,8 +7,9 @@
   flex-wrap: wrap;
   align-items: baseline;
   font: var(--h3-font);
-  /* Shrink as filters accumulate, since each one lengthens the line */
-  font-size: clamp(0.95rem, calc(1.25rem - (var(--filters, 1) - 1) * 0.06rem), 1.25rem);
+  /* Full size through two filters, then shrink gently. `* 1rem / 20`, not `* 0.05rem`: the
+     minifier rewrites the latter to `/ 20rem`, dividing by a length, which drops the rule */
+  font-size: clamp(1.05rem, calc(1.25rem - max(0, var(--filters, 1) - 2) * 1rem / 20), 1.25rem);
   line-height: 1.4;
   color: var(--gray-70);
   white-space: pre-wrap;
