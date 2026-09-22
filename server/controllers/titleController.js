@@ -4,6 +4,7 @@ import scoreService, { aggregate, lowConfidence, scoreKey } from '../services/sc
 import reviewService from '../services/reviewService.js'
 import { attachScores } from './attachScores.js'
 import { nextPageHref } from '../utils/nextPage.js'
+import { CHECKS, MULTI, PERSISTED } from '../utils/filters.js'
 import { mainView } from '../views/mainView.js'
 import { titleList } from '../views/partials/titleList.js'
 import { titleDetail } from '../views/partials/titleDetail.js'
@@ -48,17 +49,32 @@ async function list(ctx, media) {
   return data
 }
 
+// The saved set applies only to a bare visit; a URL carrying any filter is a request to reproduce it
+function applySavedFilters(ctx, rules) {
+  if (PERSISTED.some(key => ctx.query[key] !== undefined)) return
+
+  const saved = ctx.cookies.get('filters')
+
+  if (!saved) return
+
+  const savedParams = new URLSearchParams(saved)
+  const merged = { ...ctx.query }
+
+  for (const key of PERSISTED) {
+    const values = savedParams.getAll(key).filter(value => value && CHECKS[key](value, rules))
+
+    if (values.length) merged[key] = MULTI.has(key) ? values : values[0]
+  }
+
+  ctx.query = merged
+}
+
 // Each handler is built for one media type at the route, next to the `validateFilters` that already
 // names it, so nothing downstream has to work out which catalogue it is serving.
 export const showList = mediaType => async ctx => {
   const media = MEDIA[mediaType]
 
-  // The cookie never overrides an explicit URL, and a dead cookie id degrades instead of erroring
-  if (!ctx.query.wp) {
-    const saved = ctx.cookies.get('wp')?.split('|').filter(id => tmdb.filterRules(mediaType).providers?.has(+id))
-
-    if (saved?.length) ctx.query = { ...ctx.query, wp: saved }
-  }
+  applySavedFilters(ctx, tmdb.filterRules(mediaType))
 
   const data = await list(ctx, media)
 

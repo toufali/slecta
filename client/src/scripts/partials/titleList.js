@@ -13,6 +13,7 @@ const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
 const lookbackFs = lookback.closest('fieldset')
 const sortFs = document.querySelector('input[name=sort]').closest('fieldset')
+const resetBtn = filterForm.querySelector('.reset')
 const more = document.querySelector('.more')
 const panelClose = document.querySelector('.filter-panel .close')
 const searchPanel = document.querySelector('.search-panel')
@@ -35,6 +36,7 @@ export default function init() {
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
   sortFs.addEventListener('change', handleSort)
+  resetBtn.addEventListener('click', handleReset)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
@@ -128,6 +130,18 @@ function handlePopstate(e) {
   }
 }
 
+// Not type=reset: that restores the loaded filters rather than clearing them
+function handleReset() {
+  for (const input of filterForm.querySelectorAll('input[type=checkbox]')) input.checked = false
+
+  const defaultSort = filterForm.querySelector('input[name=sort]')
+
+  defaultSort.checked = true
+  lookback.value = lookback.max
+  lookback.dispatchEvent(new Event('input'))
+  defaultSort.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
 function handleSort(e) {
   const hide = newestFirst(e.target.value)
   lookbackFs.toggleAttribute('disabled', hide)
@@ -214,10 +228,9 @@ async function handleSubmit(e) {
   if (e) e.preventDefault()
 
   const params = new URLSearchParams(new FormData(e.target))
-  const services = params.getAll('wp').join('|')
 
   // The server reads this to render the next visit's first paint already filtered
-  document.cookie = `wp=${services}; path=/; samesite=lax; max-age=${services ? 31536000 : 0}`
+  document.cookie = `filters=${params}; path=/; samesite=lax; max-age=31536000`
 
   handlePanel()
 
