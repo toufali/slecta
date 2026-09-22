@@ -85,9 +85,6 @@ fieldset:last-of-type{
 
 fieldset:last-of-type > button{
   pointer-events: auto;
-}
-
-fieldset:last-of-type > .primary{
   flex: 1;
 }
 
