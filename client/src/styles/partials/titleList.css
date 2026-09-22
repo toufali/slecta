@@ -7,6 +7,8 @@
   flex-wrap: wrap;
   align-items: baseline;
   font: var(--h3-font);
+  /* Shrink as filters accumulate, since each one lengthens the line */
+  font-size: clamp(0.95rem, calc(1.25rem - (var(--filters, 1) - 1) * 0.06rem), 1.25rem);
   line-height: 1.4;
   color: var(--gray-70);
   white-space: pre-wrap;

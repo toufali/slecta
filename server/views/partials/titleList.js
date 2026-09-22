@@ -65,8 +65,9 @@ function listDescription(data, dated) {
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
 
   const lookback = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
+  const clauses = [streaming, services, language, sort, genres, ratings, lookback].filter(item => item)
 
-  return conjunctionFmt.format([streaming, services, language, sort, genres, ratings, lookback].filter(item => item))
+  return { text: conjunctionFmt.format(clauses), count: clauses.length }
 }
 
 const COPY = {
@@ -77,10 +78,11 @@ const COPY = {
 export const titleList = data => {
   const segment = data.movies ? 'movies' : 'shows'
   const { noun, dated, datedHeading } = COPY[segment]
+  const summary = listDescription(data, dated)
 
   return `
 
-<h1 class='list-description'>${noun} ${listDescription(data, dated)}</h1>
+<h1 class='list-description' style='--filters:${summary.count}'>${noun} ${summary.text}</h1>
 
 <ul class='title-list'>
   ${data[segment].map(title => `<li>${titleCard(title)}</li>`).join('')}

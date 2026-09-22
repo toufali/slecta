@@ -298,7 +298,10 @@ function renderlistDescription(data) {
 
   const lookbackText = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
-  listDescription.innerHTML = conjunctionFmt.format([sort, genres, ratings, services, language, lookbackText].filter(item => item))
+  const clauses = [sort, genres, ratings, services, language, lookbackText].filter(item => item)
+
+  listDescription.style.setProperty('--filters', clauses.length)
+  listDescription.innerHTML = conjunctionFmt.format(clauses)
   window.scrollTo(0, 0)
 }
 
