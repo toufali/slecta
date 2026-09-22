@@ -171,9 +171,9 @@ test('the window is twelve months back from one instant', () => {
 test('a lookback narrows the window discover is sent', async () => {
   const seen = captureUrl()
 
-  await tmdb.getMovies({ months: '3' })
-  await tmdb.getTvShows({ months: '3' })
-  await tmdb.getMovies()
+  await tmdb.getMovies({ months: '3', sort: 'popularity.desc' })
+  await tmdb.getTvShows({ months: '3', sort: 'popularity.desc' })
+  await tmdb.getMovies({ sort: 'popularity.desc' })
 
   // Read as the span between the bounds sent, since which day they land on is tested on its own
   const monthsBack = url => {
@@ -278,10 +278,22 @@ test('the filter rules carry the catalogue vote floor and lookback', () => {
 })
 
 // The view cannot tell the two list paths apart, so the slider's own state has to come from both
+// Newest-first already leads with the newest titles; a bound the hidden control cannot show
+// would filter the list unseen
+test('a date sort ignores a lookback carried in the URL', async () => {
+  captureUrl()
+
+  const explicit = await tmdb.getMovies({ months: '3', sort: 'primary_release_date.desc' })
+  const defaulted = await tmdb.getMovies({ months: '3' })
+
+  assert.equal(explicit.lookback, tmdb.lookbackMax)
+  assert.equal(defaulted.lookback, tmdb.lookbackMax, 'the default sort is also newest-first')
+})
+
 test('a list page carries the lookback the panel renders', async () => {
   captureUrl()
 
-  const narrowed = await tmdb.getMovies({ months: '3' })
+  const narrowed = await tmdb.getMovies({ months: '3', sort: 'popularity.desc' })
 
   assert.equal(narrowed.lookback, 3)
   assert.equal(narrowed.lookbackMax, tmdb.lookbackMax)

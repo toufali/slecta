@@ -291,6 +291,12 @@ class TmdbService {
    * A lookback in whole months, absent or unusable meaning the widest. Clamped rather than trusted:
    * a request may narrow the window, never widen it past the catalogue the nightly run scores.
    */
+  // Newest-first already shows the newest titles, so a narrower bound would only truncate the
+  // tail — and a bound the hidden control cannot show would filter the list unseen
+  #boundedMonths(sortBy, months) {
+    return sortBy.endsWith('_date.desc') ? undefined : months
+  }
+
   lookback(months) {
     const asked = Number(months)
 
@@ -319,7 +325,7 @@ class TmdbService {
       allProviders: this.providers,
       allStorefronts: this.storefronts,
       withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
-      lookback: this.lookback(query?.months),
+      lookback: this.lookback(this.#boundedMonths(query?.sort || sorts[0].value, query?.months)),
       lookbackMax: this.lookbackMax,
       inEnglish: query?.english
     }
@@ -348,10 +354,12 @@ class TmdbService {
    * @param {object} [window] one window for a whole walk, for a caller with many pages to bound
    *   identically. Otherwise the request's own lookback, clamped so it can only narrow.
    */
-  async #getList(mediaType, query, window = this.dateWindow(query?.months)) {
+  async #getList(mediaType, query, window) {
     const media = CATALOGUE[mediaType]
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]
+
+    window ??= this.dateWindow(this.#boundedMonths(query?.sort || sorts[0].value, query?.months))
 
     // TMDB silently ignores `certification` without `certification_country`, and
     // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.

@@ -1,5 +1,6 @@
 import { titleCard } from '../../../client/src/scripts/components/titleCard.js'
 import { monthsText } from '../../../client/src/scripts/utils/months.js'
+import { newestFirst } from '../../../client/src/scripts/utils/sort.js'
 import { namesText } from '../../../client/src/scripts/utils/names.js'
 import { searchForm } from './searchList.js'
 
@@ -63,7 +64,7 @@ function listDescription(data, dated) {
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
 
-  const lookback = `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
+  const lookback = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
 
   return conjunctionFmt.format([streaming, services, language, sort, genres, ratings, lookback].filter(item => item))
 }
@@ -112,7 +113,7 @@ export const titleList = data => {
       <h3>Include ratings:</h3>
       ${ratingFields(data)}
     </fieldset>`}
-    <fieldset>
+    <fieldset${newestFirst(data.sortBy) ? ' disabled hidden' : ''}>
       <h3 id='lookback-label'>${datedHeading} in the last:</h3>
       <div class='lookback'>
         <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label' aria-valuetext='${monthsText(data.lookback)}'>
