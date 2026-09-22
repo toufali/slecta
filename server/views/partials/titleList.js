@@ -55,18 +55,18 @@ function listDescription(data, dated) {
   const conjunctionFmt = new Intl.ListFormat("en-US", { style: "long", type: "conjunction" })
   const disjunctionFmt = new Intl.ListFormat("en-US", { style: "short", type: "disjunction" })
 
-  let sort, genres, ratings, services, streaming, language
+  let sort, genres, ratings, services, language
 
   sort = `<label>sorted by <output>${data.allSorting.find(opt => opt.value === data.sortBy).name}</output></label>`
-  if (data.streamingNow) streaming = `<output>streaming now</output>`
   if (data.inEnglish) language = `<output>in English</output>`
   if (data.withGenres) genres = `<label>with genre <output>${namesText(data.withGenres, data.allGenres)}</output></label>`
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
 
   const lookback = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
+  const clauses = [services, language, sort, genres, ratings, lookback].filter(item => item)
 
-  return conjunctionFmt.format([streaming, services, language, sort, genres, ratings, lookback].filter(item => item))
+  return { text: conjunctionFmt.format(clauses), count: clauses.length }
 }
 
 const COPY = {
@@ -77,10 +77,11 @@ const COPY = {
 export const titleList = data => {
   const segment = data.movies ? 'movies' : 'shows'
   const { noun, dated, datedHeading } = COPY[segment]
+  const summary = listDescription(data, dated)
 
   return `
 
-<h1 class='list-description'>${noun} ${listDescription(data, dated)}</h1>
+<h1 class='list-description' style='--filters:${summary.count}'>${noun} ${summary.text}</h1>
 
 <ul class='title-list'>
   ${data[segment].map(title => `<li>${titleCard(title)}</li>`).join('')}

@@ -199,13 +199,13 @@ test('each list page renders through the shared view with its own catalogue', as
   const movies = context()
   await showList('movie')(movies)
   assert.match(movies.body, /data-partial='titleList'/)
-  assert.match(movies.body, /<h1 class='list-description'>Movies /)
+  assert.match(movies.body, /<h1 class='list-description'[^>]*>Movies /)
   assert.match(movies.body, /href='\/movies' class="current"/)
 
   const shows = context()
   await showList('tv')(shows)
   assert.match(shows.body, /data-partial='titleList'/)
-  assert.match(shows.body, /<h1 class='list-description'>TV Shows /)
+  assert.match(shows.body, /<h1 class='list-description'[^>]*>TV Shows /)
   assert.match(shows.body, /href='\/shows' class="current"/)
 })
 

@@ -69,10 +69,15 @@ test('each catalogue describes its own date field', () => {
   assert.match(titleList(tv()), /First aired in the last:/)
 })
 
+test('the summary carries its clause count, so the font can scale with it', () => {
+  assert.match(titleList(movie()), /--filters:2'/) // sort and lookback
+  assert.match(titleList(movie({ withGenres: ['1'] })), /--filters:3'/)
+})
+
 test('each catalogue gets its own name and form action', () => {
-  assert.match(titleList(movie()), /<h1 class='list-description'>Movies /)
+  assert.match(titleList(movie()), /<h1 class='list-description'[^>]*>Movies /)
   assert.match(titleList(movie()), /action='\/api\/v1\/movies'/)
-  assert.match(titleList(tv()), /<h1 class='list-description'>TV Shows /)
+  assert.match(titleList(tv()), /<h1 class='list-description'[^>]*>TV Shows /)
   assert.match(titleList(tv()), /action='\/api\/v1\/shows'/)
 })
 
@@ -96,11 +101,11 @@ test('the More control ships hidden without a next page, above the actions row',
   }
 })
 
-test('a long genre list reads as two and etc, a short one in full', () => {
-  const four = new Map([[1, 'A'], [2, 'B'], [3, 'C'], [4, 'D']])
+test('a long genre list reads as three and etc, a short one in full', () => {
+  const five = new Map([[1, 'A'], [2, 'B'], [3, 'C'], [4, 'D'], [5, 'E']])
 
-  assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2', '3'] })), /<output>A, B, etc<\/output>/)
-  assert.match(titleList(movie({ allGenres: four, withGenres: ['1', '2'] })), /<output>A or B<\/output>/)
+  assert.match(titleList(movie({ allGenres: five, withGenres: ['1', '2', '3', '4'] })), /<output>A, B, C, etc<\/output>/)
+  assert.match(titleList(movie({ allGenres: five, withGenres: ['1', '2', '3'] })), /<output>A, B, or C<\/output>/)
 })
 
 // On mobile there is no escape key and no click-outside habit; the visible button is the dismissal

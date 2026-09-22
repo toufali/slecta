@@ -3,16 +3,18 @@
 .list-description{
   cursor: default;
   user-select: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  /* Inline flow, not flex: a flex-wrapped separator can lead a line with a comma */
   font: var(--h3-font);
+  /* Full size through two filters, then a point per filter down to 16px. `* 1rem / 16`, not
+     `* 0.0625rem`: the minifier rewrites the latter to `/ 16rem`, a divide-by-length that drops the rule */
+  font-size: clamp(1rem, calc(1.25rem - max(0, var(--filters, 1) - 2) * 1rem / 16), 1.25rem);
   line-height: 1.4;
   color: var(--gray-70);
   white-space: pre-wrap;
 }
 
 .list-description output{
+  display: inline-block;
   cursor: pointer;
   text-transform: uppercase;
   font-weight: bold;

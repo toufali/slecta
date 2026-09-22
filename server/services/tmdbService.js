@@ -320,7 +320,6 @@ class TmdbService {
       withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
-      streamingNow: query?.streaming,
       allProviders: this.providers,
       allStorefronts: this.storefronts,
       withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
