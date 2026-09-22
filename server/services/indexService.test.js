@@ -214,8 +214,9 @@ test('a lookback narrows the ranked list too', async () => {
   }
   const rows = [row({ id: 1, title: 'this week' }), row({ id: 2, title: 'two months ago', releaseDate: daysAgo(60) })]
 
-  assert.deepEqual(titles(await listing(rows)), ['this week', 'two months ago'])
-  assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week'])
+  assert.deepEqual(titles(await listing(rows, { sort: 'score' })), ['this week', 'two months ago'])
+  assert.deepEqual(titles(await listing(rows, { sort: 'score', months: '1' })), ['this week'])
+  assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week', 'two months ago'], 'ignored under Most Recent, as discover ignores it')
 })
 
 // The same filter as discover, read off the row: a change of sort must not change the list

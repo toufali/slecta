@@ -53,12 +53,12 @@ export async function cacheScores() {
   // What the next run's scores shrink toward, averaged over both catalogues
   const catalogueMeans = { sum: 0, count: 0 }
 
-  // One fetch for the walk; a failure degrades to untagged rows rather than sinking the run
+  // Fetched once for the walk, and caught so a failure costs only the TV index
   let keywordTags
   try {
     keywordTags = await tmdb.keywordTags(window)
   } catch (e) {
-    log.error('Keyword tagging failed, TV keyword genres will be empty this run', { error: e })
+    log.error('Keyword tagging failed, leaving the TV score index in place', { error: e })
   }
 
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
@@ -182,7 +182,10 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans, k
     }
   })
 
-  stats.indexFailed = !await publishIndex(mediaType, rows, titles, complete, confirmed)
+  // Untagged rows would serve every keyword genre empty, so yesterday's index stands instead
+  stats.indexFailed = mediaType === 'tv' && !keywordTags
+    ? true
+    : !await publishIndex(mediaType, rows, titles, complete, confirmed)
 
   return stats
 }

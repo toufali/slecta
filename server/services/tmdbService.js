@@ -355,7 +355,7 @@ class TmdbService {
    * a request may narrow the window, never widen it past the catalogue the nightly run scores.
    */
   // A months bound typed into the URL under this sort would filter the list unseen: the control is hidden
-  #boundedMonths(sortBy, months) {
+  boundedMonths(sortBy, months) {
     return sortBy.endsWith('_date.desc') ? undefined : months
   }
 
@@ -386,7 +386,7 @@ class TmdbService {
       allProviders: this.providers,
       allStorefronts: this.storefronts,
       withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
-      lookback: this.lookback(this.#boundedMonths(query?.sort || sorts[0].value, query?.months)),
+      lookback: this.lookback(this.boundedMonths(query?.sort || sorts[0].value, query?.months)),
       lookbackMax: this.lookbackMax,
       inEnglish: query?.english
     }
@@ -420,7 +420,7 @@ class TmdbService {
     const genres = this.genres[media.genreKey]
     const sorts = this.sortingOptions[media.segment]
 
-    window ??= this.dateWindow(this.#boundedMonths(query?.sort || sorts[0].value, query?.months))
+    window ??= this.dateWindow(this.boundedMonths(query?.sort || sorts[0].value, query?.months))
 
     // TMDB silently ignores `certification` without `certification_country`, and
     // `with_watch_monetization_types` without `watch_region`. Verified 2026-08-24.

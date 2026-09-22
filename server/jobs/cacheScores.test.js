@@ -401,6 +401,26 @@ test('a failed index publish leaves the stored average alone', async () => {
   }
 })
 
+test('a run whose keyword tagging failed leaves the TV index in place', async () => {
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ shows })
+  const written = new Map()
+  const realSetCache = redis.setCache
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  tmdb.keywordTags = async () => { throw new Error('TMDB 503') }
+
+  try {
+    const { stats } = await cacheScores()
+
+    assert.equal(written.has(SHOW_INDEX), false)
+    assert.equal(stats.find(stat => stat.mediaType === 'tv').indexFailed, true)
+  } finally {
+    redis.setCache = realSetCache
+    restore()
+  }
+})
+
 // Yesterday's ranking still has its own TTL to run, so publishing nothing beats publishing empty
 test('a run with nothing to publish leaves the previous index alone', async () => {
   const { restore } = stub({ movies: [], shows: [] })

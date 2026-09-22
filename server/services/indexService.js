@@ -86,8 +86,8 @@ class IndexService {
       ? row => row.genreIds?.some(id => genreSet.has(id)) || row.keywords?.some(id => keywordSet.has(id))
       : undefined
 
-    const rules = { window: tmdb.dateWindow(query.months), certifications, genreFilter }
     const sort = query.sort || tmdb.sortingOptions[segment][0].value
+    const rules = { window: tmdb.dateWindow(tmdb.boundedMonths(sort, query.months)), certifications, genreFilter }
     const found = rows.filter(row => matches(row, query, rules)).sort(comparator(sort))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE
