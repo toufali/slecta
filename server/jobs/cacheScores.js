@@ -53,10 +53,18 @@ export async function cacheScores() {
   // What the next run's scores shrink toward, averaged over both catalogues
   const catalogueMeans = { sum: 0, count: 0 }
 
+  // One fetch for the walk; a failure degrades to untagged rows rather than sinking the run
+  let keywordTags
+  try {
+    keywordTags = await tmdb.keywordTags(window)
+  } catch (e) {
+    log.error('Keyword tagging failed, TV keyword genres will be empty this run', { error: e })
+  }
+
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
   const scored = await Promise.allSettled([
     cacheScoresFor('movie', movieList.value ?? noTitles, catalogueMeans),
-    cacheScoresFor('tv', showList.value ?? noTitles, catalogueMeans)
+    cacheScoresFor('tv', showList.value ?? noTitles, catalogueMeans, keywordTags)
   ])
 
   for (const result of scored) {
@@ -156,7 +164,7 @@ async function carryRows(mediaType, previous, carry) {
   return rows.filter(Boolean)
 }
 
-async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
+async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans, keywordTags) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
   // Ids whose stored record was read, whatever it held. Anything else is a title we cannot speak for
@@ -165,7 +173,7 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
   await pool(titles, TITLES_IN_FLIGHT, async title => {
     try {
-      const entry = await scoreTitle(mediaType, title, stats, confirmed, catalogueMeans)
+      const entry = await scoreTitle(mediaType, title, stats, confirmed, catalogueMeans, keywordTags)
 
       if (entry) rows.push(entry)
     } catch (e) {
@@ -179,7 +187,7 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
   return stats
 }
 
-async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans) {
+async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans, keywordTags) {
   const key = scoreKey(SEGMENT[mediaType], title.id)
 
   // Null means TMDB has no such title; a throw means the lookup failed. Both count as one failure.
@@ -245,10 +253,12 @@ async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans) {
     releaseDate: title.releaseDate,
     genreIds: title.genreIds,
     votes: title.tmdbScoreCount,
+    popularity: title.popularity,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
     included: detail.included,
     originalLanguage: title.originalLanguage,
+    ...(keywordTags ? { keywords: keywordTags.get(title.id) ?? [] } : {}),
     score: avgScore
   }
 }

@@ -38,7 +38,9 @@ const CACHE_CONTROL = 'max-age=43200, stale-while-revalidate=43200'
 async function list(ctx, media) {
   // Top Rated is the one sort discover cannot serve, so it comes from the ranked index instead.
   // A failed read is a 503 rather than an empty list: the filter did not answer, we did not ask.
-  const data = ctx.query.sort === SCORE_SORT
+  // Top Rated, and any keyword-backed genre, come from the index rather than discover
+  const fromIndex = ctx.query.sort === SCORE_SORT || tmdb.hasKeywordGenre(media.mediaType, ctx.query.wg)
+  const data = fromIndex
     ? await index.getList(media.mediaType, ctx.query) ?? ctx.throw(503)
     : await media.list(ctx.query)
 

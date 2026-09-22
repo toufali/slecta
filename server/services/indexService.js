@@ -8,12 +8,17 @@ import log from '../utils/logger.js'
 
 // Bump when the row shape changes, then run the job by hand: the deploy runs the checks only, so
 // until the nightly run this key is absent and the ranked list fails outright.
-export const INDEX_VERSION = 3
+export const INDEX_VERSION = 4
 
 export const indexKey = segment => `index/${segment}/v${INDEX_VERSION}`
 
 // Votes then id break the ties an integer score produces, so the order does not reshuffle between runs
 export const byRank = (a, b) => b.score - a.score || b.votes - a.votes || a.id - b.id
+
+// The index also serves Most Recent and Popularity, for a keyword-genre selection discover cannot
+const byPopularity = (a, b) => b.popularity - a.popularity || a.id - b.id
+const byRecent = (a, b) => (a.releaseDate < b.releaseDate ? 1 : a.releaseDate > b.releaseDate ? -1 : a.id - b.id)
+const comparator = sort => sort === 'popularity.desc' ? byPopularity : sort?.endsWith('_date.desc') ? byRecent : byRank
 
 // Discover's own page size: switching sort should not change how long a page is
 const PAGE_SIZE = 20
@@ -28,15 +33,13 @@ const asList = value => {
 
 // Every filter discover is sent has to hold here too, and none that it does not: TV has no
 // certification filter there, so applying one here empties the list on a change of sort alone
-function matches(row, query, { window, certifications }) {
-  const genres = asList(query.wg)?.map(Number)
-  const without = asList(query.wog)?.map(Number)
+function matches(row, query, { window, certifications, genreFilter }) {
   const ratings = certifications ? asList(query.wr) : undefined
   const services = asList(query.wp)?.map(Number)
   const minVotes = Number(query.minVotes)
 
-  if (genres && !row.genreIds?.some(id => genres.includes(id))) return false
-  if (without?.some(id => row.genreIds?.includes(id))) return false
+  // A selected genre matches the row's own genres or, for a keyword-backed one, its keyword tags
+  if (genreFilter && !genreFilter(row)) return false
   if (ratings && !ratings.includes(row.certification)) return false
 
   // A subscription pick matches only where the title costs nothing extra; a storefront pick
@@ -76,8 +79,16 @@ class IndexService {
     // scores sink on their own — an IMDb-only row tops out well below the head of the list.
     // Once, not per row: the bound is the request's, and a scan crossing midnight would otherwise
     // filter the head of one response against a different day than its tail
-    const rules = { window: tmdb.dateWindow(query.months), certifications }
-    const found = rows.filter(row => matches(row, query, rules))
+    const { genreIds, keywords } = tmdb.translateGenres(mediaType, query.wg)
+    const genreSet = new Set(genreIds)
+    const keywordSet = new Set(keywords)
+    const genreFilter = asList(query.wg)
+      ? row => row.genreIds?.some(id => genreSet.has(id)) || row.keywords?.some(id => keywordSet.has(id))
+      : undefined
+
+    const rules = { window: tmdb.dateWindow(query.months), certifications, genreFilter }
+    const sort = query.sort || tmdb.sortingOptions[segment][0].value
+    const found = rows.filter(row => matches(row, query, rules)).sort(comparator(sort))
     const page = Number(query.page) || 1
     const start = (page - 1) * PAGE_SIZE
 

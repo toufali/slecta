@@ -509,3 +509,14 @@ test('a storefront pick asks discover for the paid types too, and the vocabulary
   assert.match(decodeURIComponent(seen[0]), /with_watch_providers=8\|175\|1796\|7/)
   assert.equal(tmdb.filterRules('movie').providers.has(7), true)
 })
+
+test('a movie genre reaches TV by id, mapped genre, or keyword', () => {
+  assert.deepEqual(tmdb.translateGenres('movie', ['27', '35']), { genreIds: [27, 35], keywords: [] })
+  assert.deepEqual(tmdb.translateGenres('tv', ['28', '35', '10751', '27']), { genreIds: [10759, 35, 10751, 10762], keywords: [315058] })
+})
+
+test('only a TV selection with a keyword-backed genre routes to the index', () => {
+  assert.equal(tmdb.hasKeywordGenre('tv', ['27', '35']), true)
+  assert.equal(tmdb.hasKeywordGenre('tv', ['28', '35']), false)
+  assert.equal(tmdb.hasKeywordGenre('movie', ['27']), false)
+})

@@ -24,10 +24,11 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   const passed = []
   const windows = []
   const originals = [[imdb, 'refresh'], [tmdb, 'getMovies'], [tmdb, 'getTvShows'], [tmdb, 'getMovieDetail'],
-    [tmdb, 'getTvShowDetail'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
+    [tmdb, 'getTvShowDetail'], [tmdb, 'keywordTags'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
     .map(([target, name]) => [target, name, target[name]])
 
   imdb.refresh = async () => {}
+  tmdb.keywordTags = async () => new Map()
   // The window is recorded, since every page of one walk has to be bounded by the same day
   tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
@@ -274,7 +275,7 @@ test('pages that repeat their titles report short despite a full row count', asy
 // The sort reads this one key, so the entry has to carry everything a card renders and everything
 // the existing filters match on — otherwise a score-sorted page needs a TMDB call per title
 test('the run publishes a score index a card could be rendered from', async () => {
-  const movies = [{ page: 1, id: 61, title: 'Dune', posterPath: '/p.jpg', releaseDate: '2026-01-01', genreIds: [878], tmdbScoreCount: 900, originalLanguage: 'en' }]
+  const movies = [{ page: 1, id: 61, title: 'Dune', posterPath: '/p.jpg', releaseDate: '2026-01-01', genreIds: [878], tmdbScoreCount: 900, popularity: 42, originalLanguage: 'en' }]
   const { restore } = stub({ movies })
   const written = new Map()
   const realSetCache = redis.setCache
@@ -291,6 +292,7 @@ test('the run publishes a score index a card could be rendered from', async () =
       releaseDate: '2026-01-01',
       genreIds: [878],
       votes: 900,
+      popularity: 42,
       certification: 'PG-13',
       providers: [8],
       included: [8],

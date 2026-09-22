@@ -4,7 +4,7 @@
 
 // Only the panel's own form is accepted: one param repeated per value, which TMDB reads as OR.
 // Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
-export const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
+export const MULTI = new Set(['wg', 'wr', 'wp'])
 
 export const PERSISTED = ['sort', 'months', 'english', 'wg', 'wr', 'wp']
 
@@ -27,7 +27,6 @@ export const CHECKS = {
   // Only the panel's own value. Anything else applies the filter while the page renders it off.
   streaming: value => value === 'on',
   wg: isGenre,
-  wog: isGenre,
   wp: (value, { providers }) => isDigits(value) && providers.has(+value),
   // TV certifications are a separate vocabulary (TV-MA…) the TV route never fetches or sends,
   // so with no list supplied `wr` goes unjudged rather than held to the film list.

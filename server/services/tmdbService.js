@@ -29,6 +29,14 @@ const day = date => date.toISOString().substring(0, 10)
 
 export const ENGLISH = 'en'
 
+// The genre panel is identical in both catalogues: the movie vocabulary minus TV Movie (a
+// distribution class, not a genre). Each genre reaches TV by its own id, a mapped TV genre, or a
+// keyword; movies use the ids directly.
+const TV_MOVIE = 10770
+const KIDS = 10762
+const TV_GENRE = new Map([[28, 10759], [12, 10759], [878, 10765], [14, 10765], [10752, 10768]])
+const GENRE_KEYWORD = new Map([[27, 315058], [53, 316362], [10749, 9840], [36, 282633], [10402, 283297]])
+
 // The detail page names a language rather than showing its code. `cn` is TMDB's own code for
 // Cantonese, not an ISO one, so `Intl` hands back the code and the page would read "cn".
 const LANGUAGE_NAMES = new Intl.DisplayNames(['en'], { type: 'language' })
@@ -159,6 +167,7 @@ class TmdbService {
   expandProvider = id => [id, ...[...this.providerAlias].filter(([, parent]) => parent === +id).map(([variant]) => variant)]
   imgConfig
   genres = {}
+  pickerGenres = new Map()
   ratings
 
   async init() {
@@ -167,6 +176,7 @@ class TmdbService {
     this.genres.all = genres.all
     this.genres.movie = genres.movie
     this.genres.show = genres.show
+    this.pickerGenres = new Map([...genres.movie].filter(([id]) => id !== TV_MOVIE))
     this.ratings = ratings
     console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
@@ -252,6 +262,59 @@ class TmdbService {
     return ratings
   }
 
+  // Movies pass through; TV maps each id to a genre, a keyword, or Family plus Kids
+  translateGenres(mediaType, wg) {
+    const ids = [wg].flat().filter(Boolean).map(Number)
+
+    if (mediaType !== 'tv') return { genreIds: ids, keywords: [] }
+
+    const genreIds = []
+    const keywords = []
+
+    for (const id of ids) {
+      if (GENRE_KEYWORD.has(id)) keywords.push(GENRE_KEYWORD.get(id))
+      else if (TV_GENRE.has(id)) genreIds.push(TV_GENRE.get(id))
+      else { genreIds.push(id); if (id === 10751) genreIds.push(KIDS) }
+    }
+
+    return { genreIds, keywords }
+  }
+
+  // A keyword-backed genre cannot be OR'd with a genre in one discover call, so its selection uses
+  // the index, which filters in memory
+  hasKeywordGenre(mediaType, wg) {
+    return mediaType === 'tv' && [wg].flat().filter(Boolean).some(id => GENRE_KEYWORD.has(Number(id)))
+  }
+
+  // One discover query per keyword across its pages, not a per-title lookup; returns title id -> keyword ids
+  async keywordTags(window) {
+    const tags = new Map()
+
+    for (const keyword of GENRE_KEYWORD.values()) {
+      for (let page = 1, pages = 1; page <= pages; page++) {
+        const params = new URLSearchParams({
+          page,
+          with_keywords: keyword,
+          watch_region: this.region,
+          'first_air_date.lte': window.to,
+          'first_air_date.gte': window.from,
+          'vote_count.gte': this.minVotes
+        })
+        const res = await fetch(`${TMDB_API_URL}/discover/tv?${params}`, { headers })
+
+        if (!res.ok) throw new Error(`TMDB ${res.status} ${res.statusText}`)
+
+        const json = await res.json()
+
+        for (const item of json.results) tags.set(item.id, [...(tags.get(item.id) ?? []), keyword])
+
+        pages = Math.min(json.total_pages, this.pageMax)
+      }
+    }
+
+    return tags
+  }
+
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media
   // type; an omitted rule leaves that param unjudged.
   filterRules(mediaType) {
@@ -262,7 +325,7 @@ class TmdbService {
       minVotes: this.minVotes,
       lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
-      genres: this.genres[media.genreKey],
+      genres: this.pickerGenres,
       // One vocabulary for validation: a picked id may name a subscription or a storefront
       providers: new Map([...this.providers, ...this.storefronts]),
       ratings: media.certifications ? this.ratings : undefined
@@ -316,7 +379,7 @@ class TmdbService {
     const media = CATALOGUE[mediaType]
     const sorts = this.sortingOptions[media.segment]
     const shape = {
-      allGenres: this.genres[media.genreKey],
+      allGenres: this.pickerGenres,
       withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
@@ -372,8 +435,7 @@ class TmdbService {
       [`${media.dateParam}.gte`]: window.from,
       'vote_count.gte': query?.minVotes || this.minVotes,
       with_original_language: query?.english ? ENGLISH : undefined,
-      with_genres: Array.isArray(query?.wg) ? query?.wg.join('|') : query?.wg,
-      without_genres: Array.isArray(query?.wog) ? query?.wog.join('|') : query?.wog,
+      with_genres: this.translateGenres(mediaType, query?.wg).genreIds.join('|') || undefined,
       certification: media.certifications ? (Array.isArray(query?.wr) ? query?.wr.join('|') : query?.wr) : undefined,
       certification_country: media.certifications ? this.region : undefined,
       watch_region: this.region,

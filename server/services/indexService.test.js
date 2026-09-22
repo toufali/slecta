@@ -14,6 +14,7 @@ const { default: redis, WRITTEN, CONFLICT } = await import('./redisService.js')
 tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
 tmdb.genres.movie = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.genres.show = new Map([[35, 'Comedy'], [18, 'Drama']])
+tmdb.pickerGenres = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.ratings = ['G', 'PG', 'PG-13', 'R']
 
 const row = over => ({
@@ -155,15 +156,31 @@ test('a service filter reads what costs nothing extra, never the flattened avail
   assert.deepEqual(titles(await listing(rows, { wp: '' })), ['subscribed', 'rentable there', 'elsewhere'])
 })
 
-// Changing the sort must not change what a filter means, so every parameter discover is sent has
-// to hold here too
-test('an excluded genre is dropped', async () => {
+test('a keyword-backed genre matches the row keyword tags', async () => {
   const data = await listing([
-    row({ id: 1, title: 'comedy', genreIds: [35] }),
-    row({ id: 2, title: 'drama', genreIds: [18] })
-  ], { wog: '35' })
+    row({ id: 1, title: 'tagged', keywords: [315058] }),
+    row({ id: 2, title: 'untagged', keywords: [] })
+  ], { wg: '27' }, 'tv')
 
-  assert.deepEqual(titles(data), ['drama'])
+  assert.deepEqual(data.shows.map(show => show.title), ['tagged'])
+})
+
+test('a mapped genre matches the TV genre it reaches', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'action', genreIds: [10759] }),
+    row({ id: 2, title: 'comedy', genreIds: [35] })
+  ], { wg: '28' }, 'tv')
+
+  assert.deepEqual(data.shows.map(show => show.title), ['action'])
+})
+
+test('the index orders by the requested sort', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'acclaimed', popularity: 5, score: 90 }),
+    row({ id: 2, title: 'watched', popularity: 99, score: 10 })
+  ], { sort: 'popularity.desc' })
+
+  assert.deepEqual(titles(data), ['watched', 'acclaimed'])
 })
 
 // The index is built at the catalogue's own floor, so an override can only narrow from there
