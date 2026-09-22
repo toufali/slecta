@@ -138,6 +138,7 @@ export const titleList = data => {
       ${providerFields(data.allStorefronts, data)}
     </fieldset>
     <fieldset>
+      <button class='secondary reset' type='button'>RESET</button>
       <button class='primary' type='submit'>APPLY</button>
     </fieldset>
   </form>

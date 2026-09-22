@@ -232,19 +232,22 @@ test('each detail page renders through the shared view with its own rows', async
   assert.doesNotMatch(tv.body, /<label>Director:/)
 })
 
-test('the page applies the saved services when the URL names none, and drops a stale id', async () => {
+test('the page applies the saved filters when the URL names none, and drops a stale id', async () => {
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.genres = { movie: new Map([[28, 'Action']]) }
+  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
 
   const ctx = context()
-  ctx.cookies.get = () => '8|999'
+  ctx.cookies.get = name => name === 'filters' ? 'wp=8&wp=999&wg=28&english=on' : undefined
   await showList('movie')(ctx)
-  assert.deepEqual(asked, ['8'])
+  assert.deepEqual(asked.wp, ['8'], 'the dead id is dropped, the live one kept')
+  assert.deepEqual(asked.wg, ['28'])
+  assert.equal(asked.english, 'on')
 })
 
-test('services named in the URL win over the cookie', async () => {
+test('a filter named in the URL wins over the saved set', async () => {
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
@@ -252,7 +255,7 @@ test('services named in the URL win over the cookie', async () => {
 
   const ctx = context()
   ctx.query = { wp: '337' }
-  ctx.cookies.get = () => '8'
+  ctx.cookies.get = name => name === 'filters' ? 'wp=8' : undefined
   await showList('movie')(ctx)
   assert.deepEqual(asked, '337')
 })

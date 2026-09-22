@@ -4,14 +4,17 @@
 
 // Only the panel's own form is accepted: one param repeated per value, which TMDB reads as OR.
 // Comma-joined `27,878` means AND to TMDB, labels one genre, and leaves the boxes unchecked.
-const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
+export const MULTI = new Set(['wg', 'wog', 'wr', 'wp'])
+
+// Filters worth remembering across visits; page and the internal vote floor are not
+export const PERSISTED = ['sort', 'months', 'english', 'wg', 'wog', 'wr', 'wp']
 
 // Canonical digits only: `Number()` also takes `0x1b`, `1e2` and `08`, which filter while rendering unchecked
 const isDigits = value => /^[1-9]\d*$/.test(value)
 
 const isGenre = (value, { genres }) => isDigits(value) && genres.has(+value)
 
-const CHECKS = {
+export const CHECKS = {
   page: (value, { pageMax }) => isDigits(value) && +value >= 1 && +value <= pageMax,
   // The catalogue is defined by this floor, so asking below it asks for titles outside it — and the
   // ranked path could not serve them anyway, since the index is built at the floor
