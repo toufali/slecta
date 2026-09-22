@@ -52,10 +52,9 @@ test('the language checkbox reflects the request', () => {
   }
 })
 
-// A bound the hidden control cannot show would filter the list unseen
 test('newest-first hides the lookback control and its summary clause', () => {
-  for (const data of [movie, tv]) {
-    const rendered = titleList(data({ sortBy: 'primary_release_date.desc' }))
+  for (const sortBy of ['primary_release_date.desc', 'first_air_date.desc']) {
+    const rendered = titleList(movie({ sortBy, allSorting: [{ name: 'Most Recent', value: sortBy }] }))
 
     assert.match(rendered, /<fieldset disabled hidden>/)
     assert.doesNotMatch(rendered, /in the last <output>/)

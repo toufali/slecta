@@ -95,6 +95,14 @@ function captureUrl(results = [ROW]) {
   return seen
 }
 
+// The span between the date bounds a discover URL carries, in whole months
+const monthsBack = url => {
+  const bound = name => decodeURIComponent(url).match(new RegExp(`date\\.${name}=(\\d+)-(\\d+)`)).slice(1).map(Number)
+  const [[fromYear, fromMonth], [toYear, toMonth]] = [bound('gte'), bound('lte')]
+
+  return (toYear - fromYear) * 12 + toMonth - fromMonth
+}
+
 test('each catalogue asks its own discover endpoint over its own date field', async () => {
   const seen = captureUrl()
 
@@ -174,14 +182,6 @@ test('a lookback narrows the window discover is sent', async () => {
   await tmdb.getMovies({ months: '3', sort: 'popularity.desc' })
   await tmdb.getTvShows({ months: '3', sort: 'popularity.desc' })
   await tmdb.getMovies({ sort: 'popularity.desc' })
-
-  // Read as the span between the bounds sent, since which day they land on is tested on its own
-  const monthsBack = url => {
-    const bound = name => decodeURIComponent(url).match(new RegExp(`date\\.${name}=(\\d+)-(\\d+)`)).slice(1).map(Number)
-    const [[fromYear, fromMonth], [toYear, toMonth]] = [bound('gte'), bound('lte')]
-
-    return (toYear - fromYear) * 12 + toMonth - fromMonth
-  }
 
   assert.equal(monthsBack(seen[0]), 3)
   assert.equal(monthsBack(seen[1]), 3, 'both catalogues, or a sort change moves the window')
@@ -278,16 +278,16 @@ test('the filter rules carry the catalogue vote floor and lookback', () => {
 })
 
 // The view cannot tell the two list paths apart, so the slider's own state has to come from both
-// Newest-first already leads with the newest titles; a bound the hidden control cannot show
-// would filter the list unseen
 test('a date sort ignores a lookback carried in the URL', async () => {
-  captureUrl()
+  const seen = captureUrl()
 
   const explicit = await tmdb.getMovies({ months: '3', sort: 'primary_release_date.desc' })
   const defaulted = await tmdb.getMovies({ months: '3' })
 
   assert.equal(explicit.lookback, tmdb.lookbackMax)
   assert.equal(defaulted.lookback, tmdb.lookbackMax, 'the default sort is also newest-first')
+  assert.equal(monthsBack(seen[0]), 12, 'the outgoing request drops the bound too, not just the metadata')
+  assert.equal(monthsBack(seen[1]), 12)
 })
 
 test('a list page carries the lookback the panel renders', async () => {

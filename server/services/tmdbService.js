@@ -291,8 +291,7 @@ class TmdbService {
    * A lookback in whole months, absent or unusable meaning the widest. Clamped rather than trusted:
    * a request may narrow the window, never widen it past the catalogue the nightly run scores.
    */
-  // Newest-first already shows the newest titles, so a narrower bound would only truncate the
-  // tail — and a bound the hidden control cannot show would filter the list unseen
+  // A months bound typed into the URL under this sort would filter the list unseen: the control is hidden
   #boundedMonths(sortBy, months) {
     return sortBy.endsWith('_date.desc') ? undefined : months
   }

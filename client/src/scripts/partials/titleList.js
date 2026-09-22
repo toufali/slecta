@@ -11,8 +11,8 @@ const filterForm = document.querySelector('form[name="title-filter"]')
 const filterBtn = document.querySelector('.list-actions .filter')
 const lookback = document.querySelector('.lookback input')
 const lookbackOutput = document.querySelector('.lookback output')
-const lookbackFieldset = lookback.closest('fieldset')
-const sortFieldset = document.querySelector('input[name=sort]').closest('fieldset')
+const lookbackFs = lookback.closest('fieldset')
+const sortFs = document.querySelector('input[name=sort]').closest('fieldset')
 const more = document.querySelector('.more')
 const panelClose = document.querySelector('.filter-panel .close')
 const searchPanel = document.querySelector('.search-panel')
@@ -34,7 +34,7 @@ export default function init() {
   listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
   lookback.addEventListener('input', handleLookback)
-  sortFieldset.addEventListener('change', handleSort)
+  sortFs.addEventListener('change', handleSort)
   more.addEventListener('click', handleMore)
   panelClose.addEventListener('click', handlePanel)
   searchBtn.addEventListener('click', handleSearch)
@@ -129,8 +129,9 @@ function handlePopstate(e) {
 }
 
 function handleSort(e) {
-  lookbackFieldset.toggleAttribute('disabled', newestFirst(e.target.value))
-  lookbackFieldset.toggleAttribute('hidden', newestFirst(e.target.value))
+  const hide = newestFirst(e.target.value)
+  lookbackFs.toggleAttribute('disabled', hide)
+  lookbackFs.toggleAttribute('hidden', hide)
 }
 
 function handleLookback() {
