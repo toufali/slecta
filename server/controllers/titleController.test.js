@@ -247,15 +247,17 @@ test('the page applies the saved filters when the URL names none, and drops a st
   assert.equal(asked.english, 'on')
 })
 
-test('a filter named in the URL wins over the saved set', async () => {
+test('any filter in the URL suppresses the whole saved set', async () => {
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.getMovies = async query => { asked = query?.wp; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
 
   const ctx = context()
   ctx.query = { wp: '337' }
-  ctx.cookies.get = name => name === 'filters' ? 'wp=8' : undefined
+  ctx.cookies.get = name => name === 'filters' ? 'wp=8&wg=28&english=on' : undefined
   await showList('movie')(ctx)
-  assert.deepEqual(asked, '337')
+  assert.deepEqual(asked.wp, '337', 'only the URL service applies')
+  assert.equal(asked.wg, undefined, 'the saved genre is not mixed in')
+  assert.equal(asked.english, undefined, 'nor the saved language')
 })

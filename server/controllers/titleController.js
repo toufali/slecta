@@ -49,8 +49,10 @@ async function list(ctx, media) {
   return data
 }
 
-// Fill each saved filter the URL omits; a URL value wins, and an invalid saved one is dropped
+// The saved set applies only to a bare visit; a URL carrying any filter is a request to reproduce it
 function applySavedFilters(ctx, rules) {
+  if (PERSISTED.some(key => ctx.query[key] !== undefined)) return
+
   const saved = ctx.cookies.get('filters')
 
   if (!saved) return
@@ -59,8 +61,6 @@ function applySavedFilters(ctx, rules) {
   const merged = { ...ctx.query }
 
   for (const key of PERSISTED) {
-    if (merged[key] !== undefined) continue
-
     const values = savedParams.getAll(key).filter(value => value && CHECKS[key](value, rules))
 
     if (values.length) merged[key] = MULTI.has(key) ? values : values[0]
