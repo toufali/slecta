@@ -88,7 +88,7 @@ fieldset:last-of-type > button{
   flex: 1;
 }
 
-fieldset:last-of-type > .primary::before,
+fieldset:last-of-type > button::before,
 .filter::before,
 .search::before {
   content: '';
@@ -103,6 +103,11 @@ fieldset:last-of-type > .primary::before,
 fieldset:last-of-type > .primary::before {
   -webkit-mask: url(/images/apply-icon.svg) no-repeat center / contain;
   mask: url(/images/apply-icon.svg) no-repeat center / contain;
+}
+
+fieldset:last-of-type > .reset::before {
+  -webkit-mask: url(/images/reset-icon.svg) no-repeat center / contain;
+  mask: url(/images/reset-icon.svg) no-repeat center / contain;
 }
 
 .list-actions {
