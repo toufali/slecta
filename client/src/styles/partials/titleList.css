@@ -3,9 +3,7 @@
 .list-description{
   cursor: default;
   user-select: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  /* Inline flow, not flex: a flex-wrapped separator can lead a line with a comma */
   font: var(--h3-font);
   /* Full size through two filters, then a point per filter down to 16px. `* 1rem / 16`, not
      `* 0.0625rem`: the minifier rewrites the latter to `/ 16rem`, a divide-by-length that drops the rule */
@@ -16,6 +14,7 @@
 }
 
 .list-description output{
+  display: inline-block;
   cursor: pointer;
   text-transform: uppercase;
   font-weight: bold;
