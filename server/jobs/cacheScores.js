@@ -53,12 +53,19 @@ export async function cacheScores() {
   // What the next run's scores shrink toward, averaged over both catalogues
   const catalogueMeans = { sum: 0, count: 0 }
 
-  // Fetched once for the walk, and caught so a failure costs only the TV index
+  // A failure reuses yesterday's tags, so only titles new tonight go untagged until the next run
   let keywordTags
   try {
     keywordTags = await tmdb.keywordTags(window)
   } catch (e) {
-    log.error('Keyword tagging failed, leaving the TV score index in place', { error: e })
+    const previous = await redis.getCache(indexKey(SEGMENT.tv))
+
+    if (previous) {
+      keywordTags = new Map(previous.map(row => [row.id, row.keywords ?? []]))
+      log.warn('Keyword tagging failed, reusing the previous index tags', { error: e })
+    } else {
+      log.error('Keyword tagging failed with no previous tags, leaving the TV score index in place', { error: e })
+    }
   }
 
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
@@ -182,7 +189,7 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans, k
     }
   })
 
-  // Untagged rows would serve every keyword genre empty, so yesterday's index stands instead
+  // With no tags to reuse, untagged rows would serve every keyword genre empty, so the index is left as it is
   stats.indexFailed = mediaType === 'tv' && !keywordTags
     ? true
     : !await publishIndex(mediaType, rows, titles, complete, confirmed)

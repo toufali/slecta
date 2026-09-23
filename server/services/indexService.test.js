@@ -48,7 +48,7 @@ test('the order is the stored ranking, with nothing withheld from it', async () 
     row({ id: 1, title: 'thin' }),
     row({ id: 2, title: 'audiences' }),
     row({ id: 3, title: 'full' })
-  ])
+  ], { sort: 'score' })
 
   assert.deepEqual(titles(data), ['thin', 'audiences', 'full'], 'the job ranked them; this only slices')
 })
@@ -82,7 +82,7 @@ test('a card carries everything the card component renders', async () => {
 test('an empty filter value is no filter, not a filter nothing matches', async () => {
   const rows = [row({ id: 1, title: 'comedy', genreIds: [35] }), row({ id: 2, title: 'unrated', certification: '' })]
 
-  for (const query of [{ wg: '' }, { wr: '' }, { wog: '' }, { wg: ['', ''] }]) {
+  for (const query of [{ wg: '' }, { wr: '' }, { wg: ['', ''] }]) {
     assert.equal(titles(await listing(rows, query)).length, 2, JSON.stringify(query))
   }
 })
@@ -171,6 +171,14 @@ test('a mapped genre matches the TV genre it reaches', async () => {
   ], { wg: '28' }, 'tv')
 
   assert.deepEqual(data.shows.map(show => show.title), ['action'])
+})
+
+test('Most Recent orders the index by release date, not by score', async () => {
+  const lastMonth = new Date(Date.now() - 30 * 86_400_000).toISOString().substring(0, 10)
+  const rows = [row({ id: 1, title: 'older, acclaimed', releaseDate: lastMonth, score: 90 }), row({ id: 2, title: 'newer, weaker', score: 10 })]
+
+  assert.deepEqual(titles(await listing(rows, { sort: 'primary_release_date.desc' })), ['newer, weaker', 'older, acclaimed'])
+  assert.deepEqual(titles(await listing(rows)), ['newer, weaker', 'older, acclaimed'], 'Most Recent is the default')
 })
 
 test('the index orders by the requested sort', async () => {

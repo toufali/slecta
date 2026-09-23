@@ -401,13 +401,38 @@ test('a failed index publish leaves the stored average alone', async () => {
   }
 })
 
-test('a run whose keyword tagging failed leaves the TV index in place', async () => {
+test('a run whose keyword tagging failed reuses the previous index tags', async () => {
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }, { page: 1, id: 10, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ shows })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === SHOW_INDEX ? [{ id: 9, keywords: [315058] }] : null
+  tmdb.keywordTags = async () => { throw new Error('TMDB 503') }
+
+  try {
+    const { stats } = await cacheScores()
+    const rows = written.get(SHOW_INDEX)
+
+    assert.deepEqual(rows.find(row => row.id === 9).keywords, [315058])
+    assert.deepEqual(rows.find(row => row.id === 10).keywords, [], 'a title new tonight goes untagged')
+    assert.equal(stats.find(stat => stat.mediaType === 'tv').indexFailed, false)
+  } finally {
+    redis.setCache = realSetCache
+    redis.getCache = realGetCache
+    restore()
+  }
+})
+
+test('a run whose keyword tagging failed with no previous tags leaves the TV index in place', async () => {
   const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
   const { restore } = stub({ shows })
   const written = new Map()
-  const realSetCache = redis.setCache
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
 
   redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async () => null
   tmdb.keywordTags = async () => { throw new Error('TMDB 503') }
 
   try {
@@ -417,6 +442,7 @@ test('a run whose keyword tagging failed leaves the TV index in place', async ()
     assert.equal(stats.find(stat => stat.mediaType === 'tv').indexFailed, true)
   } finally {
     redis.setCache = realSetCache
+    redis.getCache = realGetCache
     restore()
   }
 })
