@@ -520,3 +520,19 @@ test('only a TV selection with a keyword-backed genre routes to the index', () =
   assert.equal(tmdb.hasKeywordGenre('tv', ['28', '35']), false)
   assert.equal(tmdb.hasKeywordGenre('movie', ['27']), false)
 })
+
+test('TV adds its programming formats to the shared genres, without TV Movie or Kids', () => {
+  const real = tmdb.genres
+
+  tmdb.genres = {
+    movie: new Map([[28, 'Action'], [27, 'Horror'], [10770, 'TV Movie']]),
+    show: new Map([[10759, 'Action & Adventure'], [10762, 'Kids'], [10764, 'Reality'], [10767, 'Talk']])
+  }
+
+  try {
+    assert.deepEqual([...tmdb.filterRules('movie').genres.keys()], [28, 27])
+    assert.deepEqual([...tmdb.filterRules('tv').genres.keys()], [28, 27, 10764, 10767])
+  } finally {
+    tmdb.genres = real
+  }
+})

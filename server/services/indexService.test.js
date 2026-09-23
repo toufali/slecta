@@ -14,7 +14,6 @@ const { default: redis, WRITTEN, CONFLICT } = await import('./redisService.js')
 tmdb.imgConfig = { secure_base_url: 'https://img/', poster_sizes: ['w92'] }
 tmdb.genres.movie = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.genres.show = new Map([[35, 'Comedy'], [18, 'Drama']])
-tmdb.pickerGenres = new Map([[35, 'Comedy'], [18, 'Drama']])
 tmdb.ratings = ['G', 'PG', 'PG-13', 'R']
 
 const row = over => ({

@@ -236,7 +236,7 @@ test('the page applies the saved filters when the URL names none, and drops a st
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.pickerGenres = new Map([[28, 'Action']])
+  tmdb.genres.movie = new Map([[28, 'Action']])
   tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
 
   const ctx = context()

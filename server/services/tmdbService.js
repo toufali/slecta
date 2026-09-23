@@ -29,11 +29,12 @@ const day = date => date.toISOString().substring(0, 10)
 
 export const ENGLISH = 'en'
 
-// The genre panel is identical in both catalogues: the movie vocabulary minus TV Movie (a
-// distribution class, not a genre). Each genre reaches TV by its own id, a mapped TV genre, or a
-// keyword; movies use the ids directly.
+// Both panels offer the movie vocabulary minus TV Movie (a distribution class, not a genre), and each
+// of those reaches TV by its own id, a mapped TV genre, or a keyword. TV adds its programming formats,
+// which have no film equivalent.
 const TV_MOVIE = 10770
 const KIDS = 10762
+const TV_FORMATS = [10763, 10764, 10766, 10767] // News, Reality, Soap, Talk
 const TV_GENRE = new Map([[28, 10759], [12, 10759], [878, 10765], [14, 10765], [10752, 10768]])
 const GENRE_KEYWORD = new Map([[27, 315058], [53, 316362], [10749, 9840], [36, 282633], [10402, 283297]])
 
@@ -167,7 +168,6 @@ class TmdbService {
   expandProvider = id => [id, ...[...this.providerAlias].filter(([, parent]) => parent === +id).map(([variant]) => variant)]
   imgConfig
   genres = {}
-  pickerGenres = new Map()
   ratings
 
   async init() {
@@ -176,7 +176,6 @@ class TmdbService {
     this.genres.all = genres.all
     this.genres.movie = genres.movie
     this.genres.show = genres.show
-    this.pickerGenres = new Map([...genres.movie].filter(([id]) => id !== TV_MOVIE))
     this.ratings = ratings
     console.info('TMDB initialized:', Boolean(this.imgConfig && this.genres && this.ratings))
     console.info('- from cache:', Boolean(this.imgConfig.cacheHit && genres.cacheHit && this.ratings.cacheHit))
@@ -315,6 +314,13 @@ class TmdbService {
     return tags
   }
 
+  #picker(genreKey) {
+    const film = [...(this.genres.movie ?? [])].filter(([id]) => id !== TV_MOVIE)
+    const formats = genreKey === 'show' ? [...(this.genres.show ?? [])].filter(([id]) => TV_FORMATS.includes(id)) : []
+
+    return new Map([...film, ...formats].sort(([, a], [, b]) => a.localeCompare(b)))
+  }
+
   // Vocabularies the filter validator checks against. Sort keys and genre ids differ per media
   // type; an omitted rule leaves that param unjudged.
   filterRules(mediaType) {
@@ -325,7 +331,7 @@ class TmdbService {
       minVotes: this.minVotes,
       lookbackMax: this.lookbackMax,
       sorts: this.sortingOptions[media.segment],
-      genres: this.pickerGenres,
+      genres: this.#picker(media.genreKey),
       // One vocabulary for validation: a picked id may name a subscription or a storefront
       providers: new Map([...this.providers, ...this.storefronts]),
       ratings: media.certifications ? this.ratings : undefined
@@ -379,7 +385,7 @@ class TmdbService {
     const media = CATALOGUE[mediaType]
     const sorts = this.sortingOptions[media.segment]
     const shape = {
-      allGenres: this.pickerGenres,
+      allGenres: this.#picker(media.genreKey),
       withGenres: Array.isArray(query?.wg) ? query.wg : query?.wg ? [query.wg] : null, // TODO: this should be nicer
       allSorting: sorts,
       sortBy: query?.sort || sorts[0].value,
