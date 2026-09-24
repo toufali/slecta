@@ -48,7 +48,7 @@ test('the order is the stored ranking, with nothing withheld from it', async () 
     row({ id: 1, title: 'thin' }),
     row({ id: 2, title: 'audiences' }),
     row({ id: 3, title: 'full' })
-  ])
+  ], { sort: 'score' })
 
   assert.deepEqual(titles(data), ['thin', 'audiences', 'full'], 'the job ranked them; this only slices')
 })
@@ -82,7 +82,7 @@ test('a card carries everything the card component renders', async () => {
 test('an empty filter value is no filter, not a filter nothing matches', async () => {
   const rows = [row({ id: 1, title: 'comedy', genreIds: [35] }), row({ id: 2, title: 'unrated', certification: '' })]
 
-  for (const query of [{ wg: '' }, { wr: '' }, { wog: '' }, { wg: ['', ''] }]) {
+  for (const query of [{ wg: '' }, { wr: '' }, { wg: ['', ''] }]) {
     assert.equal(titles(await listing(rows, query)).length, 2, JSON.stringify(query))
   }
 })
@@ -155,15 +155,39 @@ test('a service filter reads what costs nothing extra, never the flattened avail
   assert.deepEqual(titles(await listing(rows, { wp: '' })), ['subscribed', 'rentable there', 'elsewhere'])
 })
 
-// Changing the sort must not change what a filter means, so every parameter discover is sent has
-// to hold here too
-test('an excluded genre is dropped', async () => {
+test('a keyword-backed genre matches the row keyword tags', async () => {
   const data = await listing([
-    row({ id: 1, title: 'comedy', genreIds: [35] }),
-    row({ id: 2, title: 'drama', genreIds: [18] })
-  ], { wog: '35' })
+    row({ id: 1, title: 'tagged', keywords: [315058] }),
+    row({ id: 2, title: 'untagged', keywords: [] })
+  ], { wg: '27' }, 'tv')
 
-  assert.deepEqual(titles(data), ['drama'])
+  assert.deepEqual(data.shows.map(show => show.title), ['tagged'])
+})
+
+test('a mapped genre matches the TV genre it reaches', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'action', genreIds: [10759] }),
+    row({ id: 2, title: 'comedy', genreIds: [35] })
+  ], { wg: '28' }, 'tv')
+
+  assert.deepEqual(data.shows.map(show => show.title), ['action'])
+})
+
+test('Most Recent orders the index by release date, not by score', async () => {
+  const lastMonth = new Date(Date.now() - 30 * 86_400_000).toISOString().substring(0, 10)
+  const rows = [row({ id: 1, title: 'older, acclaimed', releaseDate: lastMonth, score: 90 }), row({ id: 2, title: 'newer, weaker', score: 10 })]
+
+  assert.deepEqual(titles(await listing(rows, { sort: 'primary_release_date.desc' })), ['newer, weaker', 'older, acclaimed'])
+  assert.deepEqual(titles(await listing(rows)), ['newer, weaker', 'older, acclaimed'], 'Most Recent is the default')
+})
+
+test('the index orders by the requested sort', async () => {
+  const data = await listing([
+    row({ id: 1, title: 'acclaimed', popularity: 5, score: 90 }),
+    row({ id: 2, title: 'watched', popularity: 99, score: 10 })
+  ], { sort: 'popularity.desc' })
+
+  assert.deepEqual(titles(data), ['watched', 'acclaimed'])
 })
 
 // The index is built at the catalogue's own floor, so an override can only narrow from there
@@ -197,8 +221,9 @@ test('a lookback narrows the ranked list too', async () => {
   }
   const rows = [row({ id: 1, title: 'this week' }), row({ id: 2, title: 'two months ago', releaseDate: daysAgo(60) })]
 
-  assert.deepEqual(titles(await listing(rows)), ['this week', 'two months ago'])
-  assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week'])
+  assert.deepEqual(titles(await listing(rows, { sort: 'score' })), ['this week', 'two months ago'])
+  assert.deepEqual(titles(await listing(rows, { sort: 'score', months: '1' })), ['this week'])
+  assert.deepEqual(titles(await listing(rows, { months: '1' })), ['this week', 'two months ago'], 'ignored under Most Recent, as discover ignores it')
 })
 
 // The same filter as discover, read off the row: a change of sort must not change the list

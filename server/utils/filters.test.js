@@ -57,11 +57,8 @@ test('a sort key belonging to the other media type is rejected', () => {
   assert.deepEqual(invalidFilters({ sort: 'primary_release_date.desc' }, SHOW), ['sort'])
 })
 
-test('a genre id absent from this media type is rejected', () => {
-  // 27 is Horror for film; TMDB has no such genre for television
-  assert.deepEqual(invalidFilters({ wg: '27' }, SHOW), ['wg'])
+test('an unknown genre id is rejected', () => {
   assert.deepEqual(invalidFilters({ wg: '99999' }, MOVIE), ['wg'])
-  assert.deepEqual(invalidFilters({ wog: 'notanumber' }, MOVIE), ['wog'])
 })
 
 test('every value of a repeated filter is checked', () => {
@@ -119,7 +116,7 @@ test('a genre id must be plain digits, like the id route param', () => {
   // `+'0x1b'` is 27, which passes the lookup and then renders a genre TMDB was never sent
   assert.deepEqual(invalidFilters({ wg: '0x1b' }, MOVIE), ['wg'])
   assert.deepEqual(invalidFilters({ wg: '2.7e1' }, MOVIE), ['wg'])
-  assert.deepEqual(invalidFilters({ wog: '+27' }, MOVIE), ['wog'])
+  assert.deepEqual(invalidFilters({ wg: '+27' }, MOVIE), ['wg'])
 })
 
 test('an empty value counts as absent, matching what the services send', () => {

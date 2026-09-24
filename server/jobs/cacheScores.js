@@ -53,10 +53,25 @@ export async function cacheScores() {
   // What the next run's scores shrink toward, averaged over both catalogues
   const catalogueMeans = { sum: 0, count: 0 }
 
+  // A failure reuses yesterday's tags, so only titles new tonight go untagged until the next run
+  let keywordTags
+  try {
+    keywordTags = await tmdb.keywordTags(window)
+  } catch (e) {
+    const previous = await redis.getCache(indexKey(SEGMENT.tv))
+
+    if (previous) {
+      keywordTags = new Map(previous.map(row => [row.id, row.keywords ?? []]))
+      log.warn('Keyword tagging failed, reusing the previous index tags', { error: e })
+    } else {
+      log.error('Keyword tagging failed with no previous tags, leaving the TV score index in place', { error: e })
+    }
+  }
+
   // Interleaved because they share the per-host queues anyway; settled so one cannot discard the other
   const scored = await Promise.allSettled([
     cacheScoresFor('movie', movieList.value ?? noTitles, catalogueMeans),
-    cacheScoresFor('tv', showList.value ?? noTitles, catalogueMeans)
+    cacheScoresFor('tv', showList.value ?? noTitles, catalogueMeans, keywordTags)
   ])
 
   for (const result of scored) {
@@ -156,7 +171,7 @@ async function carryRows(mediaType, previous, carry) {
   return rows.filter(Boolean)
 }
 
-async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
+async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans, keywordTags) {
   const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
   const rows = []
   // Ids whose stored record was read, whatever it held. Anything else is a title we cannot speak for
@@ -165,7 +180,7 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
   // Contain the title, not the run: an unhandled throw would reject the pool and skip both checks
   await pool(titles, TITLES_IN_FLIGHT, async title => {
     try {
-      const entry = await scoreTitle(mediaType, title, stats, confirmed, catalogueMeans)
+      const entry = await scoreTitle(mediaType, title, stats, confirmed, catalogueMeans, keywordTags)
 
       if (entry) rows.push(entry)
     } catch (e) {
@@ -174,12 +189,15 @@ async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans) {
     }
   })
 
-  stats.indexFailed = !await publishIndex(mediaType, rows, titles, complete, confirmed)
+  // With no tags to reuse, untagged rows would serve every keyword genre empty, so the index is left as it is
+  stats.indexFailed = mediaType === 'tv' && !keywordTags
+    ? true
+    : !await publishIndex(mediaType, rows, titles, complete, confirmed)
 
   return stats
 }
 
-async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans) {
+async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans, keywordTags) {
   const key = scoreKey(SEGMENT[mediaType], title.id)
 
   // Null means TMDB has no such title; a throw means the lookup failed. Both count as one failure.
@@ -245,10 +263,12 @@ async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans) {
     releaseDate: title.releaseDate,
     genreIds: title.genreIds,
     votes: title.tmdbScoreCount,
+    popularity: title.popularity,
     certification: detail.rating,
     providers: detail.providers?.map(provider => provider.provider_id) ?? [],
     included: detail.included,
     originalLanguage: title.originalLanguage,
+    ...(keywordTags ? { keywords: keywordTags.get(title.id) ?? [] } : {}),
     score: avgScore
   }
 }

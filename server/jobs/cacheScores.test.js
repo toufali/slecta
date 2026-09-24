@@ -24,10 +24,11 @@ function stub({ movies = [], shows = [], totalPages = 1, totalResults }) {
   const passed = []
   const windows = []
   const originals = [[imdb, 'refresh'], [tmdb, 'getMovies'], [tmdb, 'getTvShows'], [tmdb, 'getMovieDetail'],
-    [tmdb, 'getTvShowDetail'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
+    [tmdb, 'getTvShowDetail'], [tmdb, 'keywordTags'], [scoreService, 'getScore'], [scoreService, 'getScoreFromCache']]
     .map(([target, name]) => [target, name, target[name]])
 
   imdb.refresh = async () => {}
+  tmdb.keywordTags = async () => new Map()
   // The window is recorded, since every page of one walk has to be bounded by the same day
   tmdb.getMovies = async ({ page }, window) => { windows.push(window); return { movies: movies.filter(movie => movie.page === page), totalPages, totalResults: totalResults ?? movies.length } }
   tmdb.getTvShows = async ({ page }) => ({ shows: shows.filter(show => show.page === page), totalPages, totalResults: totalResults ?? shows.length })
@@ -274,7 +275,7 @@ test('pages that repeat their titles report short despite a full row count', asy
 // The sort reads this one key, so the entry has to carry everything a card renders and everything
 // the existing filters match on — otherwise a score-sorted page needs a TMDB call per title
 test('the run publishes a score index a card could be rendered from', async () => {
-  const movies = [{ page: 1, id: 61, title: 'Dune', posterPath: '/p.jpg', releaseDate: '2026-01-01', genreIds: [878], tmdbScoreCount: 900, originalLanguage: 'en' }]
+  const movies = [{ page: 1, id: 61, title: 'Dune', posterPath: '/p.jpg', releaseDate: '2026-01-01', genreIds: [878], tmdbScoreCount: 900, popularity: 42, originalLanguage: 'en' }]
   const { restore } = stub({ movies })
   const written = new Map()
   const realSetCache = redis.setCache
@@ -291,6 +292,7 @@ test('the run publishes a score index a card could be rendered from', async () =
       releaseDate: '2026-01-01',
       genreIds: [878],
       votes: 900,
+      popularity: 42,
       certification: 'PG-13',
       providers: [8],
       included: [8],
@@ -395,6 +397,52 @@ test('a failed index publish leaves the stored average alone', async () => {
     assert.equal(written.has('catalogueAverage'), false)
   } finally {
     redis.setCache = realSetCache
+    restore()
+  }
+})
+
+test('a run whose keyword tagging failed reuses the previous index tags', async () => {
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }, { page: 1, id: 10, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ shows })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async key => key === SHOW_INDEX ? [{ id: 9, keywords: [315058] }] : null
+  tmdb.keywordTags = async () => { throw new Error('TMDB 503') }
+
+  try {
+    const { stats } = await cacheScores()
+    const rows = written.get(SHOW_INDEX)
+
+    assert.deepEqual(rows.find(row => row.id === 9).keywords, [315058])
+    assert.deepEqual(rows.find(row => row.id === 10).keywords, [], 'a title new tonight goes untagged')
+    assert.equal(stats.find(stat => stat.mediaType === 'tv').indexFailed, false)
+  } finally {
+    redis.setCache = realSetCache
+    redis.getCache = realGetCache
+    restore()
+  }
+})
+
+test('a run whose keyword tagging failed with no previous tags leaves the TV index in place', async () => {
+  const shows = [{ page: 1, id: 9, releaseDate: '2026-01-01' }]
+  const { restore } = stub({ shows })
+  const written = new Map()
+  const [realSetCache, realGetCache] = [redis.setCache, redis.getCache]
+
+  redis.setCache = async (key, value) => { written.set(key, value); return WRITTEN }
+  redis.getCache = async () => null
+  tmdb.keywordTags = async () => { throw new Error('TMDB 503') }
+
+  try {
+    const { stats } = await cacheScores()
+
+    assert.equal(written.has(SHOW_INDEX), false)
+    assert.equal(stats.find(stat => stat.mediaType === 'tv').indexFailed, true)
+  } finally {
+    redis.setCache = realSetCache
+    redis.getCache = realGetCache
     restore()
   }
 })
