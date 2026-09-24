@@ -153,6 +153,25 @@ test('any other sort still goes to discover', async () => {
   assert.deepEqual(calls.filter(call => call[0].startsWith('index:') || call[0].startsWith('list:')), [['list:movie']])
 })
 
+test('a TV keyword genre serves from the index under any sort, and the same movie genre from discover', async () => {
+  const cases = [
+    ['tv', { wg: '27' }, 'index:tv'],
+    ['tv', { wg: '27', sort: 'popularity.desc' }, 'index:tv'],
+    ['tv', { wg: '35' }, 'list:tv'],
+    ['movie', { wg: '27' }, 'list:movie']
+  ]
+
+  for (const [mediaType, query, expected] of cases) {
+    const calls = recordCalls()
+    const ctx = context()
+
+    ctx.query = query
+    await getList(mediaType)(ctx)
+
+    assert.deepEqual(calls.filter(call => call[0].startsWith('index:') || call[0].startsWith('list:')), [[expected]], JSON.stringify({ mediaType, query }))
+  }
+})
+
 // Derive the mark here from the stored record: a detail page rendering a settled badge for a thin
 // score fails nowhere else
 test('the detail page marks a thin score and leaves a settled one alone', async () => {
