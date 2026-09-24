@@ -536,3 +536,37 @@ test('TV adds its programming formats to the shared genres, without TV Movie or 
     tmdb.genres = real
   }
 })
+
+test('keyword tags walk every page and keep each keyword a title carries', async () => {
+  const pages = { 315058: [[{ id: 1 }, { id: 2 }], [{ id: 3 }]], 9840: [[{ id: 2 }]] }
+  const real = globalThis.fetch
+
+  globalThis.fetch = async url => {
+    const params = new URLSearchParams(String(url).split('?')[1])
+    const results = pages[params.get('with_keywords')] ?? [[]]
+
+    return new Response(JSON.stringify({ results: results[params.get('page') - 1], total_pages: results.length }), { status: 200 })
+  }
+
+  try {
+    const tags = await tmdb.keywordTags(tmdb.dateWindow())
+
+    assert.deepEqual(tags.get(3), [315058], 'the second page is read')
+    assert.deepEqual(tags.get(2), [315058, 9840], 'a title under two keywords keeps both')
+    assert.equal(tags.size, 3)
+  } finally {
+    globalThis.fetch = real
+  }
+})
+
+test('a failed keyword page throws rather than returning partial tags', async () => {
+  const real = globalThis.fetch
+
+  globalThis.fetch = async () => new Response('', { status: 503 })
+
+  try {
+    await assert.rejects(tmdb.keywordTags(tmdb.dateWindow()), /TMDB 503/)
+  } finally {
+    globalThis.fetch = real
+  }
+})
