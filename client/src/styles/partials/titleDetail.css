@@ -68,28 +68,26 @@ article {
   container-type: inline-size;
 }
 
-header{
-  position: relative;
+/* Set the score on the title's last baseline */
+article > header{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: var(--padding-md);
+  align-items: last baseline;
   margin-bottom: var(--padding-lg);
 }
 
 h1 {
-  border-bottom: 2px solid var(--blue-10);
-  padding-bottom: var(--padding-sm);
-  margin: 0 0 var(--padding-sm);
+  margin: 0;
+  padding-bottom: 8px;
 }
 
-/* Clearance for the badge floating over the corner, only while one is there */
-header:has(score-badge) h1 {
-  padding-right: 100px;
-}
-
+/* The row only makes room for the score's line; the ring overflows it */
 score-badge{
-  position: absolute;
-  top: -16px;
-  right: -16px;
-  width: 90px;
-  filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
+  --size: 56px;
+  --score-size: 24px;
+  width: var(--size);
+  margin-block: calc((var(--score-size) - var(--size)) / 2);
 }
 
 /* Switcher: shares the facts row when wide, stacks to its own line when narrow */
@@ -126,6 +124,9 @@ p:has(span:empty) {
 }
 
 .details {
+  grid-column: 1 / -1;
+  border-top: 2px solid var(--gray-30);
+  padding-top: var(--padding-sm);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;

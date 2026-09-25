@@ -1,153 +1,171 @@
-// Green is a shortlisting signal, kept scarce
+// Keep green scarce: it marks a shortlist
 const GREEN_FLOOR = 80
 const YELLOW_FLOOR = 65
 
-const html = `
+const TURN_MS = 1000
+
+// Start at twice the average speed, so the score leaves the start as fast as the bar moved
+const EASE_OUT = 'cubic-bezier(.5, 1, .89, 1)'
+// A point of score is 2.7deg of the gauge
+const GROW_MS_PER_POINT = 2 * TURN_MS * 2.7 / 360
+
+// Short enough to hide in the gap between the track's rounded ends
+const BAR = 16
+
+const band = score => score >= GREEN_FLOOR ? 'var(--green-70)' : score >= YELLOW_FLOOR ? 'var(--yellow-70)' : 'var(--red-70)'
+const label = score => Number.isFinite(score) ? Math.round(score) : '—'
+const describe = (score, lowConfidence) => Number.isFinite(score)
+  ? `Score ${Math.round(score)}${lowConfidence ? ', few ratings so far' : ''}`
+  : 'Score unavailable'
+
+// 270deg, open at the bottom
+const GAUGE = 'd="M 20.302 79.698 A 42 42 0 1 1 79.698 79.698"'
+// A full circle from the middle of the gap, so the bar's loop joins where the gauge hides it
+const CIRCLE = 'd="M 50 92 A 42 42 0 1 1 50 8 A 42 42 0 1 1 50 92"'
+
+const html = (score, lowConfidence) => `
 <style>
   :host{
-    contain: content;
+    display: block;
+    width: 50px;
     container-type: inline-size;
-    min-width: 50px;
-    --color: var(--gray-50);
+    --color: var(--band);
+    --wait: 0s;
   }
 
   :host([hidden]) {
     display: none
   }
 
+  :host([low-confidence]){
+    --color: var(--gray-30);
+  }
+
+  /* Keep the score the only box in flow: it sets the badge's baseline */
   figure{
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    aspect-ratio: 1/1;
+    aspect-ratio: 1;
     margin: 0;
-    animation: scale-in .3s cubic-bezier(0.25, 2, 0.75, 1);
-  }
-
-  :host([score="undefined"]) figure{
-    animation: none;
-  }
-
-  :host([score="undefined"]) figure::after {
-    content: "-";
-    position: absolute;
-    transform: none;
-  }
-
-  :host(.loading) figure::after {
-    content: "";
-    position: absolute;
-    width: 20cqw;
-    aspect-ratio: 1/1;
-    border-radius: 50%;
-    border: 3cqw solid #fff;
-    border-color: #fff transparent #fff transparent;
-    animation: rotate-loading 1.2s linear infinite;
-  }
-
-  .badge {
-    position: absolute;
-    height: 100%;
-    width: 100%;
-    animation: rotate-loading .75s forwards;
-    animation-composition: accumulate;
-    transition: background-color .5s ease-out;
-    background-color: var(--color);
-    background-image: radial-gradient(#ccc, transparent 50%);
-    background-blend-mode: overlay;
-    -webkit-mask: url(../../images/badge.svg) no-repeat 50% / 80%;
-    mask: url(../../images/badge.svg) no-repeat 50% / 80%;
-    }
-
-  /* Withhold the band colour, which is a claim this evidence has not earned. Keep the medallion, or
-     it reads as a failed render. In CSS, not script, which would leave it unstyled until upgrade. */
-  :host([low-confidence]) .badge{
-    background-color: var(--gray-50);
-  }
-
-  :host(.loading) .badge{
-    animation-duration: 1.5s;
-    animation-delay: 0s;
-    animation-iteration-count: infinite;
   }
 
   svg{
-    position: relative;
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 0 2px rgb(0 0 0 / .5));
-    transform: rotate(5deg);
-  }
-
-  /* Say in words what the colour says in grey, for a reader who cannot see it. A card has no room
-     for the detail page's sentence. Element content, not a label attribute. */
-  figcaption{
     position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+    inset: 0;
+    contain: content;
   }
 
-  /* Drop it from the accessibility tree when settled, rather than only hiding it */
-  :host(:not([low-confidence])) figcaption{
+  path{
+    fill: none;
+    stroke-width: 10;
+    stroke-linecap: round;
+  }
+
+  .track{
+    stroke: var(--blue-10);
+  }
+
+  .arc{
+    stroke: var(--color);
+    stroke-dasharray: calc(var(--score) * 1px) 200px;
+  }
+
+  /* Hide the empty arc: its round cap would still draw a dot */
+  :host([score="undefined"]) .arc{
     display: none;
   }
 
-  svg text{
-    font-size: 38cqw;
+  .bar{
+    display: none;
+    stroke: var(--gray-30);
+    stroke-dasharray: ${BAR}px ${100 - BAR}px;
+  }
+
+  .score{
+    position: relative;
+    font-size: var(--score-size, 38cqw);
     font-weight: bold;
-    letter-spacing: -1px;
-    fill: white;
-    text-anchor: middle;
-    dominant-baseline: central;
+    line-height: 1;
+    letter-spacing: -.03em;
+    color: white;
   }
 
-  @keyframes rotate-loading{
-    to{
-      transform: rotate(180deg);
-    }
+  :host([loading]) .bar{
+    display: inline;
+    animation: sweep ${TURN_MS}ms linear infinite;
   }
 
-  @keyframes scale-in{
-    from{
-      transform: scale(.5);
-    }
+  /* Hide, not remove: the score sets the baseline while loading too */
+  :host([loading]) .score{
+    visibility: hidden;
   }
 
+  /* Let the bar finish its turn, then grow the score from the start */
+  :host([arrived]) .bar{
+    display: inline;
+    animation: sweep ${TURN_MS}ms linear infinite, gone 1ms var(--wait) forwards;
+  }
+
+  :host([arrived]) .arc{
+    animation: grow calc(var(--score) * ${GROW_MS_PER_POINT}ms) ${EASE_OUT} var(--wait) backwards, tint .6s ease-out var(--wait) backwards;
+  }
+
+  :host([arrived]) .score{
+    animation: appear .4s ease-out var(--wait) backwards;
+  }
+
+  /* Start each turn with the bar hidden in the middle of the gap */
+  @keyframes sweep{
+    from{ stroke-dashoffset: ${BAR / 2}px }
+    to{ stroke-dashoffset: ${BAR / 2 - 100}px }
+  }
+
+  @keyframes gone{
+    to{ visibility: hidden }
+  }
+
+  @keyframes grow{
+    from{ stroke-dasharray: 0px 200px; visibility: hidden }
+  }
+
+  @keyframes tint{
+    from{ stroke: var(--gray-30) }
+  }
+
+  @keyframes appear{
+    from{ opacity: 0 }
+  }
 </style>
 
-<figure>
-  <div class="badge"></div>
-  <svg xmlns="http://www.w3.org/2000/svg">
-    <text x="50%" y="50%"></text>
+<figure role="img" aria-label="${describe(score, lowConfidence)}">
+  <svg viewBox="0 0 100 100">
+    <mask id="gauge"><path ${GAUGE} stroke="white"/></mask>
+    <path class="track" ${GAUGE}/>
+    <path class="bar" ${CIRCLE} pathLength="100" mask="url(#gauge)"/>
+    <path class="arc" ${GAUGE} pathLength="100"/>
   </svg>
-  <figcaption>Few ratings so far</figcaption>
+  <span class="score">${label(score)}</span>
 </figure>
 `
 
 if (typeof HTMLElement !== 'undefined') {
-  // Define custom element for browser environment, ignore for server
   class ScoreBadge extends HTMLElement {
     #score
-    #outputEl
 
     constructor() {
       super();
 
-      if (!this.shadowRoot) { // DSD did not render
-        this.attachShadow({ mode: 'open' });
-        this.shadowRoot.innerHTML = html
-      }
-
       const parsed = parseFloat(this.getAttribute('score'))
 
-      // Not `|| undefined`: 0 is a real score, and RT publishes 0% critic ratings
+      // Keep 0: RT publishes 0% critic ratings
       this.#score = Number.isFinite(parsed) ? parsed : undefined
-      this.#outputEl = this.shadowRoot.querySelector('svg text')
-      this.render()
+
+      if (!this.shadowRoot) {
+        this.attachShadow({ mode: 'open' }).innerHTML = html(this.#score, this.hasAttribute('low-confidence'))
+        this.render()
+      }
     }
 
     get score() {
@@ -160,35 +178,47 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
-    // Its own property, so the two can be set in either order. No render: the stylesheet keys off
-    // the attribute.
+    get loading() {
+      return this.hasAttribute('loading')
+    }
+
+    set loading(value) {
+      if (this.loading && !value) this.#land()
+      this.toggleAttribute('loading', Boolean(value))
+    }
+
     set lowConfidence(value) {
       this.toggleAttribute('low-confidence', Boolean(value))
+      this.render()
+    }
+
+    // CSS cannot see where the bar is, so tell it how long until the bar's turn ends
+    #land() {
+      const sweep = this.shadowRoot.querySelector('.bar').getAnimations()[0]
+      const turned = (sweep?.currentTime ?? 0) % TURN_MS
+
+      this.style.setProperty('--wait', `${(TURN_MS - turned) % TURN_MS}ms`)
+      this.setAttribute('arrived', '')
     }
 
     render() {
-      this.#outputEl.textContent = Number.isFinite(this.#score) ? Math.round(this.#score) : ''
+      const scored = Number.isFinite(this.#score)
 
-      switch (true) {
-        case this.#score >= GREEN_FLOOR:
-          this.style.setProperty('--color', 'var(--green-50)')
-          break
-        case this.#score >= YELLOW_FLOOR:
-          this.style.setProperty('--color', 'var(--yellow-50)')
-          break
-        case this.#score < YELLOW_FLOOR:
-          this.style.setProperty('--color', 'var(--red-50)')
-          break
-      }
+      this.shadowRoot.querySelector('.score').textContent = label(this.#score)
+      this.shadowRoot.querySelector('figure').setAttribute('aria-label', describe(this.#score, this.hasAttribute('low-confidence')))
+      // An empty value removes the property
+      this.style.setProperty('--score', scored ? Math.round(this.#score) : '')
+      this.style.setProperty('--band', scored ? band(this.#score) : '')
     }
   }
 
   customElements.define('score-badge', ScoreBadge)
 }
 
-// Export Declarative Shadow DOM for server-side render
-export const scoreBadge = (score, lowConfidence) => `
-<score-badge score="${score}"${lowConfidence ? ' low-confidence' : ''}>
-  <template shadowrootmode="open">${html}</template>
+// Load a score the cache lacks, unless the sources already answered that there is none. Grow in a
+// known score as if it had just landed.
+export const scoreBadge = (score, lowConfidence, noScore, grow) => `
+<score-badge score="${score}"${Number.isFinite(score) ? ` style="--score: ${Math.round(score)}; --band: ${band(score)}"` : ''}${lowConfidence ? ' low-confidence' : ''}${Number.isFinite(score) || noScore ? '' : ' loading'}${grow && Number.isFinite(score) ? ' arrived' : ''}>
+  <template shadowrootmode="open">${html(score, lowConfidence)}</template>
 </score-badge>
 `
