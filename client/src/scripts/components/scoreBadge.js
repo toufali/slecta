@@ -4,12 +4,12 @@ const YELLOW_FLOOR = 65
 
 const TURN_MS = 1000
 
-// Start at twice the average speed, so the score leaves the start as fast as the bar moved
+// Grow the score as fast as the bar moved: the ease starts at twice its average speed, and a point
+// of score is 2.7deg of the gauge
 const EASE_OUT = 'cubic-bezier(.5, 1, .89, 1)'
-// A point of score is 2.7deg of the gauge
 const GROW_MS_PER_POINT = 2 * TURN_MS * 2.7 / 360
 
-// Short enough to hide in the gap between the track's rounded ends
+// Short enough to hide in the gap between the track's rounded ends, where each turn starts
 const BAR = 16
 
 const band = score => score >= GREEN_FLOOR ? 'var(--green-70)' : score >= YELLOW_FLOOR ? 'var(--yellow-70)' : 'var(--red-70)'
@@ -29,20 +29,11 @@ const html = (score, lowConfidence, loading) => `
   :host{
     display: block;
     width: 50px;
-    container-type: inline-size;
-    --color: var(--band);
     --wait: 0s;
+    --turns: 0;
   }
 
-  :host([hidden]) {
-    display: none
-  }
-
-  :host([low-confidence]){
-    --color: var(--gray-30);
-  }
-
-  /* Keep the score the only box in flow: it sets the badge's baseline */
+  /* Keep the score the only box in flow, even while loading: it sets the badge's baseline */
   figure{
     position: relative;
     display: flex;
@@ -69,8 +60,12 @@ const html = (score, lowConfidence, loading) => `
   }
 
   .arc{
-    stroke: var(--color);
+    stroke: var(--band);
     stroke-dasharray: calc(var(--score) * 1px) 200px;
+  }
+
+  :host([low-confidence]) .arc{
+    stroke: var(--gray-50);
   }
 
   /* Hide the empty arc: its round cap would still draw a dot */
@@ -86,7 +81,7 @@ const html = (score, lowConfidence, loading) => `
 
   .score{
     position: relative;
-    font-size: var(--score-size, 38cqw);
+    font-size: var(--score-size, 19px);
     font-weight: bold;
     line-height: 1;
     letter-spacing: -.03em;
@@ -98,15 +93,13 @@ const html = (score, lowConfidence, loading) => `
     animation: sweep ${TURN_MS}ms linear infinite;
   }
 
-  /* Hide, not remove: the score sets the baseline while loading too */
   :host([loading]) .score{
     visibility: hidden;
   }
 
-  /* Let the bar finish its turn, then grow the score from the start */
   :host([arrived]) .bar{
     display: inline;
-    animation: sweep ${TURN_MS}ms linear infinite, gone 1ms var(--wait) forwards;
+    animation: sweep ${TURN_MS}ms linear var(--turns) forwards;
   }
 
   :host([arrived]) .arc{
@@ -117,14 +110,16 @@ const html = (score, lowConfidence, loading) => `
     animation: appear .4s ease-out var(--wait) backwards;
   }
 
-  /* Start each turn with the bar hidden in the middle of the gap */
+  /* Wait to be seen, but grow straight away without script to release it */
+  @media (scripting: enabled){
+    :host([hold]) :is(.arc, .score){
+      animation-play-state: paused;
+    }
+  }
+
   @keyframes sweep{
     from{ stroke-dashoffset: ${BAR / 2}px }
     to{ stroke-dashoffset: ${BAR / 2 - 100}px }
-  }
-
-  @keyframes gone{
-    to{ visibility: hidden }
   }
 
   @keyframes grow{
@@ -152,6 +147,14 @@ const html = (score, lowConfidence, loading) => `
 `
 
 if (typeof HTMLElement !== 'undefined') {
+  const onScreen = new IntersectionObserver(entries => {
+    for (const { target, isIntersecting } of entries) {
+      if (!isIntersecting) continue
+      target.removeAttribute('hold')
+      onScreen.unobserve(target)
+    }
+  })
+
   class ScoreBadge extends HTMLElement {
     #score
 
@@ -167,6 +170,18 @@ if (typeof HTMLElement !== 'undefined') {
         this.attachShadow({ mode: 'open' }).innerHTML = html(this.#score, this.hasAttribute('low-confidence'), this.loading)
         this.render()
       }
+    }
+
+    // Grow after the page's own transition, so the two do not play over each other
+    connectedCallback() {
+      if (!this.hasAttribute('hold')) return
+
+      const transition = document.activeViewTransition?.finished ?? Promise.resolve()
+      transition.then(() => this.isConnected && onScreen.observe(this))
+    }
+
+    disconnectedCallback() {
+      onScreen.unobserve(this)
     }
 
     get score() {
@@ -194,12 +209,13 @@ if (typeof HTMLElement !== 'undefined') {
       this.render()
     }
 
-    // CSS cannot see where the bar is, so tell it how long until the bar's turn ends
+    // CSS cannot see where the bar is, so tell it how many turns to finish and how long that takes
     #land() {
-      const sweep = this.shadowRoot.querySelector('.bar').getAnimations()[0]
-      const turned = (sweep?.currentTime ?? 0) % TURN_MS
+      const elapsed = this.shadowRoot.querySelector('.bar').getAnimations()[0]?.currentTime ?? 0
+      const turns = Math.ceil(elapsed / TURN_MS)
 
-      this.style.setProperty('--wait', `${(TURN_MS - turned) % TURN_MS}ms`)
+      this.style.setProperty('--turns', turns)
+      this.style.setProperty('--wait', `${turns * TURN_MS - elapsed}ms`)
       this.setAttribute('arrived', '')
     }
 
@@ -217,14 +233,13 @@ if (typeof HTMLElement !== 'undefined') {
   customElements.define('score-badge', ScoreBadge)
 }
 
-// Load a score the cache lacks, unless the sources already answered that there is none. Grow in a
-// known score as if it had just landed.
-export const scoreBadge = (score, lowConfidence, noScore, grow) => {
+// Load a score the cache lacks unless the sources answered none; grow in a known one once seen
+export const scoreBadge = (score, lowConfidence, noScore) => {
   const scored = Number.isFinite(score)
   const loading = !scored && !noScore
 
   return `
-<score-badge score="${score}"${scored ? ` style="--score: ${Math.round(score)}; --band: ${band(score)}"` : ''}${lowConfidence ? ' low-confidence' : ''}${loading ? ' loading' : ''}${grow && scored ? ' arrived' : ''}>
+<score-badge score="${score}"${scored ? ` style="--score: ${Math.round(score)}; --band: ${band(score)}" arrived hold` : ''}${lowConfidence ? ' low-confidence' : ''}${loading ? ' loading' : ''}>
   <template shadowrootmode="open">${html(score, lowConfidence, loading)}</template>
 </score-badge>
 `
