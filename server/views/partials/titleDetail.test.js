@@ -20,10 +20,10 @@ test('the badge carries the mark only when the score is thin', () => {
   // The opening tag alone: the style block names the attribute in a selector either way
   const tag = rendered => rendered.match(/<score-badge[^>]*>/)[0]
 
-  assert.match(tag(scoreBadge(83, true)), / low-confidence>$/)
+  assert.match(tag(scoreBadge(83, true)), / low-confidence[ >]/)
   assert.doesNotMatch(tag(scoreBadge(83, false)), /low-confidence/)
   // A title scored by RT alone can aggregate to 0, which every falsy check here used to read as absent
-  assert.equal(tag(scoreBadge(0, true)), '<score-badge score="0" style="--score: 0; --band: var(--red-70)" low-confidence>')
+  assert.equal(tag(scoreBadge(0, true)), '<score-badge score="0" style="--score: 0; --band: var(--red-70)" arrived hold low-confidence>')
 })
 
 test('the server sets the band colour, so the badge is right before it upgrades', () => {
@@ -72,7 +72,7 @@ test('the badge qualifies a thin score in words a screen reader can reach', () =
 
   assert.match(rendered, /aria-label="Score 83, few ratings so far"/)
   assert.match(scoreBadge(83, false), /aria-label="Score 83"/)
-  assert.match(rendered, /:host\(\[low-confidence\]\)\{\s*--color: var\(--gray-30\)/,
+  assert.match(rendered, /:host\(\[low-confidence\]\) \.arc\{\s*stroke: var\(--gray-50\)/,
     'the band colour is withheld, which has to hold before the element upgrades too')
 })
 
@@ -146,12 +146,13 @@ test('a badge loads only a score that is neither cached nor answered as none', (
   assert.equal(loads(scoreBadge(0, false, false)), false)
 })
 
-test('a detail badge grows in only a score it already has', () => {
-  const grows = rendered => / arrived>/.test(rendered.match(/<score-badge[^>]*>/)[0])
+test('a badge grows in only a score it already has', () => {
+  const grows = rendered => / arrived hold[ >]/.test(rendered.match(/<score-badge[^>]*>/)[0])
 
-  assert.equal(grows(titleDetail(data())), true)
-  assert.equal(grows(titleDetail(data({ score: undefined }))), false)
-  assert.equal(grows(titleCard({ id: 1, title: 'A Film', genres: [], releaseDate: '2026-01-01', posterThumb: '', detailPath: '/movies/1', score: 83 })), false)
+  assert.equal(grows(scoreBadge(83)), true)
+  assert.equal(grows(scoreBadge(0)), true)
+  assert.equal(grows(scoreBadge(undefined, false, false)), false)
+  assert.equal(grows(scoreBadge(undefined, false, true)), false)
 })
 
 test('a card passes a no-score answer to its badge', () => {

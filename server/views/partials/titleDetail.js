@@ -39,7 +39,7 @@ export const titleDetail = data => `
 <article id='${data.tmdbId}' data-wiki-id='${data.wikiId}' data-imdb-id='${data.imdbId}'>
   <header>
     <h1>${data.title}</h1>
-    ${scoreBadge(data.score, data.lowConfidence, data.noScore, true)}
+    ${scoreBadge(data.score, data.lowConfidence, data.noScore)}
     <ul class='details'>
       <li><time title='Release date' datetime="${data.releaseDate}">${new Date(data.releaseDate).toLocaleDateString('en-US', { year: 'numeric' })}</time></li>
       <li title='Rating'>${data.rating}</li>
