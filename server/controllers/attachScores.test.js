@@ -57,7 +57,7 @@ test('a title with no cached score keeps no score key at all', async () => {
 
   await attachScores(items, 'movies')
 
-  assert.deepEqual(items, [{ id: 1 }, { id: 2 }, { id: 3, noScore: true }, { id: 4 }], 'an unanswered retry record keeps its badge')
+  assert.deepEqual(items, [{ id: 1 }, { id: 2 }, { id: 3, noScore: true }, { id: 4 }], 'an unanswered record loads again')
 })
 
 // Settled rather than all: one unreadable record must not reject the whole list
