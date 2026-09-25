@@ -133,6 +133,11 @@ test('a completed no-score answer says the score is unavailable', () => {
   assert.match(titleDetail(data()), /<li class='no-score' hidden>/)
 })
 
+test('an unscored badge says it is loading until the sources have answered', () => {
+  assert.match(scoreBadge(undefined, false, false), /aria-label="Loading score"/)
+  assert.match(scoreBadge(undefined, false, true), /aria-label="Score unavailable"/)
+})
+
 test('a badge loads only a score that is neither cached nor answered as none', () => {
   const loads = rendered => / loading>/.test(rendered.match(/<score-badge[^>]*>/)[0])
 

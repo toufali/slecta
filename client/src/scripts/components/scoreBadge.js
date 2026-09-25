@@ -14,16 +14,17 @@ const BAR = 16
 
 const band = score => score >= GREEN_FLOOR ? 'var(--green-70)' : score >= YELLOW_FLOOR ? 'var(--yellow-70)' : 'var(--red-70)'
 const label = score => Number.isFinite(score) ? Math.round(score) : '—'
-const describe = (score, lowConfidence) => Number.isFinite(score)
-  ? `Score ${Math.round(score)}${lowConfidence ? ', few ratings so far' : ''}`
-  : 'Score unavailable'
+const describe = (score, lowConfidence, loading) => {
+  if (Number.isFinite(score)) return `Score ${Math.round(score)}${lowConfidence ? ', few ratings so far' : ''}`
+  return loading ? 'Loading score' : 'Score unavailable'
+}
 
 // 270deg, open at the bottom
 const GAUGE = 'd="M 20.302 79.698 A 42 42 0 1 1 79.698 79.698"'
 // A full circle from the middle of the gap, so the bar's loop joins where the gauge hides it
 const CIRCLE = 'd="M 50 92 A 42 42 0 1 1 50 8 A 42 42 0 1 1 50 92"'
 
-const html = (score, lowConfidence) => `
+const html = (score, lowConfidence, loading) => `
 <style>
   :host{
     display: block;
@@ -139,7 +140,7 @@ const html = (score, lowConfidence) => `
   }
 </style>
 
-<figure role="img" aria-label="${describe(score, lowConfidence)}">
+<figure role="img" aria-label="${describe(score, lowConfidence, loading)}">
   <svg viewBox="0 0 100 100">
     <mask id="gauge"><path ${GAUGE} stroke="white"/></mask>
     <path class="track" ${GAUGE}/>
@@ -163,7 +164,7 @@ if (typeof HTMLElement !== 'undefined') {
       this.#score = Number.isFinite(parsed) ? parsed : undefined
 
       if (!this.shadowRoot) {
-        this.attachShadow({ mode: 'open' }).innerHTML = html(this.#score, this.hasAttribute('low-confidence'))
+        this.attachShadow({ mode: 'open' }).innerHTML = html(this.#score, this.hasAttribute('low-confidence'), this.loading)
         this.render()
       }
     }
@@ -185,6 +186,7 @@ if (typeof HTMLElement !== 'undefined') {
     set loading(value) {
       if (this.loading && !value) this.#land()
       this.toggleAttribute('loading', Boolean(value))
+      this.render()
     }
 
     set lowConfidence(value) {
@@ -205,7 +207,7 @@ if (typeof HTMLElement !== 'undefined') {
       const scored = Number.isFinite(this.#score)
 
       this.shadowRoot.querySelector('.score').textContent = label(this.#score)
-      this.shadowRoot.querySelector('figure').setAttribute('aria-label', describe(this.#score, this.hasAttribute('low-confidence')))
+      this.shadowRoot.querySelector('figure').setAttribute('aria-label', describe(this.#score, this.hasAttribute('low-confidence'), this.loading))
       // An empty value removes the property
       this.style.setProperty('--score', scored ? Math.round(this.#score) : '')
       this.style.setProperty('--band', scored ? band(this.#score) : '')
@@ -217,8 +219,13 @@ if (typeof HTMLElement !== 'undefined') {
 
 // Load a score the cache lacks, unless the sources already answered that there is none. Grow in a
 // known score as if it had just landed.
-export const scoreBadge = (score, lowConfidence, noScore, grow) => `
-<score-badge score="${score}"${Number.isFinite(score) ? ` style="--score: ${Math.round(score)}; --band: ${band(score)}"` : ''}${lowConfidence ? ' low-confidence' : ''}${Number.isFinite(score) || noScore ? '' : ' loading'}${grow && Number.isFinite(score) ? ' arrived' : ''}>
-  <template shadowrootmode="open">${html(score, lowConfidence)}</template>
+export const scoreBadge = (score, lowConfidence, noScore, grow) => {
+  const scored = Number.isFinite(score)
+  const loading = !scored && !noScore
+
+  return `
+<score-badge score="${score}"${scored ? ` style="--score: ${Math.round(score)}; --band: ${band(score)}"` : ''}${lowConfidence ? ' low-confidence' : ''}${loading ? ' loading' : ''}${grow && scored ? ' arrived' : ''}>
+  <template shadowrootmode="open">${html(score, lowConfidence, loading)}</template>
 </score-badge>
 `
+}
