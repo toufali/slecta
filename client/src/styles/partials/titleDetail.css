@@ -65,7 +65,6 @@ figure[data-trailer-active] iframe[src] {
 
 article {
   padding: var(--padding-lg);
-  container-type: inline-size;
 }
 
 /* Keep the score on the title's last line, however many lines it takes */
@@ -91,25 +90,23 @@ score-badge{
   translate: 0 -4px;
 }
 
-/* Switcher: shares the facts row when wide, stacks to its own line when narrow */
-.details .low-confidence,
-.details .no-score {
+/* Right-align the note beside the facts when it fits, else wrap it left. The spacer takes the
+   leftover room; its negative margin cancels its gap, so the spacer itself never wraps. */
+.details::before {
+  content: '';
   flex-grow: 1;
-  flex-basis: calc((40rem - 100%) * 999);
+  order: 1;
+  margin-left: -24px;
+}
+
+.details .disclaimer {
+  order: 2;
   font: var(--small-font);
   color: var(--gray-70);
 }
 
-.details .low-confidence::before,
-.details .no-score::before {
+.details .disclaimer::before {
   content: none;
-}
-
-@container (min-width: 40rem) {
-  .details .low-confidence,
-.details .no-score {
-    text-align: right;
-  }
 }
 
 label {

@@ -38,13 +38,13 @@ test('the server sets the band colour, so the badge is right before it upgrades'
 
 // Grey alone is not self-evident, so back it with something visible where there is room
 test('a thin score is explained in words, and a settled one is not', () => {
-  assert.match(titleDetail(data({ lowConfidence: true })), /<li class='low-confidence'>Score may be inaccurate/)
-  assert.match(titleDetail(data({ lowConfidence: false })), /<li class='low-confidence' hidden>/)
+  assert.match(titleDetail(data({ lowConfidence: true })), /<li class='disclaimer low-confidence'>Score may be inaccurate/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /<li class='disclaimer low-confidence' hidden>/)
 })
 
 // Ship the line either way, since a cache miss fills the badge in by script
 test('the line ships hidden rather than absent', () => {
-  assert.match(titleDetail(data({ lowConfidence: false })), /class='low-confidence' hidden/)
+  assert.match(titleDetail(data({ lowConfidence: false })), /class='disclaimer low-confidence' hidden/)
 })
 
 // Naming the source belongs in the component breakdown; the badge answers how much to trust it
@@ -129,8 +129,8 @@ test('a title with no provider in either group falls back, with no group headers
 })
 
 test('a completed no-score answer says the score is unavailable', () => {
-  assert.match(titleDetail(data({ score: undefined, noScore: true })), /<li class='no-score'>Score unavailable\.<\/li>/)
-  assert.match(titleDetail(data()), /<li class='no-score' hidden>/)
+  assert.match(titleDetail(data({ score: undefined, noScore: true })), /<li class='disclaimer no-score'>Score unavailable\.<\/li>/)
+  assert.match(titleDetail(data()), /<li class='disclaimer no-score' hidden>/)
 })
 
 test('an unscored badge says it is loading until the sources have answered', () => {

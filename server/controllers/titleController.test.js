@@ -191,7 +191,7 @@ test('the detail page marks a thin score and leaves a settled one alone', async 
     await showDetail('movie')(ctx)
 
     assert.equal(/<score-badge[^>]* low-confidence[ >]/.test(ctx.body), marked, JSON.stringify(record))
-    assert.equal(/<li class='low-confidence'>/.test(ctx.body), marked, 'the line follows the colour')
+    assert.equal(/<li class='disclaimer low-confidence'>/.test(ctx.body), marked, 'the line follows the colour')
   }
 })
 
