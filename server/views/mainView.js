@@ -22,13 +22,10 @@ export const mainView = data => `
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <link rel='stylesheet' href='/styles/index.css' type='text/css'>
   ${data.partial.styles ? `<link rel='stylesheet' href='${data.partial.styles}' type='text/css'>` : ''}
-  <link rel='icon' href='data:,' sizes='16x16'>
-  <link rel='icon' href='data:,' sizes='32x32'>
-  <link rel='icon' href='data:,' sizes='48x48'>
-  <link rel='icon' href='data:,' sizes='96x96'>
-  <link rel='icon' href='data:,' sizes='144x144'>
-  <link rel='icon' href='data:,' sizes='256x256'>
-  <link rel='apple-touch-icon' href='data:,' sizes='180x180'>
+  <link rel='icon' href='/favicon.ico' sizes='32x32'>
+  <link rel='icon' href='/images/icon.svg' type='image/svg+xml'>
+  <link rel='apple-touch-icon' href='/images/apple-touch-icon.png'>
+  <link rel='manifest' href='/manifest.webmanifest'>
 
   <script src='/scripts/index.js' type='module'></script>
 </head>
