@@ -6,10 +6,10 @@
   "license": "ISC",
   "description": "Slector front-end code, packages, and npm scripts",
   "scripts": {
-    "build": "node esbuild && npm run build:svg && npm run copy:webp",
+    "build": "node esbuild && npm run build:svg && npm run copy:images && npm run copy:root",
     "build:svg": "svgo -f src/images/ -r -o dist/images",
     "copy:root": "mkdir -p dist/ && cp src/*.* dist/",
-    "copy:webp": "mkdir -p dist/images/ && cp -r src/images/*.webp dist/images/"
+    "copy:images": "mkdir -p dist/images/ && cp src/images/*.webp src/images/*.png dist/images/"
   },
   "dependencies": {
     "esbuild": "^0.28.2",
