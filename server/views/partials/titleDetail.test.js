@@ -29,7 +29,7 @@ test('the badge carries the mark only when the score is thin', () => {
 test('the server sets the band colour, so the badge is right before it upgrades', () => {
   const band = score => scoreBadge(score).match(/--band: var\(--(\w+)-70\)/)?.[1]
 
-  assert.equal(band(80), 'green')
+  assert.equal(band(80), 'cyan')
   assert.equal(band(79.6), 'yellow')
   assert.equal(band(65), 'yellow')
   assert.equal(band(64.9), 'red')

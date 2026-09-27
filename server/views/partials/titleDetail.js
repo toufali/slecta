@@ -28,7 +28,7 @@ function providers(data) {
   const included = data.providers?.filter(item => tmdb.providers.has(item.provider_id) && data.included?.includes(item.provider_id)) ?? []
   const rentBuy = data.providers?.filter(item => tmdb.storefronts.has(item.provider_id) && !data.included?.includes(item.provider_id)) ?? []
 
-  if (!included.length && !rentBuy.length) return '<p>Not yet on major streaming services.</p>'
+  if (!included.length && !rentBuy.length) return `<p class='disclaimer'>Not yet on major streaming services.</p>`
 
   return `${included.length ? `<p><label>Included with:</label></p>${providerList(included)}` : ''}
     ${rentBuy.length ? `<p><label>Rent or buy:</label></p>${providerList(rentBuy)}` : ''}`

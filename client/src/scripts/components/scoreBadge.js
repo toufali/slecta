@@ -1,5 +1,4 @@
-// Keep green scarce: it marks a shortlist
-const GREEN_FLOOR = 80
+const CYAN_FLOOR = 80
 const YELLOW_FLOOR = 65
 
 const TURN_MS = 1000
@@ -12,7 +11,7 @@ const GROW_MS_PER_POINT = 2 * TURN_MS * 2.7 / 360
 // Short enough to hide in the gap between the track's rounded ends, where each turn starts
 const BAR = 16
 
-const band = score => score >= GREEN_FLOOR ? 'var(--green-70)' : score >= YELLOW_FLOOR ? 'var(--yellow-70)' : 'var(--red-70)'
+const band = score => score >= CYAN_FLOOR ? 'var(--cyan-70)' : score >= YELLOW_FLOOR ? 'var(--yellow-70)' : 'var(--red-70)'
 const label = score => Number.isFinite(score) ? Math.round(score) : '—'
 const describe = (score, lowConfidence, loading) => {
   if (Number.isFinite(score)) return `Score ${Math.round(score)}${lowConfidence ? ', few ratings so far' : ''}`
