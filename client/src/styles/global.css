@@ -97,6 +97,7 @@ nav.primary a{
   gap: 2px;
   text-decoration: none;
   color: var(--gray-90);
+  position: relative;
   padding: 0 var(--padding-sm) var(--padding-sm) 0;
   border-radius: 2px;
   transition: color .3s;
@@ -119,9 +120,26 @@ nav.primary a:hover{
 
 nav.primary a.current{
   color: var(--gray-90);
-  animation: nav-item-current .4s ease-out forwards;
   pointer-events: none;
   cursor: default;
+}
+
+/* The current tab ends at the header's foot, so its stretch lands on the header's line */
+header.primary::after,
+nav.primary a.current::after{
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 1px;
+  background: var(--cream-37);
+}
+
+nav.primary a.current::after{
+  background: rgb(255 255 255 / .8);
+  box-shadow: 0 -2px 2px .5px var(--cyan-70), 0 2px 2px .5px var(--red-90);
+  animation: nav-item-current .4s ease-out;
 }
 
 body > main{
@@ -155,7 +173,7 @@ footer::before{
   left: calc(50% - 50vw);
   width: 100vw;
   height: 100%;
-  border-top: 1px solid rgb(from var(--cream-70) r g b / .37);
+  border-top: 1px solid var(--cream-37);
   background-image: radial-gradient(ellipse at top, rgba(155, 200, 255, 0.12), transparent 75%), url(../images/funky-lines.webp);
   z-index: -1;
 }
@@ -290,7 +308,7 @@ label.pill span,
 button.pill,
 .button.pill {
   padding: var(--padding-sm) var(--padding-md);
-  box-shadow: inset 0 0 0 0 var(--green-50);
+  box-shadow: inset 0 0 0 0 var(--cyan-50);
   transition: box-shadow .2s ease-out;
 }
 
@@ -301,7 +319,7 @@ label.pill span {
 label.pill input:checked + span,
 button.pill:active,
 .button.pill:active {
-  box-shadow: inset 0 0 24px 24px var(--green-50);
+  box-shadow: inset 0 0 24px 24px var(--cyan-50);
 }
 
 label.range {
@@ -343,7 +361,7 @@ input[type=range]::-webkit-slider-thumb {
   height: var(--range-h);
   width: 12px;
   border-radius: 12px;
-  background: var(--green-50);
+  background: var(--cyan-70);
   cursor: pointer;
   box-shadow: 1px 1px 2px #0008;
 }
@@ -354,7 +372,7 @@ input[type=range]::-moz-range-thumb {
   height: var(--range-h);
   width: 12px;
   border-radius: 12px;
-  background: var(--green-50);
+  background: var(--cyan-70);
   cursor: pointer;
   box-shadow: 1px 1px 2px #0008;
 }
@@ -368,9 +386,7 @@ input[type=range]::-moz-range-thumb {
 
 @keyframes nav-item-current {
   from{
-    box-shadow: 0 4px 0 transparent, inset 0 -12px 12px -10px transparent, 0 8px 6px -2px transparent;
-  }
-  to{
-    box-shadow: 0 4px 0 var(--green-90), inset 0 -12px 12px -10px var(--green-50), 0 8px 6px -2px var(--green-50);
+    opacity: 0;
+    scale: .3 1;
   }
 }

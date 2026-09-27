@@ -99,10 +99,13 @@ score-badge{
   margin-left: -24px;
 }
 
-.details .disclaimer {
-  order: 2;
+.disclaimer {
   font: var(--small-font);
   color: var(--gray-70);
+}
+
+.details .disclaimer {
+  order: 2;
 }
 
 .details .disclaimer::before {

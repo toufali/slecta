@@ -18,7 +18,7 @@
       </g>
     </g>
   </defs>
-  <use href="#a" y="-4" stroke="red" stroke-width="5" filter="url(#b)"/>
-  <use href="#a" y="4" stroke="#0ff" stroke-width="3" filter="url(#b)"/>
+  <use href="#a" x="-4" stroke="#ff1500" stroke-width="5" filter="url(#b)"/>
+  <use href="#a" x="4" stroke="#00e6bf" stroke-width="3" filter="url(#b)"/>
   <use href="#a" fill="white" />
 </svg>
