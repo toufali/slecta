@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <style>@media (prefers-color-scheme: dark){ circle{ display: none } }</style>
-  <circle cx="50" cy="52" r="44.75" fill="#20232b"/>
-  <g fill="none" stroke-width="10.5" stroke-linecap="round">
-    <path stroke="#00e6bf" d="M23.84 78.16A37 37 0 1 1 76.16 78.16"/>
-    <path stroke="#f4b73b" d="M33.38 68.62A23.5 23.5 0 1 1 73.5 52"/>
-    <path stroke="#ee4b3b" d="M42.93 59.07A10 10 0 0 1 53.83 42.76"/>
+  <style>path{ stroke: #d23100 } @media (prefers-color-scheme: dark){ path{ stroke: #00e6bf } }</style>
+  <g fill="none" stroke-width="10" stroke-linecap="round">
+    <path d="M21.36 84.57A40.5 40.5 0 1 1 78.64 84.57"/>
+    <path d="M31.97 73.96A25.5 25.5 0 1 1 75.5 55.93"/>
+    <path d="M42.58 63.35A10.5 10.5 0 0 1 54.02 46.23"/>
   </g>
 </svg>

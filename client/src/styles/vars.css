@@ -2,16 +2,12 @@
   --multiplier: 1;
   --min-width: 360px;
   --max-width: 1400px;
-  --mobile-breakpoint: 768px;
   --border-radius: 6px;
-  --checkbox-w: 20px;
   --range-h: 36px;
   --padding-xs: calc(4px * var(--multiplier));
   --padding-sm: calc(8px * var(--multiplier));
   --padding-md: calc(16px * var(--multiplier));
   --padding-lg: calc(32px * var(--multiplier));
-  --padding-xl: calc(64px * var(--multiplier));
-  --gap: calc(32px * var(--multiplier));
 
   --h1-font: 500 2.25rem/1 'Barlow Semi Condensed','Inter', sans-serif;
   --h2-font: 500 1.5rem/1 'Barlow Semi Condensed','Inter', sans-serif;
@@ -23,9 +19,7 @@
   --blue-30: #3b444f;
   --blue-50: #3e79b4;
   --blue-90: #a9c6e3;
-  --red-50: #935851;
-  --red-70: #d24d41;
-  --yellow-50: #9c7f47;
+  --red-70: #d23100;
   --yellow-70: #cea041;
   /* Translucent, so light text on it stays readable */
   --cyan-50: rgb(from var(--cyan-70) r g b / .5);
