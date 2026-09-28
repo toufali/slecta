@@ -118,8 +118,6 @@ nav.primary a:hover{
   color: var(--blue-90);
 }
 
-/* The current tab ends at the header's foot, so its bar lies on the header's line. The bar is the
-   tab's background so that only the glow blends in */
 nav.primary a.current{
   color: var(--gray-90);
   background: linear-gradient(var(--cyan-70) 0 0) no-repeat 0 calc(100% - 1.5px) / 100% 2px;
