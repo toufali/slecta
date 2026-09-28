@@ -25,12 +25,11 @@
   --blue-90: #a9c6e3;
   --red-50: #935851;
   --red-70: #d24d41;
-  /* Full strength, since blurring dims it; logo.svg repeats this and --cyan-70 */
-  --red-90: #ff1500;
   --yellow-50: #9c7f47;
   --yellow-70: #cea041;
   /* Translucent, so light text on it stays readable */
   --cyan-50: rgb(from var(--cyan-70) r g b / .5);
+  /* logo.svg and icon.svg repeat this */
   --cyan-70: #00e6bf;
   --cream-37: rgb(from var(--cream-70) r g b / .37);
   --cream-70: #cbbfae;
