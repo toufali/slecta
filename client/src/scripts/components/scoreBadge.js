@@ -55,7 +55,7 @@ const html = (score, lowConfidence, loading) => `
   }
 
   .track{
-    stroke: var(--blue-10);
+    stroke: black;
   }
 
   .arc{
@@ -146,13 +146,14 @@ const html = (score, lowConfidence, loading) => `
 `
 
 if (typeof HTMLElement !== 'undefined') {
+  // Grow once wholly on screen, judged by height: a screen narrower than the page cuts off the sides. 1 can round short
   const onScreen = new IntersectionObserver(entries => {
     for (const { target, isIntersecting } of entries) {
       if (!isIntersecting) continue
       target.removeAttribute('hold')
       onScreen.unobserve(target)
     }
-  })
+  }, { threshold: .99, rootMargin: '0px 100%' })
 
   class ScoreBadge extends HTMLElement {
     #score

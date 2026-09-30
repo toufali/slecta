@@ -31,7 +31,8 @@ function providers(data) {
   if (!included.length && !rentBuy.length) return `<p class='disclaimer'>Not yet on major streaming services.</p>`
 
   return `${included.length ? `<p><label>Included with:</label></p>${providerList(included)}` : ''}
-    ${rentBuy.length ? `<p><label>Rent or buy:</label></p>${providerList(rentBuy)}` : ''}`
+    ${rentBuy.length ? `<p><label>Rent or buy:</label></p>${providerList(rentBuy)}` : ''}
+    <p class='disclaimer source'>Streaming data from JustWatch</p>`
 }
 
 export const titleDetail = data => `

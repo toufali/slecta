@@ -5,7 +5,7 @@ import { debounce } from '../utils/time.js'
 import { runSearch } from '../utils/search.js'
 
 const list = document.querySelector('.title-list')
-const listDescription = document.querySelector('.list-description')
+const listDescription = document.querySelector('.page-description')
 const filterPanel = document.querySelector('.filter-panel')
 const filterForm = document.querySelector('form[name="title-filter"]')
 const filterBtn = document.querySelector('.list-actions .filter')

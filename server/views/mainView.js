@@ -36,6 +36,7 @@ export const mainView = data => `
       <nav class='primary' aria-label='Sections'>
         <a href='/movies' class="${data.section === 'movies' ? 'current' : ''}" style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
         <a href='/shows' class="${data.section === 'shows' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
+        <a href='/about' class="${data.section === 'about' ? 'current' : ''}" style="--icon-url:url(/images/about-icon.svg)">About</a>
       </nav>
     </div>
   </header>
@@ -44,9 +45,6 @@ export const mainView = data => `
     ${data.partial(data.content)}
   </main>
   <button class='back pill' hidden>Back to results</button>
-  <footer>
-    <a href='/about'>About Slecta</a>
-  </footer>
 </body>
 </html>
 `

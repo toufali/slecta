@@ -75,9 +75,9 @@ test('the summary carries its clause count, so the font can scale with it', () =
 })
 
 test('each catalogue gets its own name and form action', () => {
-  assert.match(titleList(movie()), /<h1 class='list-description'[^>]*>Movies /)
+  assert.match(titleList(movie()), /<h1 class='page-description'[^>]*>Movies /)
   assert.match(titleList(movie()), /action='\/api\/v1\/movies'/)
-  assert.match(titleList(tv()), /<h1 class='list-description'[^>]*>TV Shows /)
+  assert.match(titleList(tv()), /<h1 class='page-description'[^>]*>TV Shows /)
   assert.match(titleList(tv()), /action='\/api\/v1\/shows'/)
 })
 

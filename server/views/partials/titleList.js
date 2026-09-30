@@ -81,7 +81,7 @@ export const titleList = data => {
 
   return `
 
-<h1 class='list-description' style='--filters:${summary.count}'>${noun} ${summary.text}</h1>
+<h1 class='page-description' style='--filters:${summary.count}'>${noun} ${summary.text}</h1>
 
 <ul class='title-list'>
   ${data[segment].map(title => `<li>${titleCard(title)}</li>`).join('')}
