@@ -5,7 +5,7 @@ export default async function init() {
   await (document.activeViewTransition?.finished ?? Promise.resolve())
 
   new IntersectionObserver(([entry], observer) => {
-    if (!entry.isIntersecting) return
+    if (entry.intersectionRatio < .99) return
     critics.removeAttribute('data-hold')
     observer.disconnect()
   }, { threshold: .99, rootMargin: '0px 100%' }).observe(critics.querySelector('ol'))
