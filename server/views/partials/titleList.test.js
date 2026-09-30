@@ -10,8 +10,8 @@ const movie = over => ({
   allRatings: [{ certification: 'R', meaning: 'restricted' }],
   allSorting: [{ name: 'Most Recent', value: 'primary_release_date.desc' }, { name: 'Popularity', value: 'popularity.desc' }],
   sortBy: 'popularity.desc',
-  lookback: 12,
-  lookbackMax: 12,
+  releasedWithin: 12,
+  releasedWithinMax: 12,
   ...over
 })
 const tv = over => {
@@ -21,26 +21,26 @@ const tv = over => {
 
 // The slider's bounds and position are the service's, not the view's, so a change to the catalogue
 // window reaches the panel without a second place to edit
-test('the panel renders the lookback the request was answered with', () => {
+test('the panel renders the release limit the request was answered with', () => {
   // Not the catalogue's own twelve, or a hardcoded bound reads as wired
-  const rendered = titleList(movie({ lookback: 3, lookbackMax: 6 }))
+  const rendered = titleList(movie({ releasedWithin: 3, releasedWithinMax: 6 }))
 
   assert.match(rendered, /type='range' name='months' min='1' max='6' value='3'/)
 })
 
 // "the last 1 months" is what a bare count reads as, and the readout is the whole point of the control
-test('a one-month lookback reads as a month', () => {
+test('a one-month release limit reads as a month', () => {
   for (const data of [movie, tv]) {
-    assert.match(titleList(data({ lookback: 1 })), /in the last <output>month<\/output>/)
-    assert.match(titleList(data({ lookback: 2 })), /in the last <output>2 months<\/output>/)
+    assert.match(titleList(data({ releasedWithin: 1 })), /in the last <output>month<\/output>/)
+    assert.match(titleList(data({ releasedWithin: 2 })), /in the last <output>2 months<\/output>/)
   }
 })
 
 // The unit lived in the readout alone, so the handle announced a bare number
 test('the handle carries the unit, not only the readout beside it', () => {
   for (const data of [movie, tv]) {
-    assert.match(titleList(data({ lookback: 4 })), /aria-valuetext='4 months'/)
-    assert.match(titleList(data({ lookback: 1 })), /aria-valuetext='month'/)
+    assert.match(titleList(data({ releasedWithin: 4 })), /aria-valuetext='4 months'/)
+    assert.match(titleList(data({ releasedWithin: 1 })), /aria-valuetext='month'/)
   }
 })
 
@@ -52,7 +52,7 @@ test('the language checkbox reflects the request', () => {
   }
 })
 
-test('newest-first hides the lookback control and its summary clause', () => {
+test('newest-first hides the release-limit control and its summary clause', () => {
   for (const sortBy of ['primary_release_date.desc', 'first_air_date.desc']) {
     const rendered = titleList(movie({ sortBy, allSorting: [{ name: 'Most Recent', value: sortBy }] }))
 
@@ -70,7 +70,7 @@ test('each catalogue describes its own date field', () => {
 })
 
 test('the summary carries its clause count, so the font can scale with it', () => {
-  assert.match(titleList(movie()), /--filters:2'/) // sort and lookback
+  assert.match(titleList(movie()), /--filters:2'/) // sort and release limit
   assert.match(titleList(movie({ withGenres: ['1'] })), /--filters:3'/)
 })
 
