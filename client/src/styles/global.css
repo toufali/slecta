@@ -121,15 +121,13 @@ nav.primary a:hover{
   color: var(--blue-90);
 }
 
-nav.primary a.current{
+nav.primary a[aria-current]{
   color: var(--gray-90);
   background: linear-gradient(var(--cyan-70) 0 0) no-repeat 0 calc(100% - 1.5px) / 100% 2px;
-  pointer-events: none;
-  cursor: default;
 }
 
 header.primary::after,
-nav.primary a.current::after{
+nav.primary a[aria-current]::after{
   content: '';
   position: absolute;
   left: 0;
@@ -139,7 +137,7 @@ nav.primary a.current::after{
   background: var(--cream-37);
 }
 
-nav.primary a.current::after{
+nav.primary a[aria-current]::after{
   bottom: 1.5px;
   height: 2px;
   background: none;

@@ -9,11 +9,14 @@ test('the primary navigation is named', () => {
   assert.match(mainView({ partial: titleList, content: {} }), /<nav class='primary' aria-label='[^']+'>/)
 })
 
-test('the nav marks the section the handler names', () => {
-  const current = rendered => [...rendered.matchAll(/<a href='([^']+)' class="current"/g)].map(m => m[1])
+function titleDetail() { return '' }
 
-  assert.deepEqual(current(mainView({ partial: titleList, content: { movies: [] }, section: 'movies' })), ['/movies'])
-  assert.deepEqual(current(mainView({ partial: titleList, content: { shows: [] }, section: 'shows' })), ['/shows'])
+test('the nav marks the section the handler names, as the page on a list and as its section on a title', () => {
+  const current = rendered => [...rendered.matchAll(/<a href='([^']+)' aria-current='([^']+)'/g)].map(m => `${m[1]} ${m[2]}`)
+
+  assert.deepEqual(current(mainView({ partial: titleList, content: { movies: [] }, section: 'movies' })), ['/movies page'])
+  assert.deepEqual(current(mainView({ partial: titleList, content: { shows: [] }, section: 'shows' })), ['/shows page'])
+  assert.deepEqual(current(mainView({ partial: titleDetail, content: {}, section: 'movies' })), ['/movies true'])
   assert.deepEqual(current(mainView({ partial: titleList, content: {} })), [], 'a page naming no section marks nothing')
 })
 
