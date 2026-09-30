@@ -1,3 +1,6 @@
+// A title page sits in its section without being that section's page
+const current = (data, section) => data.section === section ? ` aria-current='${data.partial.name === 'titleDetail' ? 'true' : 'page'}'` : ''
+
 export const mainView = data => `
 <!doctype html>
 <html lang=en>
@@ -34,9 +37,9 @@ export const mainView = data => `
     <div>
       <a href='/'><img class='logo' src='/images/logo.svg' alt='SLECTA'></a>
       <nav class='primary' aria-label='Sections'>
-        <a href='/movies' class="${data.section === 'movies' ? 'current' : ''}" style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
-        <a href='/shows' class="${data.section === 'shows' ? 'current' : ''}" style="--icon-url:url(/images/tv-icon.svg)">Show</a>
-        <a href='/about' class="${data.section === 'about' ? 'current' : ''}" style="--icon-url:url(/images/about-icon.svg)">About</a>
+        <a href='/movies'${current(data, 'movies')} style="--icon-url:url(/images/movie-icon.svg)">Movie</a>
+        <a href='/shows'${current(data, 'shows')} style="--icon-url:url(/images/tv-icon.svg)">Show</a>
+        <a href='/about'${current(data, 'about')} style="--icon-url:url(/images/about-icon.svg)">About</a>
       </nav>
     </div>
   </header>

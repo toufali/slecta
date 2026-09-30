@@ -17,3 +17,8 @@ if (!supportsDeclarativeShadowDOM()) {
     });
   })(document);
 }
+
+// The wordmark starts over: without the saved filters, the home list opens on its defaults
+document.querySelector('header.primary .logo').closest('a').addEventListener('click', () => {
+  document.cookie = 'filters=; path=/; max-age=0'
+})

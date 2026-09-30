@@ -219,13 +219,13 @@ test('each list page renders through the shared view with its own catalogue', as
   await showList('movie')(movies)
   assert.match(movies.body, /data-partial='titleList'/)
   assert.match(movies.body, /<h1 class='page-description'[^>]*>Movies /)
-  assert.match(movies.body, /href='\/movies' class="current"/)
+  assert.match(movies.body, /href='\/movies' aria-current='page'/)
 
   const shows = context()
   await showList('tv')(shows)
   assert.match(shows.body, /data-partial='titleList'/)
   assert.match(shows.body, /<h1 class='page-description'[^>]*>TV Shows /)
-  assert.match(shows.body, /href='\/shows' class="current"/)
+  assert.match(shows.body, /href='\/shows' aria-current='page'/)
 })
 
 test('each detail page renders through the shared view with its own rows', async () => {
@@ -240,12 +240,12 @@ test('each detail page renders through the shared view with its own rows', async
   assert.match(movie.body, /data-partial='titleDetail'/)
   assert.match(movie.body, /<label>Director:/)
 
-  assert.match(movie.body, /href='\/movies' class="current"/, 'a detail page keeps its tab lit')
+  assert.match(movie.body, /href='\/movies' aria-current='true'/, 'a detail page keeps its tab lit')
 
   const tv = context()
   await showDetail('tv')(tv)
   assert.match(tv.body, /data-partial='titleDetail'/)
-  assert.match(tv.body, /href='\/shows' class="current"/)
+  assert.match(tv.body, /href='\/shows' aria-current='true'/)
   assert.match(tv.body, /<label>Creator:/)
   assert.match(tv.body, /<li title='Seasons'>3 seasons<\/li>/)
   assert.doesNotMatch(tv.body, /<label>Director:/)
