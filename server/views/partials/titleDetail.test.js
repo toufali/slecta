@@ -115,6 +115,11 @@ test('providers group by cost, and rent-or-buy is curated to the top storefronts
   assert.doesNotMatch(rendered, /Microsoft|fubo/)
 })
 
+test('JustWatch is credited beside listed services, and not when none are listed', () => {
+  assert.match(titleDetail(data({ included: [8], providers: [{ provider_id: 8, provider_name: 'Netflix', logoUrl: '/n.png' }] })), /Streaming data from JustWatch/)
+  assert.doesNotMatch(titleDetail(data({ providers: [], included: [] })), /JustWatch/)
+})
+
 test('a title with no provider in either group falls back, with no group headers', () => {
   // Available only on an uncurated service reads the same as unavailable, by decision
   const uncurated = titleDetail(data({ providers: [{ provider_id: 34, provider_name: 'MGM Plus', logoUrl: '/m.png' }], included: [34] }))
