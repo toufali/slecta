@@ -210,8 +210,8 @@ test('a title that has left the release window is dropped', async () => {
   assert.deepEqual(titles(data), ['in window'])
 })
 
-// A lookback has to mean the same under either sort, or changing the sort changes what is listed
-test('a lookback narrows the ranked list too', async () => {
+// A release limit has to mean the same under either sort, or changing the sort changes what is listed
+test('a release limit narrows the ranked list too', async () => {
   const daysAgo = days => {
     const date = new Date()
 

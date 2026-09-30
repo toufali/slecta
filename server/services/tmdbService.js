@@ -85,8 +85,8 @@ const CATALOGUE = {
 class TmdbService {
   // TMDB votes a title needs to enter the catalogue, on the job and the list path alike
   minVotes = 25
-  // Widest lookback in months, and the catalogue's own window: unbounded would page the whole of TMDB
-  lookbackMax = 12
+  // Widest release limit in months, and the catalogue's own window: unbounded would page the whole of TMDB
+  releasedWithinMax = 12
   pageMax = 500 // TMDB 400s on a higher page
   language = 'en-US' // TODO: base on user/browser preference
   includeAdult = false
@@ -329,7 +329,7 @@ class TmdbService {
     return {
       pageMax: this.pageMax,
       minVotes: this.minVotes,
-      lookbackMax: this.lookbackMax,
+      releasedWithinMax: this.releasedWithinMax,
       sorts: this.sortingOptions[media.segment],
       genres: this.#picker(media.genreKey),
       // One vocabulary for validation: a picked id may name a subscription or a storefront
@@ -339,7 +339,7 @@ class TmdbService {
   }
 
   /**
-   * The release-date bound both list paths honour, narrowed to the lookback asked for.
+   * The release-date bound both list paths honour, narrowed to the release limit asked for.
    * One clock read, passed in: two reads either side of midnight gave a window a day narrow.
    */
   dateWindow(months, now = new Date()) {
@@ -347,7 +347,7 @@ class TmdbService {
 
     // UTC accessors, since the window is formatted as UTC: the local calendar would make the bound
     // depend on the host's offset, and a month end would land a day earlier east of the line
-    from.setUTCMonth(now.getUTCMonth() - this.lookback(months))
+    from.setUTCMonth(now.getUTCMonth() - this.releasedWithin(months))
 
     // Rolled back when the target month is too short to hold the day: month arithmetic overflows
     // into the month after, which drops the oldest days of the window asked for
@@ -357,7 +357,7 @@ class TmdbService {
   }
 
   /**
-   * A lookback in whole months, absent or unusable meaning the widest. Clamped rather than trusted:
+   * A release limit in whole months, absent or unusable meaning the widest. Clamped rather than trusted:
    * a request may narrow the window, never widen it past the catalogue the nightly run scores.
    */
   // A months bound typed into the URL under this sort would filter the list unseen: the control is hidden
@@ -365,10 +365,10 @@ class TmdbService {
     return sortBy.endsWith('_date.desc') ? undefined : months
   }
 
-  lookback(months) {
+  releasedWithin(months) {
     const asked = Number(months)
 
-    return Number.isInteger(asked) && asked >= 1 && asked <= this.lookbackMax ? asked : this.lookbackMax
+    return Number.isInteger(asked) && asked >= 1 && asked <= this.releasedWithinMax ? asked : this.releasedWithinMax
   }
 
 
@@ -392,8 +392,8 @@ class TmdbService {
       allProviders: this.providers,
       allStorefronts: this.storefronts,
       withProviders: Array.isArray(query?.wp) ? query.wp : query?.wp ? [query.wp] : null,
-      lookback: this.lookback(this.boundedMonths(query?.sort || sorts[0].value, query?.months)),
-      lookbackMax: this.lookbackMax,
+      releasedWithin: this.releasedWithin(this.boundedMonths(query?.sort || sorts[0].value, query?.months)),
+      releasedWithinMax: this.releasedWithinMax,
       inEnglish: query?.english
     }
 
@@ -419,7 +419,7 @@ class TmdbService {
   // `first_air_date` — and the drift was in the mapping, not in anything the two genuinely differ on.
   /**
    * @param {object} [window] one window for a whole walk, for a caller with many pages to bound
-   *   identically. Otherwise the request's own lookback, clamped so it can only narrow.
+   *   identically. Otherwise the request's own release limit, clamped so it can only narrow.
    */
   async #getList(mediaType, query, window) {
     const media = CATALOGUE[mediaType]

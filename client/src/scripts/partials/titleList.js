@@ -9,9 +9,9 @@ const listDescription = document.querySelector('.page-description')
 const filterPanel = document.querySelector('.filter-panel')
 const filterForm = document.querySelector('form[name="title-filter"]')
 const filterBtn = document.querySelector('.list-actions .filter')
-const lookback = document.querySelector('.lookback input')
-const lookbackOutput = document.querySelector('.lookback output')
-const lookbackFs = lookback.closest('fieldset')
+const releasedWithin = document.querySelector('.released-within input')
+const releasedWithinOutput = document.querySelector('.released-within output')
+const releasedWithinFs = releasedWithin.closest('fieldset')
 const sortFs = document.querySelector('input[name=sort]').closest('fieldset')
 const resetBtn = filterForm.querySelector('.reset')
 const more = document.querySelector('.more')
@@ -34,7 +34,7 @@ export default function init() {
   filterBtn.addEventListener('click', handlePanel)
   listDescription.addEventListener('click', handleDescription)
   filterForm.addEventListener('submit', handleSubmit)
-  lookback.addEventListener('input', handleLookback)
+  releasedWithin.addEventListener('input', handleReleasedWithin)
   sortFs.addEventListener('change', handleSort)
   resetBtn.addEventListener('click', handleReset)
   more.addEventListener('click', handleMore)
@@ -137,20 +137,20 @@ function handleReset() {
   const defaultSort = filterForm.querySelector('input[name=sort]')
 
   defaultSort.checked = true
-  lookback.value = lookback.max
-  lookback.dispatchEvent(new Event('input'))
+  releasedWithin.value = releasedWithin.max
+  releasedWithin.dispatchEvent(new Event('input'))
   defaultSort.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 function handleSort(e) {
   const hide = newestFirst(e.target.value)
-  lookbackFs.toggleAttribute('disabled', hide)
-  lookbackFs.toggleAttribute('hidden', hide)
+  releasedWithinFs.toggleAttribute('disabled', hide)
+  releasedWithinFs.toggleAttribute('hidden', hide)
 }
 
-function handleLookback() {
-  lookbackOutput.textContent = monthsText(+lookback.value)
-  lookback.ariaValueText = lookbackOutput.textContent
+function handleReleasedWithin() {
+  releasedWithinOutput.textContent = monthsText(+releasedWithin.value)
+  releasedWithin.ariaValueText = releasedWithinOutput.textContent
 }
 
 function togglePanel(panel = filterPanel, btn = filterBtn) {
@@ -300,9 +300,9 @@ function renderlistDescription(data) {
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
   if (data.inEnglish) language = `<output>in English</output>`
 
-  const lookbackText = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
+  const releasedWithinText = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.releasedWithin)}</output></label>`
 
-  const clauses = [sort, genres, ratings, services, language, lookbackText].filter(item => item)
+  const clauses = [sort, genres, ratings, services, language, releasedWithinText].filter(item => item)
 
   listDescription.style.setProperty('--filters', clauses.length)
   listDescription.innerHTML = conjunctionFmt.format(clauses)

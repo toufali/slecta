@@ -211,7 +211,7 @@ test('a record with no score is not marked', async () => {
 // The wiring is one line per catalogue, and serving the wrong view would change no response shape
 test('each list page renders through the shared view with its own catalogue', async () => {
   recordCalls()
-  const shape = { allGenres: new Map(), allProviders: new Map(), allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 }
+  const shape = { allGenres: new Map(), allProviders: new Map(), allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', releasedWithin: 12, releasedWithinMax: 12 }
   tmdb.getMovies = async () => ({ movies: [], allRatings: [{ certification: 'R', meaning: 'r' }], ...shape })
   tmdb.getTvShows = async () => ({ shows: [], ...shape })
 
@@ -256,7 +256,7 @@ test('the page applies the saved filters when the URL names none, and drops a st
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
   tmdb.genres.movie = new Map([[28, 'Action']])
-  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', releasedWithin: 12, releasedWithinMax: 12 } }
 
   const ctx = context()
   ctx.cookies.get = name => name === 'filters' ? 'wp=8&wp=999&wg=28&english=on' : undefined
@@ -270,7 +270,7 @@ test('any filter in the URL suppresses the whole saved set', async () => {
   recordCalls()
   let asked
   tmdb.providers = new Map([[8, 'Netflix'], [337, 'Disney+']])
-  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', lookback: 12, lookbackMax: 12 } }
+  tmdb.getMovies = async query => { asked = query; return { movies: [], allGenres: new Map(), allProviders: tmdb.providers, allStorefronts: new Map(), allSorting: [{ name: 'X', value: 'x' }], sortBy: 'x', releasedWithin: 12, releasedWithinMax: 12 } }
 
   const ctx = context()
   ctx.query = { wp: '337' }

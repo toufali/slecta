@@ -175,8 +175,8 @@ test('the window is twelve months back from one instant', () => {
   assert.deepEqual(tmdb.dateWindow(undefined, new Date('2026-09-03T00:00:00.000Z')), { from: '2025-09-03', to: '2026-09-03' })
 })
 
-// One reading of the window, whichever sort is asked for, so the lookback cannot mean two things
-test('a lookback narrows the window discover is sent', async () => {
+// One reading of the window, whichever sort is asked for, so the release limit cannot mean two things
+test('a release limit narrows the window discover is sent', async () => {
   const seen = captureUrl()
 
   await tmdb.getMovies({ months: '3', sort: 'popularity.desc' })
@@ -188,25 +188,25 @@ test('a lookback narrows the window discover is sent', async () => {
   assert.equal(monthsBack(seen[2]), 12, 'absent means the whole catalogue')
 })
 
-// The window is mandatory, so a lookback that cannot be honoured falls back to the catalogue's own
+// The window is mandatory, so a release limit that cannot be honoured falls back to the catalogue's own
 // rather than to none: unbounded means paging the whole of TMDB
-test('a lookback outside the range reads as the widest, not as itself', () => {
+test('a release limit outside the range reads as the widest, not as itself', () => {
   // A fraction included: it is a request the panel cannot make, so it reads as unusable rather than
   // as the whole month it truncates to
   for (const months of [undefined, '', '0', '-6', '13', '99', 'abc', '1.9', 2.5, ['3', '5']]) {
-    assert.equal(tmdb.lookback(months), tmdb.lookbackMax, JSON.stringify(months))
+    assert.equal(tmdb.releasedWithin(months), tmdb.releasedWithinMax, JSON.stringify(months))
   }
 
-  assert.equal(tmdb.lookback('1'), 1)
-  assert.equal(tmdb.lookback('12'), 12)
-  assert.equal(tmdb.lookback(5), 5)
+  assert.equal(tmdb.releasedWithin('1'), 1)
+  assert.equal(tmdb.releasedWithin('12'), 12)
+  assert.equal(tmdb.releasedWithin(5), 5)
 })
 
 // The window is formatted as UTC, so the arithmetic has to be UTC too: read through the local
 // calendar it shifted a day east of the line, which is the bug class the slug year check already hit
 test('the window does not depend on the host timezone', () => {
   const real = process.env.TZ
-  // Paired with a lookback where one is what makes the instant interesting: a month end rolls back
+  // Paired with a release limit where one is what makes the instant interesting: a month end rolls back
   const instants = [['2028-02-29T12:00:00Z'], ['2026-09-02T23:59:59.999Z'], ['2026-01-01T00:30:00Z'],
     ['2026-08-31T12:00:00Z', 6], ['2026-03-31T00:30:00Z', 1]]
 
@@ -231,7 +231,7 @@ test('the window does not depend on the host timezone', () => {
 
 // Month arithmetic overflows a target month too short to hold the day, landing inside the month after
 // and dropping the oldest days of the window asked for
-test('a lookback from a month end lands on a month end', () => {
+test('a release limit from a month end lands on a month end', () => {
   assert.deepEqual(tmdb.dateWindow(6, new Date('2026-08-31T12:00:00.000Z')), { from: '2026-02-28', to: '2026-08-31' })
   assert.deepEqual(tmdb.dateWindow(1, new Date('2026-03-31T12:00:00.000Z')), { from: '2026-02-28', to: '2026-03-31' })
   // A leap day has no counterpart twelve months back either
@@ -269,35 +269,35 @@ test('a list page carries the language choice and sends the code', async () => {
 })
 
 // The validator bounds both by these, so losing a wiring rejects every value rather than only the
-// out-of-range ones — an unwired lookback 400s every submit the panel makes
-test('the filter rules carry the catalogue vote floor and lookback', () => {
+// out-of-range ones — an unwired release limit 400s every submit the panel makes
+test('the filter rules carry the catalogue vote floor and release limit', () => {
   for (const mediaType of ['movie', 'tv']) {
     assert.equal(tmdb.filterRules(mediaType).minVotes, tmdb.minVotes, mediaType)
-    assert.equal(tmdb.filterRules(mediaType).lookbackMax, tmdb.lookbackMax, mediaType)
+    assert.equal(tmdb.filterRules(mediaType).releasedWithinMax, tmdb.releasedWithinMax, mediaType)
   }
 })
 
 // The view cannot tell the two list paths apart, so the slider's own state has to come from both
-test('a date sort ignores a lookback carried in the URL', async () => {
+test('a date sort ignores a release limit carried in the URL', async () => {
   const seen = captureUrl()
 
   const explicit = await tmdb.getMovies({ months: '3', sort: 'primary_release_date.desc' })
   const defaulted = await tmdb.getMovies({ months: '3' })
 
-  assert.equal(explicit.lookback, tmdb.lookbackMax)
-  assert.equal(defaulted.lookback, tmdb.lookbackMax, 'the default sort is also newest-first')
+  assert.equal(explicit.releasedWithin, tmdb.releasedWithinMax)
+  assert.equal(defaulted.releasedWithin, tmdb.releasedWithinMax, 'the default sort is also newest-first')
   assert.equal(monthsBack(seen[0]), 12, 'the outgoing request drops the bound too, not just the metadata')
   assert.equal(monthsBack(seen[1]), 12)
 })
 
-test('a list page carries the lookback the panel renders', async () => {
+test('a list page carries the release limit the panel renders', async () => {
   captureUrl()
 
   const narrowed = await tmdb.getMovies({ months: '3', sort: 'popularity.desc' })
 
-  assert.equal(narrowed.lookback, 3)
-  assert.equal(narrowed.lookbackMax, tmdb.lookbackMax)
-  assert.equal((await tmdb.getTvShows()).lookback, tmdb.lookbackMax, 'absent means the widest')
+  assert.equal(narrowed.releasedWithin, 3)
+  assert.equal(narrowed.releasedWithinMax, tmdb.releasedWithinMax)
+  assert.equal((await tmdb.getTvShows()).releasedWithin, tmdb.releasedWithinMax, 'absent means the widest')
 })
 
 // `filterRules` reports no TV ratings, so the panel must not be offered them either
@@ -438,7 +438,7 @@ test('a cached list is reshaped on the way out, not served as it was stored', as
     assert.deepEqual(data.allSorting.map(option => option.value),
       ['primary_release_date.desc', 'popularity.desc', 'score'])
     assert.equal(data.sortBy, 'score')
-    assert.equal(data.lookback, 2, 'the slider reads the request, not the stored page')
+    assert.equal(data.releasedWithin, 2, 'the slider reads the request, not the stored page')
   } finally {
     redis.getCache = realGetCache
   }

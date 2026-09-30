@@ -63,8 +63,8 @@ function listDescription(data, dated) {
   if (data.withRatings) ratings = `<label>rated <output>${disjunctionFmt.format(data.withRatings)}</output></label>`
   if (data.withProviders) services = `<label>on <output>${namesText(data.withProviders, new Map([...data.allProviders, ...data.allStorefronts]))}</output></label>`
 
-  const lookback = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.lookback)}</output></label>`
-  const clauses = [services, language, sort, genres, ratings, lookback].filter(item => item)
+  const releasedWithin = newestFirst(data.sortBy) ? '' : `<label>${dated} in the last <output>${monthsText(data.releasedWithin)}</output></label>`
+  const clauses = [services, language, sort, genres, ratings, releasedWithin].filter(item => item)
 
   return { text: conjunctionFmt.format(clauses), count: clauses.length }
 }
@@ -115,11 +115,11 @@ export const titleList = data => {
       ${ratingFields(data)}
     </fieldset>`}
     <fieldset${newestFirst(data.sortBy) ? ' disabled hidden' : ''}>
-      <h3 id='lookback-label'>${datedHeading} in the last:</h3>
-      <div class='lookback'>
-        <input type='range' name='months' min='1' max='${data.lookbackMax}' value='${data.lookback}' aria-labelledby='lookback-label' aria-valuetext='${monthsText(data.lookback)}'>
+      <h3 id='released-within-label'>${datedHeading} in the last:</h3>
+      <div class='released-within'>
+        <input type='range' name='months' min='1' max='${data.releasedWithinMax}' value='${data.releasedWithin}' aria-labelledby='released-within-label' aria-valuetext='${monthsText(data.releasedWithin)}'>
         <!-- Hidden because the value text now reads the same words: announced twice, once per handle move -->
-        <output aria-hidden='true'>${monthsText(data.lookback)}</output>
+        <output aria-hidden='true'>${monthsText(data.releasedWithin)}</output>
       </div>
     </fieldset>
     <fieldset>
