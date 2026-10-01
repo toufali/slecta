@@ -8,7 +8,7 @@ export const mainView = data => `
   <title>SLECTA</title>
 
   <meta charset='utf-8'>
-  <meta name='viewport' content='width=320, initial-scale=1'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
   <meta name='description' content=''>
   <meta name='twitter:card' content='summary_large_image'>
   <meta name='twitter:title' content=''>
