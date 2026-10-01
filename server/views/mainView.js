@@ -26,8 +26,8 @@ export const mainView = data => `
   <link rel='stylesheet' href='/styles/index.css' type='text/css'>
   ${data.partial.styles ? `<link rel='stylesheet' href='${data.partial.styles}' type='text/css'>` : ''}
   <link rel='icon' href='/favicon.ico' sizes='32x32'>
-  <link rel='icon' href='/images/icon.svg' type='image/svg+xml'>
-  <link rel='apple-touch-icon' href='/images/apple-touch-icon.png'>
+  <link rel='icon' href='/icon.svg' type='image/svg+xml'>
+  <link rel='apple-touch-icon' href='/apple-touch-icon.png'>
   <link rel='manifest' href='/manifest.webmanifest'>
 
   <script src='/scripts/index.js' type='module'></script>
