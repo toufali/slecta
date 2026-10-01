@@ -123,16 +123,23 @@ test('a page view needs no referrer', async () => {
   assert.equal(views[0].page, '/')
 })
 
-test('a declared crawler is not counted', async () => {
-  stubRedis()
-  const views = recordViews()
-  const ctx = context(VIEW, { userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' })
+for (const [label, userAgent] of [
+  ['Googlebot', 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
+  ['Search Console', 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 (compatible; Google-InspectionTool/1.0;)'],
+  ['Lighthouse', 'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse'],
+  ['headless Chrome', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.0.0 Safari/537.36']
+]) {
+  test(`${label} is not counted`, async () => {
+    stubRedis()
+    const views = recordViews()
+    const ctx = context(VIEW, { userAgent })
 
-  await recordEvent(ctx)
+    await recordEvent(ctx)
 
-  assert.equal(ctx.status, 204)
-  assert.equal(views.length, 0)
-})
+    assert.equal(ctx.status, 204)
+    assert.equal(views.length, 0)
+  })
+}
 
 test('a phone whose model name ends in "bot" is counted', async () => {
   stubRedis()

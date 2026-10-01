@@ -8,8 +8,8 @@ const HOSTNAME = /^[a-z0-9.-]{1,253}$/
 const TIME_ZONE = /^[\w+-]{1,32}(\/[\w+-]{1,32}){0,2}$/
 const DEVICES = ['mobile', 'tablet', 'desktop']
 
-// Crawlers that render pages run the script too
-const CRAWLER = /bot\/|spider|headless/i
+// Crawlers and audit tools that render pages run the script too
+const CRAWLER = /bot\/|spider|headless|lighthouse|inspectiontool/i
 
 // Shared by every instance and expired when the UTC month ends, so nobody can be followed across months
 async function monthlySalt(now = new Date()) {
