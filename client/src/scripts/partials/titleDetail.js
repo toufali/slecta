@@ -1,4 +1,5 @@
 import { reviewQuote } from '../components/reviewQuote.js'
+import { sendEvent } from '../utils/events.js'
 
 const figure = document.querySelector('figure')
 const trailer = figure.querySelector('iframe')
@@ -33,6 +34,7 @@ function playTrailer(e) {
   trailer.remove() // remove and re-add iframe to avoid browser history navigation when changing src
   trailer.src = trailer.dataset.src
   figure.append(trailer)
+  sendEvent('trailer')
 }
 
 async function getScore() {
