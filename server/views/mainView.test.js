@@ -5,6 +5,11 @@ import { mainView } from './mainView.js'
 // A named function, since the shell reads `partial.name` for the body attribute
 function titleList() { return '' }
 
+// WebKit holds every tap for a possible double-tap zoom unless the page is laid out at device width
+test('the page lays out at device width', () => {
+  assert.match(mainView({ partial: titleList, content: {} }), /<meta name='viewport' content='width=device-width, initial-scale=1'>/)
+})
+
 test('the primary navigation is named', () => {
   assert.match(mainView({ partial: titleList, content: {} }), /<nav class='primary' aria-label='[^']+'>/)
 })
