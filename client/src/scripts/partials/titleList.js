@@ -2,7 +2,8 @@ import { monthsText } from '../utils/months.js'
 import { newestFirst } from '../utils/sort.js'
 import { namesText } from '../utils/names.js'
 import { debounce } from '../utils/time.js'
-import { runSearch } from '../utils/search.js'
+import { runSearch, recordPick } from '../utils/search.js'
+import { sendEvent } from '../utils/events.js'
 
 const list = document.querySelector('.title-list')
 const listDescription = document.querySelector('.page-description')
@@ -44,6 +45,7 @@ export default function init() {
   // Keep this half synchronous: the URL must land on the overlay's entry before a quick close traverses away
   searchInput.addEventListener('input', handleSearchInput)
   searchInput.addEventListener('input', debounce(() => runSearch(searchInput, resultList)))
+  resultList.addEventListener('click', recordPick)
   window.addEventListener('popstate', handlePopstate)
 
   // A reload restores the pushed entry, but the panels ship closed
@@ -231,6 +233,7 @@ async function handleSubmit(e) {
 
   // The server reads this to render the next visit's first paint already filtered
   document.cookie = `filters=${params}; path=/; samesite=lax; max-age=31536000`
+  sendEvent('filter', { filters: params })
 
   handlePanel()
 

@@ -1,3 +1,5 @@
+import { sendEvent } from './events.js'
+
 export async function runSearch(input, list) {
   const title = input.value
 
@@ -19,11 +21,22 @@ export async function runSearch(input, list) {
     // Drop a response the input has moved past
     if (input.value !== title) return
 
+    // Showing the same query again, as reopening the panel does, is not a new search
+    if (!results.length && list.dataset.query !== title) sendEvent('search', { query: title, results: 0 })
+
+    list.dataset.query = title
     renderResults(list, results)
     list.classList.remove('loading')
   } catch (e) {
     console.error(e)
   }
+}
+
+export function recordPick(e) {
+  const link = e.target.closest('a')
+  const list = e.currentTarget
+
+  if (link) sendEvent('search', { query: list.dataset.query, results: list.children.length, pick: new URL(link.href).pathname })
 }
 
 function renderResults(list, results) {
