@@ -20,9 +20,6 @@ export const mainView = data => `
   <meta property='og:type' content='website'>
   <meta property='og:url' content=''>
   <meta property='og:image' content=''>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500&display=swap" rel="stylesheet">
   <link rel='stylesheet' href='/styles/index.css' type='text/css'>
   ${data.partial.styles ? `<link rel='stylesheet' href='${data.partial.styles}' type='text/css'>` : ''}
   <link rel='icon' href='/favicon.ico' sizes='32x32'>
