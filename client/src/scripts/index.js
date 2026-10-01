@@ -5,6 +5,7 @@ import './scrollObserver.js'
 import './mainView.js'
 import './components/titleCard.js'
 import './components/scoreBadge.js'
+import './pageview.js'
 
 // dynamic import client script associated with partial if it exists
 const { partial } = document.body.dataset

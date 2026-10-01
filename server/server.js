@@ -9,6 +9,8 @@ import scoreService from './services/scoreService.js'
 import log from './utils/logger.js'
 
 const server = new Koa();
+// Read ctx.ip from the X-Forwarded-For header Cloud Run sets
+server.proxy = true
 const { PORT, STATIC_DIR } = env
 
 await redis.init()

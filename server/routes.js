@@ -4,6 +4,7 @@ import { invalidFilters } from './utils/filters.js'
 import { showSearch, getTitles } from './controllers/searchController.js'
 import { showList, showDetail, getList, getDetail, getScore, getQuotes } from './controllers/titleController.js'
 import { showAbout } from './controllers/mainController.js'
+import { recordEvent } from './controllers/eventController.js'
 
 const router = new Router();
 
@@ -45,5 +46,6 @@ router.get('/api/v1/shows', validateFilters('tv'), getList('tv'));
 router.get('/api/v1/shows/:id', getDetail('tv'));
 router.get('/api/v1/shows/:id/score', getScore('tv'));
 router.get('/api/v1/shows/:id/quotes', getQuotes('tv'));
+router.post('/api/v1/events', recordEvent);
 
 export default router.routes()
