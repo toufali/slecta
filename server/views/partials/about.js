@@ -24,6 +24,9 @@ const bands = [
   [undefined, false, 'No score', 'Too new or too niche to be rated yet.']
 ]
 
+// As character references, which browsers decode and most address harvesters do not
+const EMAIL = [...'hello@slecta.com'].map(char => `&#${char.charCodeAt(0)};`).join('')
+
 export const about = () => `
 <article>
   <section id='what'>
@@ -68,7 +71,7 @@ export const about = () => `
 
   <section id='credits'>
     <h2>Credits</h2>
-    <p>Made by A Toufali</p>
+    <p>Made by A Toufali · <a href='mailto:${EMAIL}'>${EMAIL}</a></p>
     <p><img src='/images/tmdb.svg' alt='TMDB'> This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>
     <p>Streaming data from JustWatch.</p>
     <p>Information courtesy of IMDb (https://www.imdb.com). Used with permission.</p>

@@ -10,3 +10,12 @@ test('the About page carries TMDB’s and IMDb’s required credits word for wor
   assert.ok(page.includes('Information courtesy of IMDb (https://www.imdb.com). Used with permission.'))
   assert.match(page, /Streaming data from JustWatch/)
 })
+
+test('the contact address is written as character references, never as plain text', () => {
+  const page = about()
+
+  const encoded = [...'hello@slecta.com'].map(char => `&#${char.charCodeAt(0)};`).join('')
+
+  assert.doesNotMatch(page, /hello@slecta\.com/)
+  assert.ok(page.includes(`<a href='mailto:${encoded}'>${encoded}</a>`))
+})
