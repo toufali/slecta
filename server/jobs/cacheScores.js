@@ -172,7 +172,7 @@ async function carryRows(mediaType, previous, carry) {
 }
 
 async function cacheScoresFor(mediaType, { titles, complete }, catalogueMeans, keywordTags) {
-  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {} }
+  const stats = { mediaType, total: titles.length, processed: 0, failed: 0, notCached: 0, unscored: 0, outcomes: {}, slugs: {} }
   const rows = []
   // Ids whose stored record was read, whatever it held. Anything else is a title we cannot speak for
   const confirmed = new Set()
@@ -229,11 +229,9 @@ async function scoreTitle(mediaType, title, stats, confirmed, catalogueMeans, ke
     if (!sources.length) stats.unscored++
 
     // Why each source produced what it did, which is what all three coverage rates divide by
-    for (const [source, outcome] of Object.entries(score.outcomes ?? {})) {
-      const tally = stats.outcomes[source] ??= {}
+    for (const [source, outcome] of Object.entries(score.outcomes ?? {})) count(stats.outcomes, source, outcome)
 
-      tally[outcome] = (tally[outcome] ?? 0) + 1
-    }
+    for (const [host, origin] of Object.entries(score.slugs ?? {})) count(stats.slugs, host, origin)
 
     stats.processed++
   }
@@ -280,4 +278,10 @@ async function pool(items, limit, worker) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
     for (const item of queue) await worker(item)
   }))
+}
+
+function count(tallies, group, value) {
+  const tally = tallies[group] ??= {}
+
+  tally[value] = (tally[value] ?? 0) + 1
 }
