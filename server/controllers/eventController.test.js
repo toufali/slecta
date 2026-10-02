@@ -42,7 +42,7 @@ async function record(query, { ip = '203.0.113.7', userAgent = IPHONE } = {}) {
 
 const visitor = async (query, options) => (await record(query, options)).at(-1).visitor
 
-test('a page view logs its name, page, referrer, device, OS, browser, time zone, visitor and owner marker, and neither the address nor the browser', async () => {
+test('a page view logs its name, page, referrer, device, OS, browser, time zone, visitor and owner marker, and neither the address nor the user agent', async () => {
   const [view] = await record(VIEW)
 
   assert.deepEqual(Object.keys(view), ['message', 'name', 'page', 'referrer', 'device', 'os', 'browser', 'timeZone', 'visitor', 'owner'])
@@ -114,6 +114,11 @@ for (const [os, browser, userAgent, device = 'mobile'] of [
   ['macOS', 'Chrome', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'desktop'],
   ['Windows', 'Edge', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0', 'desktop'],
   ['Windows', 'Firefox', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0', 'desktop'],
+  ['iOS', 'Instagram', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 400.0.0.0 (iPhone15,2; iOS 18_6)'],
+  ['iOS', 'Opera', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) OPiOS/16.0.15 Mobile/15E148 Safari/9537.53'],
+  ['Windows', 'Opera', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 OPR/124.0.0.0', 'desktop'],
+  ['ChromeOS', 'Chrome', 'Mozilla/5.0 (X11; CrOS x86_64 16328.65.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'desktop'],
+  ['Linux', 'Firefox', 'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0', 'desktop'],
   ['other', 'other', 'curl/8.7.1', 'desktop']
 ]) {
   test(`${browser} on ${os} is recorded as such`, async () => {

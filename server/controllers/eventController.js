@@ -20,7 +20,7 @@ const CRAWLER = /bot\/|spider|headless|lighthouse|inspectiontool/i
 const OS = [['iPadOS', /iPad/], ['iOS', /iPhone|iPod/], ['Android', /Android/], ['ChromeOS', /CrOS/], ['Windows', /Windows/], ['macOS', /Mac OS X/], ['Linux', /Linux/]]
 const BROWSERS = [
   ['Facebook', /FBAN|FBAV/], ['Instagram', /Instagram/], ['Google app', /GSA\//], ['Samsung Internet', /SamsungBrowser/],
-  ['Edge', /Edg/], ['Opera', /OPR\//], ['Firefox', /Firefox|FxiOS/], ['Chrome', /Chrome|CriOS/], ['Safari', /Safari/]
+  ['Edge', /Edg/], ['Opera', /OPR\/|OPiOS|OPT\//], ['Firefox', /Firefox|FxiOS/], ['Chrome', /Chrome|CriOS/], ['Safari', /Safari/]
 ]
 
 const family = (list, userAgent) => list.find(([, pattern]) => pattern.test(userAgent))?.[0] ?? 'other'
