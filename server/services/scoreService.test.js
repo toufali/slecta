@@ -598,6 +598,33 @@ test('each source reports why it produced no score', async () => {
   assert.deepEqual(score.outcomes, { imdb: 'absent', metacritic: 'absent', rtCritic: 'scored', rtAudience: 'unscored' })
 })
 
+test('each host reports where its slug came from', async () => {
+  stubHosts({
+    'www.wikidata.org': wikidata(undefined, 'movie/inception'),
+    'www.rottentomatoes.com': rtScorecard(87, 90),
+    'www.metacritic.com': () => ok('<script type="application/ld+json">{"@type":"Movie","name":"x"}</script>')
+  })
+
+  const score = await scoreService.getScore('test/movie/slugs', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.slugs, { rt: 'guessed', mc: 'wikidata' })
+})
+
+test('a host left without a slug by an unanswered lookup is unread, not missing', async () => {
+  stubHosts({
+    'www.wikidata.org': () => { throw new Error('lookup down') },
+    'www.rottentomatoes.com': rtScorecard(87, 90)
+  })
+
+  const score = await scoreService.getScore('test/movie/slugs-unread', {
+    wikiId: 'Q25188', title: 'Inception', releaseDate: '2010-07-16', mediaType: 'movie'
+  }, false)
+
+  assert.deepEqual(score.slugs, { rt: 'guessed', mc: 'unread' })
+})
+
 // A source we were blocked from reading is the one outcome no count of resolved scores can reveal
 test('a source that could not be read is unreachable, not absent', async () => {
   stubHosts({

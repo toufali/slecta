@@ -340,7 +340,7 @@ class ScoreService {
       if (!answered) log.warn('Score is missing a source it could not read', { key, title })
 
       // Tonight's numbers, never the stored ones, or the nightly check passes while a source is down
-      return await this.#store(key, score, { outcomes, answered, title })
+      return await this.#store(key, score, { outcomes, slugs: { rt: slugOrigin(resolved.rt), mc: slugOrigin(resolved.mc) }, answered, title })
     } catch (e) {
       log.error('Error getting average score', { key, title, error: e })
     }
@@ -351,7 +351,7 @@ class ScoreService {
    * because every never-degrade defect has landed in these lines.
    * @return {object} tonight's score, carrying what storage did with it on non-enumerable fields
    */
-  async #store(key, score, { outcomes, answered, title }) {
+  async #store(key, score, { outcomes, slugs, answered, title }) {
     // Read here, not before the fetches: in that window the record can expire, or a request can
     // store a richer one that an unconditional write would then clobber
     const stored = await this.getScoreFromCache(key)
@@ -382,6 +382,8 @@ class ScoreService {
     Object.defineProperty(result, 'kept', { value: kept })
     // Tonight's attempt per source, for the coverage check. Not stored: it describes the run.
     Object.defineProperty(result, 'outcomes', { value: outcomes })
+    // Where each host's slug came from tonight, for the job's guess-rejection rate
+    Object.defineProperty(result, 'slugs', { value: slugs })
 
     return result
   }
@@ -648,6 +650,9 @@ class ScoreService {
 // guessed, so a record written before this check is verified rather than trusted. Every entry
 // carries a non-empty slug, so the readers do not re-check.
 // Exported for its own tests: the ordering rules are the part worth checking without a network.
+// An unread host is not a host with no page, or an outage would read as slugs going missing
+const slugOrigin = host => host?.source ?? (host?.answered ? 'none' : 'unread')
+
 export function orderCandidates(cachedSlug, cachedSource, wikiSlug, guesses) {
   // Wikidata confirming a cached guess makes it authoritative; leaving it `guessed` would keep it
   // paying a year check it should not, and a re-release date could then reject a correct slug

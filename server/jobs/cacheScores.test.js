@@ -763,6 +763,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
 
     Object.defineProperty(fresh, 'cached', { value: true })
     Object.defineProperty(fresh, 'outcomes', { value: { imdb: 'scored', metacritic: 'unreachable', rtCritic: 'unreachable', rtAudience: 'unreachable' } })
+    Object.defineProperty(fresh, 'slugs', { value: { rt: 'guessed', mc: 'unread' } })
     return fresh
   }
   // The write was refused, so the richer record is what the key still holds
@@ -777,6 +778,7 @@ test('a refused write publishes the stored score, not tonight\u2019s thinner one
     assert.deepEqual(stats.outcomes, {
       imdb: { scored: 1 }, metacritic: { unreachable: 1 }, rtCritic: { unreachable: 1 }, rtAudience: { unreachable: 1 }
     })
+    assert.deepEqual(stats.slugs, { rt: { guessed: 1 }, mc: { unread: 1 } })
     assert.equal(stats.notCached, 0, 'a refusal is not a persistence failure')
   } finally {
     redis.setCache = realSet
