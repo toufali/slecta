@@ -42,10 +42,10 @@ async function record(query, { ip = '203.0.113.7', userAgent = IPHONE } = {}) {
 
 const visitor = async (query, options) => (await record(query, options)).at(-1).visitor
 
-test('a page view logs its name, page, referrer, device, time zone, visitor and owner marker, and neither the address nor the browser', async () => {
+test('a page view logs its name, page, referrer, device, OS, browser, time zone, visitor and owner marker, and neither the address nor the browser', async () => {
   const [view] = await record(VIEW)
 
-  assert.deepEqual(Object.keys(view), ['message', 'name', 'page', 'referrer', 'device', 'timeZone', 'visitor', 'owner'])
+  assert.deepEqual(Object.keys(view), ['message', 'name', 'page', 'referrer', 'device', 'os', 'browser', 'timeZone', 'visitor', 'owner'])
   assert.match(view.visitor, /^[0-9a-f]{16}$/)
   assert.doesNotMatch(JSON.stringify(logged), /203\.0\.113\.7|iPhone/)
 })
@@ -99,6 +99,25 @@ for (const [label, query, expected] of [
 ]) {
   test(label, async () => {
     assert.partialDeepStrictEqual((await record(query))[0], expected)
+  })
+}
+
+for (const [os, browser, userAgent, device = 'mobile'] of [
+  ['iOS', 'Safari', IPHONE],
+  ['iOS', 'Chrome', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.101 Mobile/15E148 Safari/604.1'],
+  ['iOS', 'Google app', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/380.0.0 Mobile/15E148 Safari/604.1'],
+  ['iOS', 'Facebook', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/500.0.0.0]'],
+  ['iPadOS', 'Safari', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', 'tablet'],
+  ['Android', 'Chrome', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36'],
+  ['Android', 'Samsung Internet', 'Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Mobile Safari/537.36'],
+  ['macOS', 'Safari', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', 'desktop'],
+  ['macOS', 'Chrome', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'desktop'],
+  ['Windows', 'Edge', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0', 'desktop'],
+  ['Windows', 'Firefox', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0', 'desktop'],
+  ['other', 'other', 'curl/8.7.1', 'desktop']
+]) {
+  test(`${browser} on ${os} is recorded as such`, async () => {
+    assert.partialDeepStrictEqual((await record({ ...VIEW, device }, { userAgent }))[0], { os, browser })
   })
 }
 

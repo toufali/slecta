@@ -15,6 +15,23 @@ const FILTERS = /^[\w.=&%+-]{1,500}$/
 // Crawlers and audit tools that render pages run the script too
 const CRAWLER = /bot\/|spider|headless|lighthouse|inspectiontool/i
 
+// Families only, never the user agent itself. First match wins: an iPhone also says Mac OS X, Android
+// says Linux, and Chrome-based browsers say Chrome and Safari.
+const OS = [['iPadOS', /iPad/], ['iOS', /iPhone|iPod/], ['Android', /Android/], ['ChromeOS', /CrOS/], ['Windows', /Windows/], ['macOS', /Mac OS X/], ['Linux', /Linux/]]
+const BROWSERS = [
+  ['Facebook', /FBAN|FBAV/], ['Instagram', /Instagram/], ['Google app', /GSA\//], ['Samsung Internet', /SamsungBrowser/],
+  ['Edge', /Edg/], ['Opera', /OPR\//], ['Firefox', /Firefox|FxiOS/], ['Chrome', /Chrome|CriOS/], ['Safari', /Safari/]
+]
+
+const family = (list, userAgent) => list.find(([, pattern]) => pattern.test(userAgent))?.[0] ?? 'other'
+
+// Safari on an iPad presents as a Mac by default; the page's touch check is what tells them apart
+function osOf(userAgent, device) {
+  const os = family(OS, userAgent)
+
+  return os === 'macOS' && device === 'tablet' ? 'iPadOS' : os
+}
+
 // A malformed optional field is dropped, not the event
 const valid = (pattern, value) => pattern.test(value ?? '') ? value : undefined
 
@@ -52,6 +69,8 @@ export async function recordEvent(ctx) {
     page,
     referrer: valid(HOSTNAME, referrer),
     device,
+    os: osOf(userAgent, device),
+    browser: family(BROWSERS, userAgent),
     timeZone: valid(TIME_ZONE, timeZone),
     query: typeof query === 'string' ? query.slice(0, QUERY_MAX) : undefined,
     results: valid(RESULTS, results) && Number(results),
